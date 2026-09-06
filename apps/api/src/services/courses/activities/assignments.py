@@ -82,6 +82,13 @@ from src.services.analytics import events as analytics_events
 from src.services.audit.audit import record_audit_event
 from src.db.user_audit_events import UserAuditEventType
 from src.services.webhooks.dispatch import dispatch_webhooks
+from src.services.courses.activities.seb import (
+    build_seb_config_plist,
+    capture_seb_headers,
+    generate_seb_config_key,
+    is_seb_user_agent,
+)
+from src.services.email.utils import get_base_url_from_request
 
 # Hard caps for regex answer-matching (defense-in-depth alongside the timeout).
 _REGEX_MAX_LEN = 1000
@@ -206,6 +213,39 @@ def _is_assignment_past_due(assignment: Assignment) -> bool:
     if "T" not in raw_str and ":" not in raw_str:
         parsed = parsed + timedelta(days=1)
     return parsed < datetime.now()
+
+
+def _enforce_seb_if_required(
+    assignment: Assignment,
+    request: Request,
+    is_instructor: bool,
+    is_token_submit: bool,
+) -> None:
+    """Raise 403 if this assignment requires Safe Exam Browser and this
+    request doesn't look like it came from one.
+
+    Exemptions mirror the deadline check right next to every call site of
+    this function: an instructor previewing/grading isn't sitting the exam,
+    and a token submitting on behalf of a learner is an authorized external
+    writer (the custom frontend integration owns its own access control),
+    not the learner's own browser session.
+
+    See services.courses.activities.seb module docstring for why this gates
+    on User-Agent rather than the Config Key hash: SEB's Config Key is
+    derived internally from its own loaded settings file, which nothing
+    server-side here reproduces, so it is captured for the submission's
+    audit trail (see the *_headers columns set at the call sites) but never
+    used to allow or deny a request.
+    """
+    if not assignment.require_safe_exam_browser:
+        return
+    if is_instructor or is_token_submit:
+        return
+    if not is_seb_user_agent(request):
+        raise HTTPException(
+            status_code=403,
+            detail="This assignment requires Safe Exam Browser.",
+        )
 
 
 def _strip_answer_key(contents, keep_answer_keys: bool = False):
@@ -1228,6 +1268,110 @@ async def read_assignment_from_activity_uuid(
     return _apply_solution_visibility(result, assignment, unlocked=unlocked)
 
 
+# Static exit page the frontend navigates the SEB browser to right after a
+# final submission succeeds (see the quit-flow design in seb.py). One route
+# shared across every assignment — quitURL doesn't need to be per-assignment,
+# SEB just needs a stable URL to watch for.
+SEB_EXIT_PATH = "/seb-exit"
+
+
+def _build_seb_exam_url(base_url: str, org_slug: str, course_uuid: str, activity_uuid: str) -> str:
+    return f"{base_url}/orgs/{org_slug}/course/{course_uuid}/activity/{activity_uuid}"
+
+
+async def get_assignment_seb_config(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> tuple[bytes, str]:
+    """Instructor-only: build a downloadable .seb config file for this
+    assignment, generating its Config Key on first call.
+
+    The key is generated lazily here (not eagerly when
+    require_safe_exam_browser is toggled on) so flipping that flag stays a
+    plain field update with no side effects — the key only needs to exist
+    once someone actually downloads a file that could embed it.
+    """
+    statement = (
+        select(Assignment, Course.course_uuid, Organization.slug, Activity.activity_uuid)
+        .join(Course, Course.id == Assignment.course_id)  # type: ignore
+        .join(Organization, Organization.id == Course.org_id)  # type: ignore
+        .join(Activity, Activity.id == Assignment.activity_id)  # type: ignore
+        .where(Assignment.assignment_uuid == assignment_uuid)
+    )
+    row = (await db_session.execute(statement)).first()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Assignment not found",
+        )
+
+    assignment, course_uuid, org_slug, activity_uuid = row
+
+    await authorize_assignment_access(request, db_session, current_user, course_uuid, AccessAction.UPDATE)
+
+    if not assignment.seb_config_key:
+        assignment.seb_config_key = generate_seb_config_key()
+        db_session.add(assignment)
+        await db_session.commit()
+        await db_session.refresh(assignment)
+
+    base_url = get_base_url_from_request(request)
+    exam_url = _build_seb_exam_url(base_url, org_slug, course_uuid, activity_uuid)
+    quit_url = f"{base_url}{SEB_EXIT_PATH}"
+
+    plist_bytes = build_seb_config_plist(
+        exam_url=exam_url,
+        quit_url=quit_url,
+        quit_password=assignment.seb_quit_password,
+    )
+    filename = f"{assignment.assignment_uuid}.seb"
+    return plist_bytes, filename
+
+
+async def check_assignment_seb_status(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> bool:
+    """True if this assignment doesn't require SEB, or this request's
+    User-Agent looks like it came from SEB. False otherwise.
+
+    This is what the student-facing gate polls to decide whether to render
+    the assignment or a blocking "open this in Safe Exam Browser" screen
+    (see Phase 5 of the SEB integration plan) — the browser itself can't
+    read its own outgoing request headers, only the server can.
+
+    Read access only: a student is checking their own gate status, not
+    changing anything, so this uses the same permission level as viewing
+    the assignment.
+    """
+    statement = (
+        select(Assignment, Course.course_uuid)
+        .join(Course, Course.id == Assignment.course_id)  # type: ignore
+        .where(Assignment.assignment_uuid == assignment_uuid)
+    )
+    row = (await db_session.execute(statement)).first()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Assignment not found",
+        )
+
+    assignment, course_uuid = row
+
+    await authorize_assignment_access(request, db_session, current_user, course_uuid, AccessAction.READ)
+
+    if not assignment.require_safe_exam_browser:
+        return True
+
+    return is_seb_user_agent(request)
+
+
 async def update_assignment(
     request: Request,
     assignment_uuid: str,
@@ -1823,6 +1967,7 @@ async def put_assignment_task_submission_file(
             status_code=403,
             detail="Assignment deadline has passed",
         )
+    _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit=False)
 
     # Upload submission file
     if sub_file and sub_file.filename and activity and org:
@@ -2193,6 +2338,7 @@ async def handle_assignment_task_submission(
                     status_code=403,
                     detail="Assignment deadline has passed",
                 )
+            _enforce_seb_if_required(assignment, request, is_instructor=False, is_token_submit=False)
 
             # SECURITY: answers are frozen once the attempt has been handed in.
             # Without this, a learner could keep PUTting task answers after
@@ -2844,6 +2990,18 @@ async def create_assignment_submission(
         raise HTTPException(
             status_code=403,
             detail="Assignment deadline has passed",
+        )
+    _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit)
+    if assignment.require_safe_exam_browser:
+        # Audit trail only — see services.courses.activities.seb module
+        # docstring for why the Config Key hash isn't verified server-side.
+        # Logged (not persisted) to keep this pass minimal; promote to a
+        # column on AssignmentUserSubmission if you need it queryable later.
+        logger.info(
+            "SEB submission for assignment %s by user %s: %s",
+            assignment.assignment_uuid,
+            submitter.id,
+            capture_seb_headers(request),
         )
 
     # Check if the submission has already been made. A row in PENDING /
@@ -3606,13 +3764,15 @@ async def retry_assignment_submission(
     # every write path 403s — so allowing it here destroyed graded work with no
     # way back. Every other learner write is deadline-gated (file upload, task
     # submission, submit-for-grading); this one was the sole gap.
-    if _is_assignment_past_due(assignment) and not await _is_assignment_instructor(
+    is_instructor = await _is_assignment_instructor(
         request, current_user, course.course_uuid, db_session
-    ):
+    )
+    if _is_assignment_past_due(assignment) and not is_instructor:
         raise HTTPException(
             status_code=403,
             detail="Assignment deadline has passed",
         )
+    _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit=False)
 
     # Enforce the attempt cap. max_retries=0 means unlimited; otherwise the
     # current attempt_number must be strictly less than max_retries so the

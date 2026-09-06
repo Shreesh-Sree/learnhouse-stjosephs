@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, Query, Request, Response, UploadFile, HTTPException
 from pydantic import BaseModel
 from src.db.courses.assignments import (
     AssignmentCreate,
@@ -15,6 +15,7 @@ from src.db.users import PublicUser
 from src.core.events.database import get_db_session
 from src.security.auth import get_current_user
 from src.services.courses.activities.assignments import (
+    check_assignment_seb_status,
     create_assignment,
     create_assignment_submission,
     create_assignment_task,
@@ -24,6 +25,7 @@ from src.services.courses.activities.assignments import (
     delete_assignment_task,
     delete_assignment_solution_file,
     delete_assignment_task_submission,
+    get_assignment_seb_config,
     get_assignments_from_course,
     get_grade_assignment_submission,
     grade_assignment_submission,
@@ -133,6 +135,64 @@ async def api_read_assignment_from_activity(
     """
     return await read_assignment_from_activity_uuid(
         request, activity_uuid, current_user, db_session
+    )
+
+
+@router.get(
+    "/{assignment_uuid}/seb_status",
+    summary="Check Safe Exam Browser status",
+    description=(
+        "Whether this request looks like it came from Safe Exam Browser. "
+        "Always true when the assignment doesn't require it. Used by the "
+        "student-facing gate, which can't read its own outgoing headers."
+    ),
+    responses={
+        200: {"description": "SEB status for this request."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_check_assignment_seb_status(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> dict:
+    seb_ok = await check_assignment_seb_status(
+        request, assignment_uuid, current_user, db_session
+    )
+    return {"seb_ok": seb_ok}
+
+
+@router.get(
+    "/{assignment_uuid}/seb_config",
+    summary="Download Safe Exam Browser config",
+    description=(
+        "Instructor-only. Generates (or reuses) this assignment's Config Key "
+        "and returns a downloadable .seb config file to distribute to exam "
+        "machines."
+    ),
+    responses={
+        200: {"description": ".seb config file.", "content": {"application/octet-stream": {}}},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_get_assignment_seb_config(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> Response:
+    plist_bytes, filename = await get_assignment_seb_config(
+        request, assignment_uuid, current_user, db_session
+    )
+    return Response(
+        content=plist_bytes,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
