@@ -51,6 +51,7 @@ const Canva = lazy(() => import('@components/Objects/Activities/DynamicCanva/Dyn
 const VideoActivity = lazy(() => import('@components/Objects/Activities/Video/Video'))
 const DocumentPdfActivity = lazy(() => import('@components/Objects/Activities/DocumentPdf/DocumentPdf'))
 const AssignmentStudentActivity = lazy(() => import('@components/Objects/Activities/Assignment/AssignmentStudentActivity'))
+import AssignmentSebGate from '@components/Objects/Activities/Assignment/AssignmentSebGate'
 // Deadline rule shared with the learner activity view (and mirroring the
 // server's _is_assignment_past_due) so the submit/retry affordances agree with
 // what the API will actually accept. Static import: it's a pure function, and
@@ -348,19 +349,31 @@ function ActivityClient(props: ActivityClientProps) {
       case 'TYPE_ASSIGNMENT':
         return assignment ? (
           <Suspense fallback={<LoadingFallback />}>
-            {/* AssignmentSubmissionProvider wraps AssignmentProvider (instead
-                of being nested inside it) so that BOTH providers mount in the
-                same render cycle and kick off their SWR calls in parallel.
-                Otherwise AssignmentSubmissionProvider would wait for
-                AssignmentProvider's gated load before firing its own
-                requests, adding an extra round-trip phase. */}
-            <AssignmentSubmissionProvider assignment_uuid={assignment?.assignment_uuid}>
-              <AssignmentProvider assignment_uuid={assignment?.assignment_uuid}>
-                <AssignmentsTaskProvider>
-                  <AssignmentStudentActivity />
-                </AssignmentsTaskProvider>
-              </AssignmentProvider>
-            </AssignmentSubmissionProvider>
+            {/* Gate first: an assignment requiring Safe Exam Browser shows a
+                blocking screen instead of the providers below when this
+                session doesn't look like SEB. Server-side enforcement is what
+                actually matters (see the gate component's own docstring) —
+                this only saves a student the confusion of loading task
+                editors they won't be able to submit. */}
+            <AssignmentSebGate
+              requireSafeExamBrowser={!!assignment.require_safe_exam_browser}
+              assignmentUuid={assignment?.assignment_uuid}
+              accessToken={access_token}
+            >
+              {/* AssignmentSubmissionProvider wraps AssignmentProvider (instead
+                  of being nested inside it) so that BOTH providers mount in the
+                  same render cycle and kick off their SWR calls in parallel.
+                  Otherwise AssignmentSubmissionProvider would wait for
+                  AssignmentProvider's gated load before firing its own
+                  requests, adding an extra round-trip phase. */}
+              <AssignmentSubmissionProvider assignment_uuid={assignment?.assignment_uuid}>
+                <AssignmentProvider assignment_uuid={assignment?.assignment_uuid}>
+                  <AssignmentsTaskProvider>
+                    <AssignmentStudentActivity />
+                  </AssignmentsTaskProvider>
+                </AssignmentProvider>
+              </AssignmentSubmissionProvider>
+            </AssignmentSebGate>
           </Suspense>
         ) : null;
       case 'TYPE_SCORM':
@@ -372,7 +385,7 @@ function ActivityClient(props: ActivityClientProps) {
       default:
         return null;
     }
-  }, [activity, course, assignment, orgslug]);
+  }, [activity, course, assignment, orgslug, access_token]);
 
   // Past the last activity lies the course-end screen holding the certificate.
   const isLastActivity = currentIndex >= 0 && !nextActivity;
@@ -1516,6 +1529,16 @@ function AssignmentTools(props: {
           session.data?.tokens?.access_token
         )
         if (res.success) {
+          // SEB flow: this assignment's .seb file has allowQuit=false (no
+          // manual quit) and quitURL pointed at /seb-exit. A full navigation
+          // (not router.push) is required — SEB's quitURL detection watches
+          // real page loads, and a client-side route change may not trigger
+          // it. Skip the rest of the success handling entirely; the page is
+          // about to leave anyway.
+          if (props.assignment?.require_safe_exam_browser) {
+            window.location.assign('/seb-exit')
+            return
+          }
           toast.success(t('assignments.assignment_submitted_success'))
           queryClient.invalidateQueries({ queryKey: queryKeys.assignments.submission(props.assignment?.assignment_uuid) })
           queryClient.invalidateQueries({ queryKey: queryKeys.assignments.taskSubmission(props.assignment?.assignment_uuid) })

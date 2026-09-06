@@ -1423,6 +1423,11 @@
     "unmark_activity_title": "Unmark activity as complete",
     "marking": "Marking...",
     "not_published_yet": "This activity is not published yet",
+    "seb_gate": {
+      "title": "This assignment requires Safe Exam Browser",
+      "description": "You can't open this assignment from a regular browser. Ask your instructor for the exam config file (.seb), install Safe Exam Browser if you haven't already, and open the assignment from inside it.",
+      "check_again": "Check again"
+    },
     "focus_mode": "Focus Mode",
     "exit_focus_mode": "Exit focus mode",
     "not_started": "Not Started",
