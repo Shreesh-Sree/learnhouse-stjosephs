@@ -71,3 +71,36 @@ export async function uploadScormPackage(
 export function getScormContentUrl(activityUuid: string, entryPoint: string) {
   return `${getAPIUrl()}scorm/${activityUuid}/content/${entryPoint}`
 }
+
+// Instructor-only.
+export async function deleteScormPackage(activityUuid: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}scorm/${activityUuid}/package`,
+    RequestBodyWithAuthHeader('DELETE', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export interface ScormResultRow {
+  user_id: number
+  user_uuid: string
+  username: string
+  first_name: string
+  last_name: string
+  lesson_status: ScormLessonStatus
+  score_raw: number | null
+  score_max: number | null
+  total_time_seconds: number
+  update_date: string | null
+}
+
+// Instructor-only.
+export async function getScormResults(activityUuid: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}scorm/${activityUuid}/results`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}

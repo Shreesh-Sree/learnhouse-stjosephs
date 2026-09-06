@@ -99,6 +99,21 @@ class ScormTrackingDataRead(ScormTrackingDataBase):
     update_date: Optional[str] = None
 
 
+class ScormResultRow(SQLModel):
+    """One learner's row in the instructor-facing results table."""
+
+    user_id: int
+    user_uuid: str
+    username: str
+    first_name: str
+    last_name: str
+    lesson_status: ScormLessonStatus
+    score_raw: Optional[float] = None
+    score_max: Optional[float] = None
+    total_time_seconds: int = 0
+    update_date: Optional[str] = None
+
+
 class ScormTrackingDataUpdate(SQLModel):
     """Fields the SCORM API shim's LMSSetValue/LMSCommit can write.
 

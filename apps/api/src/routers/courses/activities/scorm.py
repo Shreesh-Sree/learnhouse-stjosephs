@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, Request, Response, UploadFile
 from src.core.events.database import get_db_session
-from src.db.courses.scorm import ScormTrackingDataRead, ScormTrackingDataUpdate
+from src.db.courses.scorm import ScormResultRow, ScormTrackingDataRead, ScormTrackingDataUpdate
 from src.db.users import PublicUser
 from src.security.auth import get_current_user
 from src.services.courses.activities.scorm import (
+    delete_scorm_package,
     get_scorm_tracking,
+    list_scorm_results,
     serve_scorm_file,
     upload_scorm_package,
     upsert_scorm_tracking,
@@ -40,6 +42,48 @@ async def api_upload_scorm_package(
 ):
     activity = await upload_scorm_package(request, activity_uuid, scorm_file, current_user, db_session)
     return {"success": True, "content": activity.content}
+
+
+@router.delete(
+    "/{activity_uuid}/package",
+    summary="Remove an uploaded SCORM package",
+    description="Instructor-only. Deletes the extracted package's storage and clears the activity's SCORM content fields. Existing learner tracking rows are kept.",
+    responses={
+        200: {"description": "Package removed."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this activity"},
+        404: {"description": "Activity not found"},
+    },
+)
+async def api_delete_scorm_package(
+    request: Request,
+    activity_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    activity = await delete_scorm_package(request, activity_uuid, current_user, db_session)
+    return {"success": True, "content": activity.content}
+
+
+@router.get(
+    "/{activity_uuid}/results",
+    response_model=list[ScormResultRow],
+    summary="List every learner's SCORM tracking state",
+    description="Instructor-only. One row per learner who has started this activity — status, score, time spent.",
+    responses={
+        200: {"description": "Results rows.", "model": list[ScormResultRow]},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this activity's results"},
+        404: {"description": "Activity not found"},
+    },
+)
+async def api_list_scorm_results(
+    request: Request,
+    activity_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> list[ScormResultRow]:
+    return await list_scorm_results(request, activity_uuid, current_user, db_session)
 
 
 @router.get(

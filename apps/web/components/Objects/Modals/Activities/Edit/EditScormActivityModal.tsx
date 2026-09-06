@@ -1,20 +1,14 @@
 'use client'
 import React, { useState } from 'react'
-import dynamic from 'next/dynamic'
 import LearnHouseSpinner from '@components/Objects/Loaders/LearnHouseSpinner'
-import { Package, Upload } from 'lucide-react'
+import ConfirmationModal from '@components/Objects/StyledElements/ConfirmationModal/ConfirmationModal'
+import { ExternalLink, Package, Trash2, Upload } from 'lucide-react'
 import { updateActivity } from '@services/courses/activities'
-import { uploadScormPackage } from '@services/courses/scorm'
+import { deleteScormPackage, getScormContentUrl, uploadScormPackage } from '@services/courses/scorm'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import toast from 'react-hot-toast'
 import { mutate } from 'swr'
-
-// EE component — dynamically imported so OSS builds (no ee/) degrade gracefully,
-// mirroring how the activity page lazy-loads ScormActivity.
-const ScormResults = dynamic(
-  () => import('../../../../../ee/components/Activities/ScormResults'),
-  { ssr: false },
-)
+import ScormResultsTable from '@components/Objects/Activities/Scorm/ScormResultsTable'
 
 interface EditScormActivityModalProps {
   activity: any
@@ -30,8 +24,16 @@ function EditScormActivityModal({ activity, onClose }: EditScormActivityModalPro
   const [name, setName] = useState(activity.name || '')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingPackage, setIsUploadingPackage] = useState(false)
+  const [isRemovingPackage, setIsRemovingPackage] = useState(false)
+  const [scormContent, setScormContent] = useState(activity?.content || {})
   const fileInputRef = React.useRef<HTMLInputElement | null>(null)
-  const currentEntryPoint = activity?.content?.scorm_entry_point as string | undefined
+
+  const currentEntryPoint = scormContent?.scorm_entry_point as string | undefined
+  const currentTitle = scormContent?.scorm_title as string | undefined
+
+  const invalidateCourseCaches = () => {
+    mutate((key: string) => typeof key === 'string' && key.includes('/courses/org_slug/'))
+  }
 
   const handlePackageFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -46,12 +48,32 @@ function EditScormActivityModal({ activity, onClose }: EditScormActivityModalPro
         toast.error(res?.data?.detail || 'Failed to upload SCORM package', { id: toastId })
       } else {
         toast.success('SCORM package uploaded', { id: toastId })
-        mutate((key: string) => typeof key === 'string' && key.includes('/courses/org_slug/'))
+        setScormContent(res?.data?.content || {})
+        invalidateCourseCaches()
       }
     } catch {
       toast.error('Failed to upload SCORM package', { id: toastId })
     } finally {
       setIsUploadingPackage(false)
+    }
+  }
+
+  const handleRemovePackage = async () => {
+    setIsRemovingPackage(true)
+    const toastId = toast.loading('Removing SCORM package...')
+    try {
+      const res = await deleteScormPackage(activity.activity_uuid, access_token)
+      if (res?.success === false) {
+        toast.error('Failed to remove SCORM package', { id: toastId })
+      } else {
+        toast.success('SCORM package removed', { id: toastId })
+        setScormContent(res?.data?.content || {})
+        invalidateCourseCaches()
+      }
+    } catch {
+      toast.error('Failed to remove SCORM package', { id: toastId })
+    } finally {
+      setIsRemovingPackage(false)
     }
   }
 
@@ -71,7 +93,7 @@ function EditScormActivityModal({ activity, onClose }: EditScormActivityModalPro
         toast.error('Failed to update SCORM activity', { id: toastId })
       } else {
         toast.success('SCORM activity updated', { id: toastId })
-        mutate((key: string) => typeof key === 'string' && key.includes('/courses/org_slug/'))
+        invalidateCourseCaches()
         onClose()
       }
     } catch {
@@ -101,22 +123,57 @@ function EditScormActivityModal({ activity, onClose }: EditScormActivityModalPro
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-gray-700">SCORM package</label>
             {currentEntryPoint && (
-              <span className="text-[11px] text-gray-400 truncate max-w-[200px]">{currentEntryPoint}</span>
+              <span className="text-[11px] text-gray-400 truncate max-w-[180px]" title={currentEntryPoint}>
+                {currentTitle || currentEntryPoint}
+              </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploadingPackage}
-            className="w-full inline-flex items-center justify-center gap-2 h-9 px-3 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-          >
-            {isUploadingPackage ? (
-              <LearnHouseSpinner size={16} />
-            ) : (
-              <Upload size={15} />
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploadingPackage || isRemovingPackage}
+              className="flex-1 inline-flex items-center justify-center gap-2 h-9 px-3 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              {isUploadingPackage ? <LearnHouseSpinner size={16} /> : <Upload size={15} />}
+              {currentEntryPoint ? 'Replace package' : 'Upload package (.zip)'}
+            </button>
+
+            {currentEntryPoint && (
+              <>
+                <a
+                  href={getScormContentUrl(activity.activity_uuid, currentEntryPoint)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Preview in a new tab"
+                  className="inline-flex items-center justify-center h-9 w-9 flex-none text-gray-500 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <ExternalLink size={15} />
+                </a>
+
+                <ConfirmationModal
+                  dialogTitle="Remove SCORM package?"
+                  confirmationMessage="This deletes the uploaded package's files. Learner results already recorded for this activity are kept. You'll need to upload a package again before learners can open this activity."
+                  confirmationButtonText="Remove package"
+                  pendingButtonText="Removing..."
+                  status="warning"
+                  functionToExecute={handleRemovePackage}
+                  dialogTrigger={
+                    <button
+                      type="button"
+                      disabled={isUploadingPackage || isRemovingPackage}
+                      title="Remove package"
+                      className="inline-flex items-center justify-center h-9 w-9 flex-none text-rose-600 bg-rose-50 border border-rose-100 rounded-lg hover:bg-rose-100 transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  }
+                />
+              </>
             )}
-            {currentEntryPoint ? 'Replace package (.zip)' : 'Upload package (.zip)'}
-          </button>
+          </div>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -144,7 +201,8 @@ function EditScormActivityModal({ activity, onClose }: EditScormActivityModalPro
 
       {/* Learner results (instructor reporting) */}
       <div className="rounded-xl nice-shadow p-4">
-        <ScormResults activityUuid={activity.activity_uuid} />
+        <p className="text-sm font-medium text-gray-700 mb-2">Learner results</p>
+        <ScormResultsTable activityUuid={activity.activity_uuid} />
       </div>
 
       <div className="flex justify-end">

@@ -38,13 +38,14 @@ from src.db.courses.courses import Course
 from src.db.courses.scorm import (
     SCORM_COMPLETING_STATUSES,
     ScormLessonStatus,
+    ScormResultRow,
     ScormTrackingData,
     ScormTrackingDataRead,
     ScormTrackingDataUpdate,
     ScormVersionEnum,
 )
 from src.db.organizations import Organization
-from src.db.users import AnonymousUser, APITokenUser, PublicUser
+from src.db.users import AnonymousUser, APITokenUser, PublicUser, User
 from src.security.rbac import AccessAction, check_resource_access
 from src.services.courses.transfer.storage_utils import delete_storage_directory
 from src.services.trail.trail import add_activity_to_trail
@@ -554,3 +555,73 @@ async def upsert_scorm_tracking(
     result = ScormTrackingDataRead.model_validate(row)
     result.activity_uuid = activity_uuid
     return result
+
+
+async def delete_scorm_package(
+    request: Request,
+    activity_uuid: str,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> Activity:
+    """Instructor-only: remove the uploaded package and its content fields.
+
+    Tracking data is deliberately left in place — a teacher who removes a
+    package (e.g. to fix a broken export before re-uploading) shouldn't
+    silently wipe out learners' recorded completions/scores for it. A fresh
+    upload just points the activity at new content; existing tracking rows
+    stay keyed to the same activity_id and remain visible in results.
+    """
+    activity, course, org = await _resolve_activity_and_course(activity_uuid, db_session)
+    await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.UPDATE)
+
+    content_dir = _scorm_content_directory(course.course_uuid, activity_uuid)
+    delete_storage_directory(f"content/orgs/{org.org_uuid}/{content_dir}")
+
+    content = dict(activity.content or {})
+    for key in ("scorm_version", "scorm_entry_point", "scorm_title", "scorm_mastery_score"):
+        content.pop(key, None)
+    activity.content = content
+    activity.update_date = str(datetime.now())
+    db_session.add(activity)
+    await db_session.commit()
+    await db_session.refresh(activity)
+    return activity
+
+
+async def list_scorm_results(
+    request: Request,
+    activity_uuid: str,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> list[ScormResultRow]:
+    """Instructor-only: every learner's tracking row for this activity, for
+    the results table in the activity editor. UPDATE-gated, same bar as
+    uploading the package — this is authoring/reporting, not something a
+    learner should see about their classmates.
+    """
+    activity, course, _org = await _resolve_activity_and_course(activity_uuid, db_session)
+    await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.UPDATE)
+
+    statement = (
+        select(ScormTrackingData, User)
+        .join(User, User.id == ScormTrackingData.user_id)
+        .where(ScormTrackingData.activity_id == activity.id)
+        .order_by(User.first_name, User.last_name)
+    )
+    rows = (await db_session.execute(statement)).all()
+
+    return [
+        ScormResultRow(
+            user_id=user.id,
+            user_uuid=user.user_uuid,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            lesson_status=tracking.lesson_status,
+            score_raw=tracking.score_raw,
+            score_max=tracking.score_max,
+            total_time_seconds=tracking.total_time_seconds,
+            update_date=tracking.update_date,
+        )
+        for tracking, user in rows
+    ]
