@@ -91,6 +91,26 @@ class AssignmentBase(SQLModel):
     solution_file: Optional[str] = None
     solution_reveal: Optional[SolutionRevealEnum] = SolutionRevealEnum.NEVER
 
+    # When True, the assignment can only be submitted from a Safe Exam Browser
+    # session. Enforcement happens server-side by verifying the
+    # X-SafeExamBrowser-ConfigKeyHash header on every submission-mutating
+    # request (see services.courses.activities.seb.verify_seb_headers) — the
+    # frontend gate is a UX courtesy, not the security boundary.
+    require_safe_exam_browser: Optional[bool] = False
+    # Random per-assignment secret used to compute/verify the Config Key hash.
+    # Generated once, server-side, the first time SEB is enabled for this
+    # assignment (see services.courses.activities.seb.generate_seb_config_key).
+    # Never regenerated afterwards — regenerating invalidates every .seb file
+    # already handed out to students. Not exposed through AssignmentUpdate;
+    # only the dedicated seb_config endpoint reads/writes it.
+    seb_config_key: Optional[str] = None
+    # Proctor break-glass only. The primary quit flow disables SEB's general
+    # quit button entirely (allowQuit=false) and instead auto-navigates to a
+    # dedicated exit page after submission, which needs no password. This
+    # password only matters if a proctor has to force-quit a stuck session
+    # through SEB's own quit UI.
+    seb_quit_password: Optional[str] = None
+
     org_id: int
     course_id: int
     chapter_id: int
@@ -149,6 +169,8 @@ class AssignmentUpdate(SQLModel):
     ungraded: Optional[bool] = None
     solution: Optional[str] = None
     solution_reveal: Optional[SolutionRevealEnum] = None
+    require_safe_exam_browser: Optional[bool] = None
+    seb_quit_password: Optional[str] = None
     update_date: Optional[str] = None
 
 
