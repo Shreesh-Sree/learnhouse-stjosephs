@@ -216,3 +216,57 @@ async def read_content(
 def _read_file_bytes(path: str) -> bytes:
     with open(path, "rb") as f:
         return f.read()
+
+
+async def read_content_nested(
+    directory: str,
+    type_of_dir: Literal["orgs", "users"],
+    uuid: str,
+    relative_path: str,
+) -> bytes:
+    """Read raw bytes for a file at a caller-supplied relative sub-path under
+    ``directory`` (filesystem or S3/R2).
+
+    The nested counterpart of :func:`read_content`, which only accepts a
+    flat filename with no separators. Needed for content that is itself a
+    directory tree of files (e.g. an extracted SCORM package) rather than a
+    single uploaded file. ``relative_path`` is attacker-controlled (it comes
+    straight off the request URL) — every path component is validated
+    individually via ``_safe_content_path`` before touching disk or building
+    an S3 key, so ``../`` segments, null bytes, and absolute-path components
+    are rejected rather than merely normalized away.
+    """
+    if not relative_path or "\x00" in relative_path:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    parts = [p for p in relative_path.replace("\\", "/").split("/") if p not in ("", ".")]
+    if not parts:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    learnhouse_config = get_learnhouse_config()
+    content_delivery = learnhouse_config.hosting_config.content_delivery.type
+
+    if content_delivery == "s3api":
+        # Validate containment the same way the filesystem branch does before
+        # building the S3 key — _safe_content_path raises on any traversal
+        # attempt regardless of delivery type.
+        _safe_content_path(type_of_dir, uuid, directory, *parts)
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=learnhouse_config.hosting_config.content_delivery.s3api.endpoint_url,
+            config=botocore.config.Config(connect_timeout=10, read_timeout=60, retries={"max_attempts": 2}),
+        )
+        bucket_name = learnhouse_config.hosting_config.content_delivery.s3api.bucket_name or "learnhouse-media"
+        s3_key = "/".join(["content", type_of_dir, uuid, directory, *parts])
+        try:
+            resp = await asyncio.to_thread(s3.get_object, Bucket=bucket_name, Key=s3_key)
+            return await asyncio.to_thread(resp["Body"].read)
+        except (ClientError, BotoCoreError) as e:
+            logger.error("S3 read failed: %s", e)
+            raise HTTPException(status_code=404, detail="File not found")
+
+    # filesystem
+    safe_path = _safe_content_path(type_of_dir, uuid, directory, *parts)
+    if not os.path.isfile(safe_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return await asyncio.to_thread(_read_file_bytes, safe_path)
