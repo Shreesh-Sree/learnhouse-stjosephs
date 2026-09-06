@@ -107,6 +107,26 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   per-course analytics.
 - Verifiable digital credentials for certificates (Open Badges or a signed
   PDF), extending the certificates that already exist.
+- Weekly digest email ("here's what's due, what you haven't started"),
+  student-facing — distinct from the existing org-admin lifecycle nudges
+  (`services/email/nudge_translations`), which only address admins.
+- Gamification (points, streaks, badges for consistent participation) —
+  genuinely absent today; worth weighing carefully for a college audience,
+  since it fits some course types far better than others.
+
+**Access / scale**
+- Offline-capable course content (PWA + service worker caching), so a
+  student on unreliable campus wifi or at home can still read cached
+  lecture material. No such capability exists today.
+- Live video conferencing / virtual classroom (embedded Zoom/Meet, or a
+  native WebRTC session) — Boards and Podcasts exist for collaboration and
+  async audio; nothing covers a live class session.
+- Learning path / prerequisite enforcement (a course or activity stays
+  locked until a prior one is completed) — sequencing beyond the existing
+  chapter order.
+- Native mobile app wrapper (iOS/Android) — large, long-term scope; only
+  worth it once the web app's mobile experience is confirmed insufficient
+  on its own.
 
 ## Small cleanup items
 
