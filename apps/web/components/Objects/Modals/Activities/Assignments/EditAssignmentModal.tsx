@@ -1,6 +1,7 @@
 import React from 'react';
 import {
     deleteAssignmentSolutionFile,
+    downloadAssignmentSebConfig,
     updateAssignment,
     updateAssignmentSolutionFile,
 } from '@services/courses/assignments';
@@ -40,6 +41,9 @@ import {
     Paperclip,
     Trash2,
     Upload,
+    ShieldCheck,
+    KeyRound,
+    Download,
 } from 'lucide-react';
 
 type GradingType = 'ALPHABET' | 'NUMERIC' | 'PERCENTAGE' | 'PASS_FAIL' | 'GPA_SCALE';
@@ -61,6 +65,8 @@ interface Assignment {
     solution?: string | null;
     solution_file?: string | null;
     solution_reveal?: SolutionReveal;
+    require_safe_exam_browser?: boolean;
+    seb_quit_password?: string | null;
     assignment_tasks?: any[];
 }
 
@@ -165,6 +171,30 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
     // teacher who cancels the modal doesn't leave a half-applied change behind.
     const [solutionFile, setSolutionFile] = React.useState<File | null>(null);
     const [removeSolutionFile, setRemoveSolutionFile] = React.useState(false);
+    const [isDownloadingSeb, setIsDownloadingSeb] = React.useState(false);
+
+    const handleDownloadSebConfig = async () => {
+        setIsDownloadingSeb(true);
+        try {
+            const file = await downloadAssignmentSebConfig(assignment.assignment_uuid, accessToken);
+            const url = URL.createObjectURL(file);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (_error) {
+            toast.error(
+                t('dashboard.assignments.modals.edit.form.seb_download_error', {
+                    defaultValue: "Couldn't download the SEB config file.",
+                })
+            );
+        } finally {
+            setIsDownloadingSeb(false);
+        }
+    };
 
     const formik = useFormik({
         initialValues: {
@@ -196,6 +226,11 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             ungraded: assignment.ungraded || false,
             solution: assignment.solution || '',
             solution_reveal: (assignment.solution_reveal || 'NEVER') as SolutionReveal,
+            require_safe_exam_browser: assignment.require_safe_exam_browser || false,
+            // The break-glass quit password (see Phase 2/3 of the SEB
+            // integration): irrelevant to the normal submit-then-auto-exit
+            // flow, only used if a proctor has to force-quit a stuck session.
+            seb_quit_password: assignment.seb_quit_password || '',
         },
         enableReinitialize: true,
         onSubmit: async (values, { setSubmitting }) => {
@@ -212,6 +247,9 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             // Clearing the date means "no deadline". Send null, not the empty
             // string the input clears itself to, so the column reads as unset.
             payload.due_date = values.due_date || null;
+            // Same convention for the quit password: an emptied field clears
+            // it in the DB rather than storing an empty string.
+            payload.seb_quit_password = values.seb_quit_password || null;
             // Formative mode owns the grading switches: an ungraded assignment
             // never auto-grades and has no answer key to reveal, so send the
             // consistent state rather than leaving stale flags in the DB that
@@ -469,6 +507,24 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
                     />
                     )}
                 </div>
+            </div>
+
+            {/* Exam security */}
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <p className={labelClass}>
+                        {t('dashboard.assignments.modals.edit.form.exam_security_label', { defaultValue: 'Exam security' })}
+                    </p>
+                </div>
+                <SEBRow
+                    checked={formik.values.require_safe_exam_browser}
+                    onChange={(v) => formik.setFieldValue('require_safe_exam_browser', v, true)}
+                    quitPassword={formik.values.seb_quit_password}
+                    onQuitPasswordChange={(v) => formik.setFieldValue('seb_quit_password', v, true)}
+                    savedEnabled={!!assignment.require_safe_exam_browser}
+                    onDownload={handleDownloadSebConfig}
+                    isDownloading={isDownloadingSeb}
+                />
             </div>
 
             {/* Model answer ("corrigé") */}
@@ -807,6 +863,110 @@ function ToggleRow({
                     }`}
                 />
             </button>
+        </div>
+    );
+}
+
+// Require a locked-down Safe Exam Browser session to submit this assignment.
+// The toggle here only flips the DB flag — real enforcement happens
+// server-side on every submission-mutating request (see
+// _enforce_seb_if_required in the assignments service). The .seb config file
+// is only worth downloading once this has actually been SAVED with the
+// toggle on: downloading it while the toggle is checked but unsaved would
+// hand a student a file whose lockdown isn't enforced yet.
+function SEBRow({
+    checked,
+    onChange,
+    quitPassword,
+    onQuitPasswordChange,
+    savedEnabled,
+    onDownload,
+    isDownloading,
+}: {
+    checked: boolean;
+    onChange: (_next: boolean) => void;
+    quitPassword: string;
+    onQuitPasswordChange: (_v: string) => void;
+    savedEnabled: boolean;
+    onDownload: () => void;
+    isDownloading: boolean;
+}) {
+    const { t } = useTranslation();
+    return (
+        <div className="rounded-xl border nice-shadow bg-white border-gray-100 overflow-hidden">
+            <div className="flex items-start justify-between gap-3 p-3">
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <div className="mt-0.5 flex-none">
+                        <ShieldCheck size={16} className="text-rose-500" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <p className="text-xs font-bold text-gray-900">
+                            {t('dashboard.assignments.modals.edit.form.seb_label', { defaultValue: 'Require Safe Exam Browser' })}
+                        </p>
+                        <p className="text-[10px] text-gray-500 leading-snug mt-0.5">
+                            {t('dashboard.assignments.modals.edit.form.seb_description', {
+                                defaultValue: 'Learners can only submit from a locked-down Safe Exam Browser session. Requires the current version of SEB on exam machines.',
+                            })}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onChange(!checked)}
+                    aria-pressed={checked}
+                    className={`relative flex-none inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        checked ? 'bg-gray-900' : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                >
+                    <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
+                        }`}
+                    />
+                </button>
+            </div>
+            {checked && (
+                <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/50 space-y-3">
+                    <div className="space-y-1.5">
+                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-700">
+                            <KeyRound size={12} className="text-gray-400" />
+                            {t('dashboard.assignments.modals.edit.form.seb_quit_password_label', { defaultValue: 'Proctor quit password (optional)' })}
+                        </label>
+                        <input
+                            type="text"
+                            value={quitPassword}
+                            onChange={(e) => onQuitPasswordChange(e.target.value)}
+                            placeholder={t('dashboard.assignments.modals.edit.form.seb_quit_password_placeholder', { defaultValue: 'Leave blank to disable' })}
+                            className={inputClass}
+                        />
+                        <p className="text-[10px] text-gray-400 leading-snug">
+                            {t('dashboard.assignments.modals.edit.form.seb_quit_password_hint', {
+                                defaultValue: "Not needed for the normal flow — students exit automatically once they submit. This is only a proctor's way to force-quit a stuck session.",
+                            })}
+                        </p>
+                    </div>
+
+                    {savedEnabled ? (
+                        <button
+                            type="button"
+                            onClick={onDownload}
+                            disabled={isDownloading}
+                            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[11px] font-bold text-gray-700 bg-white border border-gray-200 nice-shadow hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                            <Download size={13} />
+                            {isDownloading
+                                ? t('dashboard.assignments.modals.edit.form.seb_downloading', { defaultValue: 'Preparing…' })
+                                : t('dashboard.assignments.modals.edit.form.seb_download', { defaultValue: 'Download .seb config' })}
+                        </button>
+                    ) : (
+                        <p className="text-[10px] text-amber-600 leading-snug">
+                            {t('dashboard.assignments.modals.edit.form.seb_save_first', {
+                                defaultValue: 'Save this assignment with the toggle on before downloading — the config file only locks down students once this is saved.',
+                            })}
+                        </p>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

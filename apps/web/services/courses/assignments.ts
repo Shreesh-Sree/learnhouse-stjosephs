@@ -3,6 +3,7 @@ import {
   RequestBodyFormWithAuthHeader,
   RequestBodyWithAuthHeader,
   getResponseMetadata,
+  secureFetch,
 } from '@services/utils/ts/requests'
 
 export async function createAssignment(body: any, access_token: string) {
@@ -70,6 +71,41 @@ export async function getAssignmentFromActivityUUID(
   )
   const res = await getResponseMetadata(result)
   return res
+}
+
+// Instructor-only: fetch the generated .seb config file (a downloadable
+// blob, not JSON) and hand back a File the caller can offer for download.
+// The server derives the filename from the assignment UUID.
+export async function downloadAssignmentSebConfig(
+  assignmentUUID: string,
+  access_token: string
+) {
+  const url = `${getAPIUrl()}assignments/${assignmentUUID}/seb_config`
+  const result = await secureFetch(
+    url,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  if (!result.ok) {
+    throw new Error(`Failed to download SEB config (${result.status})`)
+  }
+  const blob = await result.blob()
+  return new File([blob], `${assignmentUUID}.seb`, {
+    type: 'application/octet-stream',
+  })
+}
+
+// Whether the CURRENT request looks like it came from Safe Exam Browser.
+// Always seb_ok: true when the assignment doesn't require it.
+export async function checkAssignmentSebStatus(
+  assignmentUUID: string,
+  access_token: string
+): Promise<{ seb_ok: boolean }> {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/seb_status`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res.data ?? { seb_ok: true }
 }
 
 // Delete an assignment
