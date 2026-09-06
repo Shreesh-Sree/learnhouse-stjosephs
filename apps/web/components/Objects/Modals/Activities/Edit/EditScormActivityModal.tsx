@@ -2,8 +2,9 @@
 import React, { useState } from 'react'
 import dynamic from 'next/dynamic'
 import LearnHouseSpinner from '@components/Objects/Loaders/LearnHouseSpinner'
-import { Package } from 'lucide-react'
+import { Package, Upload } from 'lucide-react'
 import { updateActivity } from '@services/courses/activities'
+import { uploadScormPackage } from '@services/courses/scorm'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import toast from 'react-hot-toast'
 import { mutate } from 'swr'
@@ -28,6 +29,31 @@ function EditScormActivityModal({ activity, onClose }: EditScormActivityModalPro
 
   const [name, setName] = useState(activity.name || '')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploadingPackage, setIsUploadingPackage] = useState(false)
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null)
+  const currentEntryPoint = activity?.content?.scorm_entry_point as string | undefined
+
+  const handlePackageFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setIsUploadingPackage(true)
+    const toastId = toast.loading('Uploading SCORM package...')
+    try {
+      const res = await uploadScormPackage(activity.activity_uuid, file, access_token)
+      if (res?.success === false) {
+        toast.error(res?.data?.detail || 'Failed to upload SCORM package', { id: toastId })
+      } else {
+        toast.success('SCORM package uploaded', { id: toastId })
+        mutate((key: string) => typeof key === 'string' && key.includes('/courses/org_slug/'))
+      }
+    } catch {
+      toast.error('Failed to upload SCORM package', { id: toastId })
+    } finally {
+      setIsUploadingPackage(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,6 +97,38 @@ function EditScormActivityModal({ activity, onClose }: EditScormActivityModalPro
       </div>
 
       <div className="rounded-xl nice-shadow p-4 space-y-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-gray-700">SCORM package</label>
+            {currentEntryPoint && (
+              <span className="text-[11px] text-gray-400 truncate max-w-[200px]">{currentEntryPoint}</span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingPackage}
+            className="w-full inline-flex items-center justify-center gap-2 h-9 px-3 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+          >
+            {isUploadingPackage ? (
+              <LearnHouseSpinner size={16} />
+            ) : (
+              <Upload size={15} />
+            )}
+            {currentEntryPoint ? 'Replace package (.zip)' : 'Upload package (.zip)'}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            className="hidden"
+            onChange={handlePackageFileSelected}
+          />
+          <p className="text-[10px] text-gray-400">
+            SCORM 1.2 packages only. Replacing an existing package overwrites it entirely.
+          </p>
+        </div>
+
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-gray-700">Activity name</label>
           <input

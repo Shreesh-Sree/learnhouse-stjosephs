@@ -30,6 +30,7 @@ from src.routers.courses import migration as migration_router_module
 from src.routers.communities import communities as communities_router_module
 from src.routers.communities import discussions as discussions_router_module
 from src.routers.courses.activities import activities, blocks
+from src.routers.courses.activities import scorm as scorm_router_module
 from src.routers.podcasts import podcasts as podcasts_router_module
 from src.routers.podcasts import episodes as episodes_router_module
 from src.routers.boards import boards as boards_router_module
@@ -219,6 +220,12 @@ v1_router.include_router(
 )
 v1_router.include_router(chapters.router, prefix="/chapters", tags=["chapters"])
 v1_router.include_router(activities.router, prefix="/activities", tags=["activities"])
+v1_router.include_router(
+    scorm_router_module.router,
+    prefix="/scorm",
+    tags=["scorm"],
+    dependencies=[Depends(require_authenticated_user)]
+)
 v1_router.include_router(
     folders_router_module.router, prefix="/folders", tags=["folders"]
 )
