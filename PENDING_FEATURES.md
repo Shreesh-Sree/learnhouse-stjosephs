@@ -100,6 +100,11 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
 - Question-bank import (QTI format) for migrating existing quiz content from
   other tools.
 - Calendar/ICS feed of assignment due dates.
+- Anonymous/pseudonymous question posting in course discussions — visible as
+  anonymous to classmates but still identified to the instructor (so it
+  can't be abused). Real, well-documented pain point in large lecture
+  courses: a lot of students won't ask a "dumb" question under their real
+  name, so it never gets asked or answered for anyone.
 
 **Retention / engagement**
 - At-risk student dashboard (login gaps, multiple failing assignments,
