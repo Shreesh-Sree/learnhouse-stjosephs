@@ -2,6 +2,7 @@ import asyncio
 import copy
 import logging
 import math
+import random
 import re
 from datetime import datetime, timedelta
 from typing import Sequence
@@ -377,6 +378,65 @@ def _strip_answer_key(contents, keep_answer_keys: bool = False):
                     blank.pop("correctAnswer", None)
 
     return c
+
+
+async def _current_attempt_number(
+    current_user, assignment_id: int, db_session: AsyncSession
+) -> int:
+    """Attempt number to seed quiz pool selection with. Defaults to 1 for a
+    user with no submission row yet (a fresh, not-yet-started attempt is
+    legitimately attempt 1) or a caller with no real user id (API token,
+    anonymous) — pool selection is moot for those anyway since they can't
+    hand in answers to be graded against it.
+    """
+    user_id = getattr(current_user, "id", None)
+    if not user_id:
+        return 1
+    statement = select(AssignmentUserSubmission.attempt_number).where(
+        AssignmentUserSubmission.assignment_id == assignment_id,
+        AssignmentUserSubmission.user_id == user_id,
+    )
+    attempt_number = (await db_session.execute(statement)).scalars().first()
+    return int(attempt_number) if attempt_number else 1
+
+
+def _select_quiz_pool_questions(
+    contents: dict,
+    user_id: int,
+    assignment_task_id: int,
+    attempt_number: int,
+) -> dict:
+    """Deterministically narrow a QUIZ task's ``questions`` to a random
+    subset when the task defines a pool (``contents["pool_size"]``), the same
+    "no column, no migration" pattern grading_mode/response_type already use.
+
+    The selection is a pure function of (user, task, attempt) — same student,
+    same attempt, always the same subset (stable across page reloads and
+    across the read path vs the grading path, which is the whole point: they
+    MUST agree, or a student's answers to unshown questions would be graded
+    as blank). A retry increments attempt_number, which reseeds a different
+    subset for the new attempt, same as a real randomized exam would.
+
+    Returns ``contents`` unchanged (not even copied) when pooling isn't
+    configured, is misconfigured (non-positive or >= the full question
+    count), or there's nothing to select from — callers that need a copy
+    already deep-copy via _strip_answer_key downstream.
+    """
+    if not isinstance(contents, dict):
+        return contents
+    questions = contents.get("questions")
+    if not isinstance(questions, list) or not questions:
+        return contents
+    pool_size = contents.get("pool_size")
+    if not isinstance(pool_size, int) or pool_size <= 0 or pool_size >= len(questions):
+        return contents
+
+    seed = f"{user_id}:{assignment_task_id}:{attempt_number}"
+    selected = random.Random(seed).sample(questions, pool_size)
+
+    result = dict(contents)
+    result["questions"] = selected
+    return result
 
 
 async def _student_may_see_answer_key(
@@ -933,13 +993,19 @@ async def _grade_code_task_async(task, task_submission):
     return round(passed_count / total_count * task_max)
 
 
-async def _server_verified_task_grade(task, task_submission):
+async def _server_verified_task_grade(task, task_submission, attempt_number: int = 1):
     """
     If this task type is in SERVER_VERIFIED_TASK_TYPES, re-compute its
     grade from the stored task contents + submission data and return it.
     Returns ``None`` for task types we don't verify, or when the CODE
     grader can't reach Judge0 — the caller should fall back to
     ``task_submission.grade`` in both cases.
+
+    ``attempt_number`` matters only for a pooled QUIZ task: it MUST be the
+    same value the student's task list was rendered with (see
+    _select_quiz_pool_questions), or this would score answers against a
+    different random subset of questions than the one the student actually
+    saw and answered.
     """
     if task.assignment_type not in SERVER_VERIFIED_TASK_TYPES:
         return None
@@ -967,7 +1033,10 @@ async def _server_verified_task_grade(task, task_submission):
         return task_max if passed else 0
 
     if task.assignment_type == AssignmentTaskTypeEnum.QUIZ:
-        return _grade_quiz_task(contents, submission_data, task_max)
+        pooled_contents = _select_quiz_pool_questions(
+            contents, task_submission.user_id, task.id, attempt_number
+        )
+        return _grade_quiz_task(pooled_contents, submission_data, task_max)
 
     if task.assignment_type == AssignmentTaskTypeEnum.FORM:
         return _grade_form_task(contents, submission_data, task_max)
@@ -1805,11 +1874,25 @@ async def read_assignment_tasks(
         not is_instructor
         and await _student_may_see_answer_key(current_user, assignment, db_session)
     )
+    # One query for the whole assignment (attempt_number is per
+    # assignment-submission, not per-task) rather than once per task below.
+    attempt_number = (
+        1 if is_instructor
+        else await _current_attempt_number(current_user, assignment.id, db_session)
+    )
 
     result = []
     for assignment_task in (await db_session.execute(statement)).scalars().all():
         read = AssignmentTaskRead.model_validate(assignment_task)
         if not is_instructor:
+            # Pool selection BEFORE stripping the answer key, so the strip
+            # only ever touches the questions this student can actually see.
+            read.contents = _select_quiz_pool_questions(
+                read.contents,
+                getattr(current_user, "id", 0) or 0,
+                assignment_task.id,
+                attempt_number,
+            )
             read.contents = _strip_answer_key(
                 read.contents, keep_answer_keys=reveal_to_student
             )
@@ -1865,6 +1948,13 @@ async def read_assignment_task(
     if not is_instructor:
         reveal_to_student = await _student_may_see_answer_key(
             current_user, assignment, db_session
+        )
+        attempt_number = await _current_attempt_number(current_user, assignment.id, db_session)
+        read.contents = _select_quiz_pool_questions(
+            read.contents,
+            getattr(current_user, "id", 0) or 0,
+            assignmenttask.id,
+            attempt_number,
         )
         read.contents = _strip_answer_key(
             read.contents, keep_answer_keys=reveal_to_student
@@ -4117,7 +4207,9 @@ async def _apply_grade_and_finalize(
         ts = task_submissions_by_task_id.get(task.id)
         if ts is not None and ts.manually_graded:
             continue
-        verified = await _server_verified_task_grade(task, ts)
+        verified = await _server_verified_task_grade(
+            task, ts, attempt_number=int(assignment_user_submission.attempt_number or 1)
+        )
         if (
             verified is None
             and ts is not None
