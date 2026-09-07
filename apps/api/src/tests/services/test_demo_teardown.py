@@ -72,6 +72,10 @@ _SET_NULL_ALLOWED = {
     # The demo state row deliberately outlives its organization so the next
     # provision can read last_error and bundle_version off it.
     ("demo_state", "org_id"),
+    # A flag record is a moderation artifact that should survive the flagging
+    # or resolving user being deleted, not disappear with them.
+    ("quiz_question_flag", "flagged_by_user_id"),
+    ("quiz_question_flag", "resolved_by_user_id"),
 }
 
 

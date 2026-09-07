@@ -264,11 +264,12 @@ def _task(assignment_type, contents, max_grade_value=100):
         contents=contents,
         max_grade_value=max_grade_value,
         assignment_task_uuid="task_uuid",
+        id=1,
     )
 
 
 def _task_submission(data):
-    return SimpleNamespace(task_submission=data, grade=0)
+    return SimpleNamespace(task_submission=data, grade=0, user_id=1)
 
 
 class TestServerVerifiedTaskGrade:
