@@ -215,6 +215,53 @@ def _is_assignment_past_due(assignment: Assignment) -> bool:
     return parsed < datetime.now()
 
 
+def _is_time_limit_expired(assignment: Assignment, started_at: Optional[str]) -> bool:
+    """True if this attempt's per-attempt clock has run out.
+
+    No time limit, or no started_at (the learner hasn't called
+    start_assignment_attempt yet) -> not expired. The "must start before you
+    can submit" requirement for a timed assignment is enforced separately —
+    this function only ever answers "has an already-running clock expired",
+    never "was this attempt ever started".
+    """
+    if not assignment.time_limit_minutes or not started_at:
+        return False
+    try:
+        started = datetime.fromisoformat(str(started_at).strip())
+    except (ValueError, TypeError):
+        return False
+    if started.tzinfo is not None:
+        started = started.replace(tzinfo=None)
+    deadline = started + timedelta(minutes=assignment.time_limit_minutes)
+    return datetime.now() > deadline
+
+
+async def _enforce_time_limit_if_set(
+    assignment: Assignment,
+    user_id: int,
+    is_instructor: bool,
+    is_token_submit: bool,
+    db_session: AsyncSession,
+) -> None:
+    """Raise 403 if this assignment has a time limit and the calling user's
+    own attempt clock has run out. Same exemptions as the deadline/SEB
+    checks: an instructor isn't sitting the exam, and a token write is an
+    authorized external integration that owns its own timing.
+    """
+    if is_instructor or is_token_submit or not assignment.time_limit_minutes:
+        return
+    statement = select(AssignmentUserSubmission.started_at).where(
+        AssignmentUserSubmission.assignment_id == assignment.id,
+        AssignmentUserSubmission.user_id == user_id,
+    )
+    started_at = (await db_session.execute(statement)).scalars().first()
+    if _is_time_limit_expired(assignment, started_at):
+        raise HTTPException(
+            status_code=403,
+            detail="The time limit for this attempt has expired.",
+        )
+
+
 def _enforce_seb_if_required(
     assignment: Assignment,
     request: Request,
@@ -1969,6 +2016,9 @@ async def put_assignment_task_submission_file(
             detail="Assignment deadline has passed",
         )
     _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit=False)
+    await _enforce_time_limit_if_set(
+        assignment, current_user.id, is_instructor, is_token_submit=False, db_session=db_session
+    )
 
     # Upload submission file
     if sub_file and sub_file.filename and activity and org:
@@ -2340,6 +2390,9 @@ async def handle_assignment_task_submission(
                     detail="Assignment deadline has passed",
                 )
             _enforce_seb_if_required(assignment, request, is_instructor=False, is_token_submit=False)
+            await _enforce_time_limit_if_set(
+                assignment, current_user.id, is_instructor=False, is_token_submit=False, db_session=db_session
+            )
 
             # SECURITY: answers are frozen once the attempt has been handed in.
             # Without this, a learner could keep PUTting task answers after
@@ -2939,6 +2992,118 @@ async def delete_assignment_task_submission(
 ## > Assignments Submissions CRUD
 
 
+async def start_assignment_attempt(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> AssignmentUserSubmissionRead:
+    """Explicitly starts a timed assignment's per-attempt clock.
+
+    Idempotent: calling this again after the attempt has already started
+    returns the existing started_at rather than resetting it — a page
+    refresh or a flaky network retry must not hand the student more time.
+    Safe to call even when the assignment has no time limit at all (the
+    frontend gate calls this unconditionally rather than branching on
+    whether a limit is set); _is_time_limit_expired treats a missing limit
+    as "never expires" regardless of started_at.
+
+    Session-only, like put_assignment_task_submission_file and
+    retry_assignment_submission — a headless integration writing via API
+    token owns its own timing UI, so it has no reason to call this.
+
+    Instructors get a transient (never persisted) response instead of a
+    real AssignmentUserSubmission row: previewing a timed assignment
+    shouldn't create what looks like a student attempt in the roster.
+    """
+    _block_api_tokens(current_user)
+
+    statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
+    assignment = (await db_session.execute(statement)).scalars().first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    statement = select(Course).where(Course.id == assignment.course_id)
+    course = (await db_session.execute(statement)).scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.READ)
+    is_instructor = await authorization_verify_based_on_roles(
+        request, current_user.id, "update", course.course_uuid, db_session
+    )
+
+    if is_instructor:
+        return AssignmentUserSubmissionRead(
+            id=0,
+            creation_date=str(datetime.now()),
+            update_date=str(datetime.now()),
+            grade=0,
+            user_id=current_user.id,
+            assignment_id=assignment.id,
+            started_at=str(datetime.now()),
+        )
+
+    if not await authorization_verify_based_on_roles(request, current_user.id, "read", course.course_uuid, db_session):
+        raise HTTPException(status_code=403, detail="You must be enrolled in this course to start this assignment")
+    if _is_assignment_past_due(assignment):
+        raise HTTPException(status_code=403, detail="Assignment deadline has passed")
+    _enforce_seb_if_required(assignment, request, is_instructor=False, is_token_submit=False)
+
+    statement = select(AssignmentUserSubmission).where(
+        AssignmentUserSubmission.assignment_id == assignment.id,
+        AssignmentUserSubmission.user_id == current_user.id,
+    )
+    row = (await db_session.execute(statement)).scalars().first()
+
+    if row:
+        if row.submission_status not in (
+            AssignmentUserSubmissionStatus.PENDING,
+            AssignmentUserSubmissionStatus.NOT_SUBMITTED,
+        ):
+            raise HTTPException(status_code=400, detail="This assignment has already been submitted.")
+        if not row.started_at:
+            row.started_at = str(datetime.now())
+            row.update_date = str(datetime.now())
+            db_session.add(row)
+            await db_session.commit()
+            await db_session.refresh(row)
+        return AssignmentUserSubmissionRead.model_validate(row)
+
+    row = AssignmentUserSubmission(
+        user_id=current_user.id,
+        assignment_id=assignment.id,  # type: ignore
+        grade=0,
+        assignmentusersubmission_uuid=str(f"assignmentusersubmission_{uuid4()}"),
+        submission_status=AssignmentUserSubmissionStatus.NOT_SUBMITTED,
+        attempt_number=1,
+        started_at=str(datetime.now()),
+        creation_date=str(datetime.now()),
+        update_date=str(datetime.now()),
+    )
+    db_session.add(row)
+    try:
+        await db_session.commit()
+    except IntegrityError:  # pragma: no cover - concurrent-start race recovery
+        # Same race shape as create_assignment_submission's recovery below:
+        # a concurrent start already won and created the row (unique
+        # user_id+assignment_id) — adopt it rather than erroring, and never
+        # overwrite its started_at (that would extend the winner's clock).
+        await db_session.rollback()
+        row = (await db_session.execute(
+            select(AssignmentUserSubmission).where(
+                AssignmentUserSubmission.assignment_id == assignment.id,
+                AssignmentUserSubmission.user_id == current_user.id,
+            )
+        )).scalars().first()
+        if row is None:
+            raise
+    else:
+        await db_session.refresh(row)
+
+    return AssignmentUserSubmissionRead.model_validate(row)
+
+
 async def create_assignment_submission(
     request: Request,
     assignment_uuid: str,
@@ -2993,6 +3158,9 @@ async def create_assignment_submission(
             detail="Assignment deadline has passed",
         )
     _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit)
+    await _enforce_time_limit_if_set(
+        assignment, submitter.id, is_instructor, is_token_submit, db_session=db_session
+    )
     if assignment.require_safe_exam_browser:
         # Audit trail only — see services.courses.activities.seb module
         # docstring for why the Config Key hash isn't verified server-side.
@@ -3826,6 +3994,11 @@ async def retry_assignment_submission(
     assignment_user_submission.grade = 0
     assignment_user_submission.overall_feedback = None
     assignment_user_submission.attempt_number = current_attempt + 1
+    # A retry is a NEW attempt, so a timed assignment's clock resets with it —
+    # cleared, not restarted, so the student has to explicitly
+    # start_assignment_attempt again rather than have the clock silently
+    # already running from the moment they clicked retry.
+    assignment_user_submission.started_at = None
     assignment_user_submission.update_date = str(datetime.now())
     db_session.add(assignment_user_submission)
 

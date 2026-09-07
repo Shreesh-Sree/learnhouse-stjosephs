@@ -342,6 +342,20 @@ export async function getFinalGrade(
   return res
 }
 
+// Starts a timed assignment's per-attempt clock. Safe to call even when the
+// assignment has no time limit set — idempotent either way.
+export async function startAssignmentAttempt(
+  assignmentUUID: string,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/start`,
+    RequestBodyWithAuthHeader('POST', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
 export async function retryAssignmentSubmission(
   assignmentUUID: string,
   access_token: string

@@ -10,6 +10,7 @@ from src.db.courses.assignments import (
     AssignmentTaskUpdate,
     AssignmentUpdate,
     AssignmentUserSubmissionCreate,
+    AssignmentUserSubmissionRead,
 )
 from src.db.users import PublicUser
 from src.core.events.database import get_db_session
@@ -46,6 +47,7 @@ from src.services.courses.activities.assignments import (
     read_user_assignment_task_submissions_me,
     read_user_assignment_task_submissions_me_batch,
     retry_assignment_submission,
+    start_assignment_attempt,
     update_assignment,
     update_assignment_submission,
     update_assignment_task,
@@ -910,6 +912,33 @@ async def api_final_grade_submission(
         db_session,
         overall_feedback=body.overall_feedback if body else None,
     )
+
+
+@router.post(
+    "/{assignment_uuid}/start",
+    response_model=AssignmentUserSubmissionRead,
+    summary="Start a timed assignment attempt",
+    description=(
+        "Starts the per-attempt clock for an assignment with time_limit_minutes "
+        "set. Idempotent — calling it again after the attempt has already "
+        "started returns the existing started_at rather than resetting it. "
+        "Safe to call even when the assignment has no time limit at all."
+    ),
+    responses={
+        200: {"description": "Attempt started (or already-started state returned).", "model": AssignmentUserSubmissionRead},
+        400: {"description": "Assignment has already been submitted"},
+        401: {"description": "Authentication required"},
+        403: {"description": "Not enrolled, deadline passed, or SEB required and not detected"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_start_assignment_attempt(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> AssignmentUserSubmissionRead:
+    return await start_assignment_attempt(request, assignment_uuid, current_user, db_session)
 
 
 @router.post(
