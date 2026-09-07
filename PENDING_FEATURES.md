@@ -418,9 +418,31 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   really does see the true author (and that nobody else does).
 
 **Retention / engagement**
-- At-risk student dashboard (login gaps, multiple failing assignments,
-  falling behind pace) for advisors/instructors — distinct from the existing
-  per-course analytics.
+- ~~At-risk student dashboard~~ — **done**, distinct from the existing
+  per-course analytics (which is Tinybird-backed and TTL'd — a retention
+  signal needs to still be true months later, so this is computed entirely
+  from durable Postgres data: enrollment, grading, and completion, not the
+  analytics event stream). A new "At-Risk" course-dashboard tab flags
+  enrolled students on up to four independent signals: **inactive** (no
+  login and no activity in this course for 14+ days), **failing** (2+
+  GRADED submissions came back failed, via the exact `grade_display.passed`
+  every other grading surface already computes), **missing_assignments**
+  (2+ published assignments past this student's own EFFECTIVE due date —
+  extensions honored via `get_effective_due_date` — with no submission row
+  at all), and **low_progress** (enrolled 14+ days with under 25%
+  completion). `risk_level` is "high" at 2+ signals, "medium" at exactly
+  one; a student with zero signals is left out of the response entirely so
+  the queue stays short enough to act on. SCOPE DECISION, disclosed in the
+  service module's own docstring: this project has no course-schedule/
+  syllabus model (no start/end dates, no weekly pacing plan), so "falling
+  behind pace" is approximated as "enrolled a while ago but has completed
+  very little" rather than compared against a real schedule — a real
+  limitation, not an oversight. The day-math and flag-derivation logic
+  (including the important "a student enrolled yesterday must not be
+  flagged low_progress" edge case) were verified with a standalone script;
+  the DB-aggregation half needs real-environment verification like
+  everything else this session, since this sandbox has no live Postgres to
+  run it against.
 - Verifiable digital credentials for certificates (Open Badges or a signed
   PDF), extending the certificates that already exist.
 - Weekly digest email ("here's what's due, what you haven't started"),

@@ -59,6 +59,7 @@ from src.services.courses.roster import (
     parse_roster_emails,
 )
 from src.services.courses.qti_import import import_qti_to_course
+from src.services.courses.at_risk import get_at_risk_students, AtRiskStudent
 from src.services.courses.transfer import (
     export_course,
     export_courses_batch,
@@ -1183,3 +1184,35 @@ async def api_import_qti(
     return await import_qti_to_course(
         request, course_uuid, chapter_id, file.filename or "upload", content, activity_name, current_user, db_session
     )
+
+
+## AT-RISK STUDENT DASHBOARD ##
+
+
+@router.get(
+    "/{course_uuid}/at_risk_students",
+    response_model=List[AtRiskStudent],
+    summary="List students showing at-risk signals in this course",
+    description=(
+        "Instructor-only. Flags enrolled students on up to four independent "
+        "signals — inactivity, multiple failing grades, multiple missing "
+        "overdue assignments, and low progress after a while enrolled — "
+        "computed from durable enrollment/grading data. A student with no "
+        "signal is omitted entirely. See services/courses/at_risk.py for "
+        "the thresholds and the scope decision on 'falling behind pace' "
+        "(no course schedule model exists to compare against)."
+    ),
+    responses={
+        200: {"description": "At-risk students, worst first.", "model": List[AtRiskStudent]},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to manage this course"},
+        404: {"description": "Course not found"},
+    },
+)
+async def api_get_at_risk_students(
+    request: Request,
+    course_uuid: str,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: PublicUser = Depends(get_current_user),
+) -> List[AtRiskStudent]:
+    return await get_at_risk_students(request, course_uuid, current_user, db_session)
