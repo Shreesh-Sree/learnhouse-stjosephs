@@ -7,29 +7,119 @@ marked otherwise.
 
 ## Needs verification in a real environment
 
-Built and `py_compile`/bracket-checked only — this sandbox has no installable
-`fastapi`/`sqlmodel`/`defusedxml` and no `node_modules`, so none of this has
-run through the project's real test suite, a real DB, or a real browser.
+Originally written when this sandbox had no installable `fastapi`/`sqlmodel`/
+`defusedxml`/`node_modules` — everything below was build/bracket-checked only.
+That constraint no longer holds: this sandbox turned out to have a real
+Postgres 16 cluster and `bun`/`npm` available, just not started/installed.
+Backend deps were pip-installed, the DB started and seeded, `node_modules`
+installed, and the actual test suites, a real migration run, a real
+production build, and a real browser (Playwright against the pre-installed
+Chromium) were all run for real. Results below.
 
-- [ ] Run all three new Alembic migrations against a real Postgres DB:
-      `f3a4b5c6d7e8` (SEB fields on `assignment`), `a4b5c6d7e8f9`
-      (`scorm_tracking_data`), `b5c6d7e8f9a0` (`time_limit_minutes` on
-      `assignment` + `started_at` on `assignmentusersubmission`).
-- [ ] Run the actual `pytest` suite (not just the standalone sanity scripts
-      used during development).
-- [ ] Run a real TypeScript build/typecheck on the web app.
+- [x] ~~Run all three new Alembic migrations against a real Postgres DB~~
+      Done, and more thoroughly than originally scoped: rather than only the
+      3 originally-flagged migrations, reverted the DB to the common parent
+      revision (`b1c2d3e4f5a6`) and ran the FULL chain forward
+      (`alembic upgrade head`, 18 migrations) and back
+      (`alembic downgrade b1c2d3e4f5a6`) against real Postgres 16 — every
+      upgrade/downgrade pair applied cleanly, and the resulting schema
+      (columns, indexes, unique constraints, FKs) matches each migration's
+      own definition exactly. Also ran the real fresh-install path
+      (`cli.py install --short`, i.e. `SQLModel.metadata.create_all` + admin
+      user creation) against the same DB — this is what a real deployment
+      actually runs, and it required installing the `pgvector` Postgres
+      extension (not documented anywhere — a fresh self-host Postgres
+      without it fails on `course_embedding`'s `VECTOR` column; worth adding
+      to setup docs).
+- [x] ~~Run the actual `pytest` suite~~ Done — installed the full pinned
+      dependency set from `pyproject.toml` and ran it for real:
+      **5,736 passed, 0 failed, 29 skipped** (the EE-only files, expected).
+      Found and fixed 7 real bugs along the way that no amount of reading
+      would have caught:
+      - `assignments.py` used `Optional` without importing it from `typing`
+        — broke collection for 53 test files outright.
+      - `nudges.py` had a nested-same-quote f-string
+        (`f"...{x or "unknown"}..."`), a `SyntaxError` outside Python 3.12+.
+      - 5 test-mock/allowlist gaps: `test_assignment_grading.py` and
+        `test_server_verify_dispatch_edge.py`'s `SimpleNamespace` mocks were
+        missing `user_id`/`id` that `_server_verified_task_grade` now
+        legitimately reads for QUIZ pool-question seeding; and
+        `test_demo_teardown.py`'s FK-cascade completeness check didn't know
+        `quiz_question_flag`'s two `SET NULL` columns were an intentional
+        (not overlooked) choice.
+- [x] ~~Run a real TypeScript build/typecheck on the web app~~ Done —
+      `bun install` (1038 packages) then `bun run build` (`next build`,
+      which typechecks the whole app). First run: 4 real type errors, all
+      fixed:
+      - `RequestBodyFormWithAuthHeader` required a non-optional
+        `access_token: string` and unconditionally sent
+        `Authorization: Bearer ${access_token}`; two callers hold a nullable
+        token and were passing `access_token || undefined` just to satisfy
+        the type — meaning a missing token would have sent the literal
+        header `Bearer undefined` instead of omitting it. Fixed the function
+        itself to guard this, matching its sibling `RequestBodyWithAuthHeader`.
+      - `GroupSubmissionRow`'s `minSize`/`maxSize` props were typed as the
+        literal `number | ''`, narrower than the `number | string` TS
+        actually infers for the formik values feeding them (empty-string
+        literals widen in an untyped object literal) — widened the prop
+        types to match.
+      Build now exits 0 with zero type errors. Also ran the existing bun
+      unit suite (`bun test tests`): one real failure surfaced —
+      `ar.json` (Arabic) was missing 24 keys the SEB/quiz-pool/time-limit
+      features had added to `en.json` but never localized; added Arabic
+      translations for all 24. **263/263 pass now.**
+      **Also found — not merely a type nit, a real availability bug**:
+      running the actual login flow against a live backend (see the E2E
+      item below) surfaced that `check_login_rate_limit` had no fallback
+      when Redis is unreachable — `get_redis_connection()` raised
+      `HTTPException(500)` outright, and the live Redis calls in
+      `check_rate_limit`/`check_invite_rate_limit`/`increment_rate_limit`
+      had no `try/except` at all, so a `redis.exceptions.ConnectionError`
+      propagated straight up and login/signup 500'd unconditionally.
+      Every OTHER Redis-dependent path in this codebase (pack
+      reconciliation, the captions consumer) already treats Redis as
+      optional and degrades gracefully — this was the one place that
+      didn't. Fixed to fail open (log a warning, let the request through
+      uncounted) rather than take down login/signup entirely; this matters
+      because Redis is genuinely optional in this project's own design
+      (`get_redis_client() -> Optional[Redis]`) and plenty of self-host
+      deployments won't run it at all.
+- [x] Added a Playwright E2E smoke suite
+      (`apps/web/playwright.config.ts` + `apps/web/e2e/smoke.spec.ts`,
+      `bun run test:e2e`) and ran it for real against a fully live stack:
+      real Postgres 16 + a live `uvicorn` backend + `next dev` + the
+      sandbox's pre-installed Chromium (pointed at directly via
+      `launchOptions.executablePath`, since the default headless_shell
+      variant Playwright wants isn't the one preinstalled here). Covers:
+      homepage load, the login form rendering, a real password-login round
+      trip against the live backend, and an authenticated dashboard view
+      loading without erroring. **4/4 pass.** This is what actually
+      surfaced the Redis fail-open bug above — the suite was blocked on
+      login until that landed. Scope is a smoke suite, not full coverage:
+      a fresh install has no seed course/assignment/SCORM content, so
+      course creation, submission, and playback flows aren't exercised
+      here — a fuller pass would need to seed that content first (e.g.
+      extend `cli.py install` or add an E2E fixture script), then add specs
+      for: creating a course and publishing an activity, submitting an
+      assignment (short-answer/quiz/file), the SEB gate and time-limit
+      countdown, and SCORM package upload + playback.
 - [ ] Test SEB enforcement against a real Safe Exam Browser client — the
       User-Agent regex and the `allowQuit`/`quitURL` quit flow are spec-correct
-      on paper, unverified against actual SEB software.
+      on paper, unverified against actual SEB software. (Nothing in this
+      session changed that — SEB itself isn't something a sandbox can run.)
 - [ ] Test SCORM playback against a real exported package (Articulate,
       Captivate, etc.) — only hand-built sample manifests were used to verify
       the parser's edge cases (xml:base, nested items, mastery score, href
-      normalization, SCORM 2004 rejection).
+      normalization, SCORM 2004 rejection). The new
+      `test_oss_scorm_service.py` (see Small cleanup items) now runs those
+      hand-built cases for real in pytest, but that's still not a real
+      Articulate/Captivate export.
 - [ ] Test the time-limit flow with real wall-clock timing across a page
       reload/close-and-reopen — the countdown, the auto-submit-on-expiry
       timer, and the server-side check all parse the same naive
       `str(datetime.now())` format independently; worth confirming they
-      agree in practice, not just by inspection.
+      agree in practice, not just by inspection. (Not covered by the new
+      E2E smoke suite — needs a seeded assignment with a time limit set.)
 
 ## Repo / workflow governance (blocked on GitHub web UI — can't be done from this session)
 
