@@ -15,6 +15,7 @@ import {
     ChevronDown,
     CircleDashed,
     Clock,
+    Fingerprint,
     Hourglass,
     Inbox,
     RotateCcw,
@@ -29,8 +30,10 @@ import toast from 'react-hot-toast';
 import {
     assignPeerReviews,
     getAssignmentExtensions,
+    getPlagiarismMatches,
     grantAssignmentExtension,
     revokeAssignmentExtension,
+    runPlagiarismCheck,
 } from '@services/courses/assignments';
 import EvaluateAssignment from './Modals/EvaluateAssignment';
 import { AssignmentProvider } from '@components/Contexts/Assignments/AssignmentContext';
@@ -303,6 +306,25 @@ function AssignmentSubmissionsSubPage({ assignment_uuid }: { assignment_uuid: st
                         <Star size={12} />
                         <span>{t('dashboard.assignments.submissions.assign_peer_reviews', { defaultValue: 'Assign peer reviews' })}</span>
                     </button>
+
+                    {/* Plagiarism check: same one-off bulk-action shape as peer
+                        review above — the backend validates enablement, so this
+                        stays unconditional here too. */}
+                    <button
+                        onClick={async () => {
+                            const res = await runPlagiarismCheck(assignment_uuid, access_token);
+                            if (res.success) {
+                                toast.success(res.data.message);
+                            } else {
+                                toast.error(res.data?.detail || t('common.something_went_wrong'));
+                            }
+                        }}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-cyan-700 bg-cyan-50 nice-shadow rounded-full hover:bg-cyan-100/80 transition-colors"
+                    >
+                        <Fingerprint size={12} />
+                        <span>{t('dashboard.assignments.submissions.run_plagiarism_check', { defaultValue: 'Run plagiarism check' })}</span>
+                    </button>
+                    <PlagiarismResultsButton assignment_uuid={assignment_uuid} />
                 </div>
             </div>
 
@@ -788,6 +810,81 @@ function ExtensionButton({ assignment_uuid, user_id }: { assignment_uuid: string
                 <div className="ms-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 font-bold py-1.5 px-2.5 rounded-md text-xs cursor-pointer nice-shadow transition-colors flex items-center gap-1">
                     <CalendarClock size={12} />
                 </div>
+            }
+        />
+    );
+}
+
+// Results of the last "Run plagiarism check" — a plain table of flagged
+// pairs. Loaded on open, not kept live, since a run only happens on demand.
+function PlagiarismResultsButton({ assignment_uuid }: { assignment_uuid: string }) {
+    const { t } = useTranslation();
+    const session = useLHSession() as any;
+    const access_token = session?.data?.tokens?.access_token;
+    const [open, setOpen] = useState(false);
+    const [matches, setMatches] = useState<any[] | null>(null);
+
+    const load = async () => {
+        const res = await getPlagiarismMatches(assignment_uuid, access_token);
+        if (res.success) setMatches(res.data);
+    };
+
+    const userIds = Array.from(
+        new Set((matches || []).flatMap((m: any) => [m.user_a_id, m.user_b_id]))
+    );
+    const userQueries = useQueries({
+        queries: userIds.map((id) => ({
+            queryKey: ['users', 'id', id],
+            queryFn: () => apiFetch(`${getAPIUrl()}users/id/${id}`, access_token),
+            enabled: !!(id && access_token),
+            staleTime: 60_000,
+        })),
+    });
+    const usersById = new Map<number, any>();
+    userIds.forEach((id, i) => {
+        const u = userQueries[i]?.data;
+        if (u) usersById.set(id, u);
+    });
+    const nameOf = (id: number) => {
+        const u = usersById.get(id);
+        if (!u) return `#${id}`;
+        return u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.username ? `@${u.username}` : `#${id}`;
+    };
+
+    return (
+        <Modal
+            isDialogOpen={open}
+            onOpenChange={(next: boolean) => {
+                if (next) load();
+                setOpen(next);
+            }}
+            minWidth="lg"
+            dialogContent={
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                    {!matches ? (
+                        <p className="text-xs text-gray-400">{t('common.loading', { defaultValue: 'Loading…' })}</p>
+                    ) : matches.length === 0 ? (
+                        <p className="text-xs text-gray-400">
+                            {t('dashboard.assignments.submissions.plagiarism.none', { defaultValue: 'No flagged pairs. Run the check after students have submitted.' })}
+                        </p>
+                    ) : (
+                        matches.map((m: any) => (
+                            <div key={m.match_uuid} className="flex items-center justify-between rounded-lg border border-gray-100 px-3 py-2">
+                                <p className="text-xs font-semibold text-gray-800">
+                                    {nameOf(m.user_a_id)} ↔ {nameOf(m.user_b_id)}
+                                </p>
+                                <p className="text-xs font-bold text-cyan-700">{m.similarity_percent}%</p>
+                            </div>
+                        ))
+                    )}
+                </div>
+            }
+            dialogTitle={t('dashboard.assignments.submissions.plagiarism.title', { defaultValue: 'Flagged similarity pairs' })}
+            dialogDescription={t('dashboard.assignments.submissions.plagiarism.description', { defaultValue: 'A review aid, not an accusation — check the actual submissions before acting on any of these.' })}
+            dialogTrigger={
+                <button className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white nice-shadow rounded-full hover:bg-gray-50 transition-colors">
+                    <span>{t('dashboard.assignments.submissions.plagiarism.view_results', { defaultValue: 'View results' })}</span>
+                </button>
             }
         />
     );

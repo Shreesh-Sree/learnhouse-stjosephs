@@ -49,6 +49,7 @@ import {
     Wifi,
     Users,
     Star,
+    Fingerprint,
 } from 'lucide-react';
 
 type GradingType = 'ALPHABET' | 'NUMERIC' | 'PERCENTAGE' | 'PASS_FAIL' | 'GPA_SCALE';
@@ -81,6 +82,8 @@ interface Assignment {
     group_max_size?: number | null;
     enable_peer_review?: boolean;
     peer_reviews_per_submission?: number | null;
+    enable_plagiarism_check?: boolean;
+    plagiarism_similarity_threshold?: number | null;
     assignment_tasks?: any[];
 }
 
@@ -257,6 +260,9 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             enable_peer_review: assignment.enable_peer_review || false,
             peer_reviews_per_submission:
                 typeof assignment.peer_reviews_per_submission === 'number' ? assignment.peer_reviews_per_submission : 2,
+            enable_plagiarism_check: assignment.enable_plagiarism_check || false,
+            plagiarism_similarity_threshold:
+                typeof assignment.plagiarism_similarity_threshold === 'number' ? assignment.plagiarism_similarity_threshold : 70,
         },
         enableReinitialize: true,
         onSubmit: async (values, { setSubmitting }) => {
@@ -619,6 +625,21 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
                     onChange={(v) => formik.setFieldValue('enable_peer_review', v, true)}
                     reviewsPerSubmission={formik.values.peer_reviews_per_submission}
                     onReviewsPerSubmissionChange={(v) => formik.setFieldValue('peer_reviews_per_submission', v, true)}
+                />
+            </div>
+
+            {/* Plagiarism check */}
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <p className={labelClass}>
+                        {t('dashboard.assignments.modals.edit.form.plagiarism_check_section_label', { defaultValue: 'Plagiarism check' })}
+                    </p>
+                </div>
+                <PlagiarismCheckRow
+                    checked={formik.values.enable_plagiarism_check}
+                    onChange={(v) => formik.setFieldValue('enable_plagiarism_check', v, true)}
+                    threshold={formik.values.plagiarism_similarity_threshold}
+                    onThresholdChange={(v) => formik.setFieldValue('plagiarism_similarity_threshold', v, true)}
                 />
             </div>
 
@@ -1323,6 +1344,85 @@ function PeerReviewRow({
                     <p className="text-[10px] text-gray-400 leading-snug mt-2">
                         {t('dashboard.assignments.modals.edit.form.peer_review_hint', {
                             defaultValue: 'Reviewer and reviewee identities are never shown to each other, only to you. Trigger "Assign peer reviews" from the submissions page once enough students have submitted.',
+                        })}
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Cross-submission text similarity for CODE/SHORT_ANSWER tasks — an
+// instructor-triggered review aid (see "Run plagiarism check" on the
+// submissions page), not an automated penalty. Distinct from
+// anti_copy_paste, which blocks paste events while a student is answering
+// rather than comparing submissions to each other afterwards.
+function PlagiarismCheckRow({
+    checked,
+    onChange,
+    threshold,
+    onThresholdChange,
+}: {
+    checked: boolean;
+    onChange: (_next: boolean) => void;
+    threshold: number;
+    onThresholdChange: (_v: number) => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <div className="rounded-xl border nice-shadow bg-white border-gray-100 overflow-hidden">
+            <div className="flex items-start justify-between gap-3 p-3">
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <div className="mt-0.5 flex-none">
+                        <Fingerprint size={16} className="text-cyan-600" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <p className="text-xs font-bold text-gray-900">
+                            {t('dashboard.assignments.modals.edit.form.plagiarism_check_label', { defaultValue: 'Enable plagiarism check' })}
+                        </p>
+                        <p className="text-[10px] text-gray-500 leading-snug mt-0.5">
+                            {t('dashboard.assignments.modals.edit.form.plagiarism_check_description', {
+                                defaultValue: 'Compares code and short-answer submissions against each other for suspicious overlap. A review aid for you — never an automatic penalty.',
+                            })}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onChange(!checked)}
+                    aria-pressed={checked}
+                    className={`relative flex-none inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        checked ? 'bg-gray-900' : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                >
+                    <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
+                        }`}
+                    />
+                </button>
+            </div>
+            {checked && (
+                <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/50">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold text-gray-700">
+                            {t('dashboard.assignments.modals.edit.form.plagiarism_threshold_label', { defaultValue: 'Flag at (%)' })}
+                        </p>
+                        <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={threshold}
+                            onChange={(e) => {
+                                const raw = parseInt(e.target.value, 10);
+                                if (!Number.isNaN(raw)) onThresholdChange(Math.max(1, Math.min(100, raw)));
+                            }}
+                            className="w-16 text-center px-2 py-1 text-sm rounded-md bg-white border border-gray-200"
+                        />
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-snug mt-2">
+                        {t('dashboard.assignments.modals.edit.form.plagiarism_check_hint', {
+                            defaultValue: 'Trigger "Run plagiarism check" from the submissions page once students have submitted. Short, narrowly-correct answers can show high similarity by coincidence — use judgment before acting on a flag.',
                         })}
                     </p>
                 </div>

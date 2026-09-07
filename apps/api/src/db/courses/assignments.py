@@ -170,6 +170,17 @@ class AssignmentBase(SQLModel):
     enable_peer_review: Optional[bool] = False
     peer_reviews_per_submission: Optional[int] = 2
 
+    # Cross-submission similarity checking. When True, an instructor can
+    # trigger services.courses.activities.plagiarism.run_plagiarism_check to
+    # compare every CODE/SHORT_ANSWER submission on this assignment against
+    # every other, flagging pairs at or above
+    # plagiarism_similarity_threshold. In-house k-shingle similarity, not a
+    # third-party API — see db.courses.plagiarism's module docstring for
+    # what this is (a review aid) and is NOT (an automated penalty, or a
+    # replacement for anti_copy_paste's separate paste-blocking deterrent).
+    enable_plagiarism_check: Optional[bool] = False
+    plagiarism_similarity_threshold: Optional[int] = 70
+
     org_id: int
     course_id: int
     chapter_id: int
@@ -248,6 +259,8 @@ class AssignmentUpdate(SQLModel):
     group_max_size: Optional[int] = None
     enable_peer_review: Optional[bool] = None
     peer_reviews_per_submission: Optional[int] = None
+    enable_plagiarism_check: Optional[bool] = None
+    plagiarism_similarity_threshold: Optional[int] = None
     update_date: Optional[str] = None
 
 

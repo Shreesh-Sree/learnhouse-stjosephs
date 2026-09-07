@@ -526,6 +526,28 @@ export async function getMyAssignmentExtension(assignmentUUID: string, access_to
   return res
 }
 
+// Plagiarism / similarity check //
+
+// Instructor-only.
+export async function runPlagiarismCheck(assignmentUUID: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/plagiarism_check/run`,
+    RequestBodyWithAuthHeader('POST', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only.
+export async function getPlagiarismMatches(assignmentUUID: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/plagiarism_check/results`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
 export async function submitAssignmentForGrading(
   assignmentUUID: string,
   access_token: string

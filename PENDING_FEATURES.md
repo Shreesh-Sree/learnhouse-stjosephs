@@ -216,9 +216,32 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   (`AssignmentSubmissionsSubPage.tsx`) to grant/revoke one student's
   extension. Needs real-environment verification like everything else this
   session.
-- Pluggable plagiarism/similarity check (third-party API or in-house
-  cross-submission similarity), distinct from the existing `anti_copy_paste`
-  UI deterrent.
+- ~~Plagiarism/similarity check~~ — **done**, as in-house cross-submission
+  similarity (no third-party API — this is a self-hosted deployment with no
+  assumed network egress to Turnitin/Copyleaks/etc.), distinct from the
+  existing `anti_copy_paste` UI deterrent (that blocks paste events while a
+  student is answering; this compares finished submissions to each other
+  afterward). Instructor-triggered ("Run plagiarism check" on the
+  submissions page, mirroring "Assign peer reviews"): k-shingle Jaccard
+  similarity over CODE (`source_code`) and SHORT_ANSWER (`answer`) task
+  submissions, pairwise across every student who submitted, flagged at
+  `assignment.plagiarism_similarity_threshold` (default 70%) and stored in
+  a new `PlagiarismMatch` table, fully recomputed each run. Never touches a
+  grade — purely a review aid the instructor still has to judge.
+  KNOWN LIMITATIONS, called out directly rather than left implicit: (1)
+  FALSE POSITIVES — a narrow-answer SHORT_ANSWER task (e.g. a single-fact
+  question) will show high similarity between every student who simply got
+  it right; a length floor (`_MIN_TOKENS_FOR_COMPARISON`) filters the
+  shortest cases but doesn't eliminate this for longer narrow-answer tasks.
+  (2) EASILY DEFEATED — plain token-shingle similarity is sensitive to
+  identifier renaming; a plagiarist who search-replaces variable names in
+  copied code will show markedly lower similarity even though the logic is
+  identical. (3) FILE_SUBMISSION is NOT covered — the submitted content is
+  a binary/document reference, not inline text this can shingle without a
+  separate text-extraction pipeline. (4) O(n²) pairwise comparison per
+  task — fine at a self-hosted college's classroom scale, not built for a
+  MOOC-sized cohort. Needs real-environment verification like everything
+  else this session.
 - Student-flaggable quiz questions ("something's wrong with this question")
   feeding an instructor review queue.
 

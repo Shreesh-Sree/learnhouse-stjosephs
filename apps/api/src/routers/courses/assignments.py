@@ -16,6 +16,7 @@ from src.db.courses.proctoring import ProctoringSnapshotRead
 from src.db.courses.assignment_groups import AssignmentGroupRead
 from src.db.courses.peer_reviews import PeerReviewRead
 from src.db.courses.assignment_extensions import AssignmentExtensionRead
+from src.db.courses.plagiarism import PlagiarismMatchRead
 from src.db.users import PublicUser
 from src.core.events.database import get_db_session
 from src.security.auth import get_current_user
@@ -46,6 +47,10 @@ from src.services.courses.activities.assignment_extensions import (
     grant_extension,
     list_extensions,
     revoke_extension,
+)
+from src.services.courses.activities.plagiarism import (
+    list_plagiarism_matches,
+    run_plagiarism_check,
 )
 from src.services.courses.activities.assignments import (
     check_assignment_ip_allowlist_status,
@@ -912,6 +917,51 @@ async def api_get_my_extension(
     db_session=Depends(get_db_session),
 ):
     return await get_my_extension(request, assignment_uuid, current_user, db_session)
+
+
+## PLAGIARISM CHECK ##
+
+
+@router.post(
+    "/{assignment_uuid}/plagiarism_check/run",
+    summary="Run the plagiarism/similarity check",
+    description="Instructor-only. Recomputes cross-submission similarity for every CODE/SHORT_ANSWER task on this assignment and replaces the stored flagged pairs.",
+    responses={
+        200: {"description": "Check complete."},
+        400: {"description": "Plagiarism checking not enabled for this assignment"},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_run_plagiarism_check(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    return await run_plagiarism_check(request, assignment_uuid, current_user, db_session)
+
+
+@router.get(
+    "/{assignment_uuid}/plagiarism_check/results",
+    response_model=list[PlagiarismMatchRead],
+    summary="List flagged similarity pairs",
+    description="Instructor-only. Every pair of students flagged by the last plagiarism check run, most similar first.",
+    responses={
+        200: {"description": "Flagged pairs.", "model": list[PlagiarismMatchRead]},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_list_plagiarism_matches(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> list[PlagiarismMatchRead]:
+    return await list_plagiarism_matches(request, assignment_uuid, current_user, db_session)
 
 
 ## ASSIGNMENTS Tasks ##
