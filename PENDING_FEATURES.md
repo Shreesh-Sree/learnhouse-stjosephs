@@ -11,8 +11,10 @@ Built and `py_compile`/bracket-checked only — this sandbox has no installable
 `fastapi`/`sqlmodel`/`defusedxml` and no `node_modules`, so none of this has
 run through the project's real test suite, a real DB, or a real browser.
 
-- [ ] Run both new Alembic migrations against a real Postgres DB:
-      `f3a4b5c6d7e8` (SEB fields on `assignment`), `a4b5c6d7e8f9` (`scorm_tracking_data`).
+- [ ] Run all three new Alembic migrations against a real Postgres DB:
+      `f3a4b5c6d7e8` (SEB fields on `assignment`), `a4b5c6d7e8f9`
+      (`scorm_tracking_data`), `b5c6d7e8f9a0` (`time_limit_minutes` on
+      `assignment` + `started_at` on `assignmentusersubmission`).
 - [ ] Run the actual `pytest` suite (not just the standalone sanity scripts
       used during development).
 - [ ] Run a real TypeScript build/typecheck on the web app.
@@ -23,6 +25,11 @@ run through the project's real test suite, a real DB, or a real browser.
       Captivate, etc.) — only hand-built sample manifests were used to verify
       the parser's edge cases (xml:base, nested items, mastery score, href
       normalization, SCORM 2004 rejection).
+- [ ] Test the time-limit flow with real wall-clock timing across a page
+      reload/close-and-reopen — the countdown, the auto-submit-on-expiry
+      timer, and the server-side check all parse the same naive
+      `str(datetime.now())` format independently; worth confirming they
+      agree in practice, not just by inspection.
 
 ## Repo / workflow governance (blocked on GitHub web UI — can't be done from this session)
 
@@ -70,9 +77,11 @@ Grouped roughly by theme. None of these have been scoped in detail; each
 needs its own investigation pass before implementation, same as SEB/SCORM.
 
 **Exam integrity (natural extensions of the SEB work)**
-- Per-attempt time limits on assignments (countdown from first open, not
-  just an absolute due date — no duration field exists on `AssignmentBase`
-  today).
+- ~~Per-attempt time limits on assignments~~ — **done.** `time_limit_minutes`
+  on `Assignment`, explicit "Start attempt" gate (no silent auto-start),
+  server-enforced via `_enforce_time_limit_if_set` on every learner-write
+  path, auto-submit on expiry. Needs real-environment verification like
+  everything else in this session (see that section above).
 - Randomized question pools (draw N questions per student from a larger bank).
 - Shuffled question/answer order per student (lighter-weight than pooling).
 - Webcam proctoring snapshots during a SEB-locked session.

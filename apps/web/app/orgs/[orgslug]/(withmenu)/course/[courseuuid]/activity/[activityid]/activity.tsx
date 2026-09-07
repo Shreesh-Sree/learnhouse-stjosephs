@@ -52,11 +52,12 @@ const VideoActivity = lazy(() => import('@components/Objects/Activities/Video/Vi
 const DocumentPdfActivity = lazy(() => import('@components/Objects/Activities/DocumentPdf/DocumentPdf'))
 const AssignmentStudentActivity = lazy(() => import('@components/Objects/Activities/Assignment/AssignmentStudentActivity'))
 import AssignmentSebGate from '@components/Objects/Activities/Assignment/AssignmentSebGate'
+import AssignmentTimeLimitGate from '@components/Objects/Activities/Assignment/AssignmentTimeLimitGate'
 // Deadline rule shared with the learner activity view (and mirroring the
 // server's _is_assignment_past_due) so the submit/retry affordances agree with
 // what the API will actually accept. Static import: it's a pure function, and
 // gating render on the lazy chunk would flash the wrong control.
-import { isAssignmentPastDue } from '@components/Objects/Activities/Assignment/AssignmentStudentActivity'
+import { isAssignmentPastDue, parseDueDate } from '@components/Objects/Activities/Assignment/AssignmentStudentActivity'
 const AIActivityAsk = lazy(() => import('@components/Objects/Activities/AI/AIActivityAsk'))
 const AISidePanelContentWrapper = lazy(() => import('@components/Objects/Activities/AI/AIActivityAsk').then(mod => ({ default: mod.AISidePanelContentWrapper })))
 const AISidePanelInline = lazy(() => import('@components/Objects/Activities/AI/AIActivityAsk').then(mod => ({ default: mod.AISidePanelInline })))
@@ -367,11 +368,21 @@ function ActivityClient(props: ActivityClientProps) {
                   AssignmentProvider's gated load before firing its own
                   requests, adding an extra round-trip phase. */}
               <AssignmentSubmissionProvider assignment_uuid={assignment?.assignment_uuid}>
-                <AssignmentProvider assignment_uuid={assignment?.assignment_uuid}>
-                  <AssignmentsTaskProvider>
-                    <AssignmentStudentActivity />
-                  </AssignmentsTaskProvider>
-                </AssignmentProvider>
+                {/* Nested inside AssignmentSubmissionProvider so it can read
+                    the learner's own submission (started_at) via
+                    useAssignmentSubmission — same context AssignmentTools
+                    (in ActivityActions) reads to auto-submit on expiry. */}
+                <AssignmentTimeLimitGate
+                  assignmentUuid={assignment?.assignment_uuid}
+                  timeLimitMinutes={assignment?.time_limit_minutes}
+                  accessToken={access_token}
+                >
+                  <AssignmentProvider assignment_uuid={assignment?.assignment_uuid}>
+                    <AssignmentsTaskProvider>
+                      <AssignmentStudentActivity />
+                    </AssignmentsTaskProvider>
+                  </AssignmentProvider>
+                </AssignmentTimeLimitGate>
               </AssignmentSubmissionProvider>
             </AssignmentSebGate>
           </Suspense>
@@ -1561,6 +1572,37 @@ function AssignmentTools(props: {
       }
     }
   }
+
+  // Auto-submit when a timed assignment's clock runs out. Ref (not a
+  // dependency) so this effect only recreates its timer when the actual
+  // timing inputs change, not on every render submitForGradingUI is
+  // redefined — it still always calls the LATEST submit function.
+  const submitForGradingRef = React.useRef(submitForGradingUI)
+  submitForGradingRef.current = submitForGradingUI
+  const hasAutoSubmittedRef = React.useRef(false)
+
+  React.useEffect(() => {
+    const timeLimitMinutes = props.assignment?.time_limit_minutes
+    const startedAt = submission?.started_at
+    const status = submission?.submission_status
+    const isDone = status === 'SUBMITTED' || status === 'GRADED' || status === 'LATE'
+    if (!timeLimitMinutes || !startedAt || isDone || hasAutoSubmittedRef.current) return
+
+    const parsed = parseDueDate(startedAt)
+    if (!parsed) return
+    const msRemaining = parsed.at.getTime() + timeLimitMinutes * 60_000 - Date.now()
+
+    if (msRemaining <= 0) {
+      hasAutoSubmittedRef.current = true
+      submitForGradingRef.current()
+      return
+    }
+    const timeoutId = setTimeout(() => {
+      hasAutoSubmittedRef.current = true
+      submitForGradingRef.current()
+    }, msRemaining)
+    return () => clearTimeout(timeoutId)
+  }, [props.assignment?.time_limit_minutes, submission?.started_at, submission?.submission_status])
 
   const [isRetrying, setIsRetrying] = React.useState(false);
   const retrySubmissionUI = async () => {

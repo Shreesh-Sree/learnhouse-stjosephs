@@ -43,6 +43,7 @@ import {
     Upload,
     ShieldCheck,
     KeyRound,
+    Timer,
     Download,
 } from 'lucide-react';
 
@@ -67,6 +68,7 @@ interface Assignment {
     solution_reveal?: SolutionReveal;
     require_safe_exam_browser?: boolean;
     seb_quit_password?: string | null;
+    time_limit_minutes?: number | null;
     assignment_tasks?: any[];
 }
 
@@ -231,6 +233,9 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             // integration): irrelevant to the normal submit-then-auto-exit
             // flow, only used if a proctor has to force-quit a stuck session.
             seb_quit_password: assignment.seb_quit_password || '',
+            time_limit_enabled: typeof assignment.time_limit_minutes === 'number',
+            time_limit_minutes:
+                typeof assignment.time_limit_minutes === 'number' ? assignment.time_limit_minutes : 60,
         },
         enableReinitialize: true,
         onSubmit: async (values, { setSubmitting }) => {
@@ -250,6 +255,11 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             // Same convention for the quit password: an emptied field clears
             // it in the DB rather than storing an empty string.
             payload.seb_quit_password = values.seb_quit_password || null;
+            // time_limit_enabled is a form-only toggle, never sent — it just
+            // decides whether time_limit_minutes goes out as a number or an
+            // explicit null (clearing it, same convention as due_date above).
+            payload.time_limit_minutes = values.time_limit_enabled ? values.time_limit_minutes : null;
+            delete payload.time_limit_enabled;
             // Formative mode owns the grading switches: an ungraded assignment
             // never auto-grades and has no answer key to reveal, so send the
             // consistent state rather than leaving stale flags in the DB that
@@ -524,6 +534,12 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
                     savedEnabled={!!assignment.require_safe_exam_browser}
                     onDownload={handleDownloadSebConfig}
                     isDownloading={isDownloadingSeb}
+                />
+                <TimeLimitRow
+                    enabled={formik.values.time_limit_enabled}
+                    onEnabledChange={(v) => formik.setFieldValue('time_limit_enabled', v, true)}
+                    minutes={formik.values.time_limit_minutes}
+                    onMinutesChange={(v) => formik.setFieldValue('time_limit_minutes', v, true)}
                 />
             </div>
 
@@ -965,6 +981,95 @@ function SEBRow({
                             })}
                         </p>
                     )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Per-attempt duration, independent of the due_date deadline above. The
+// student sees an explicit "Start attempt" screen and a countdown once
+// enabled — see AssignmentTimeLimitGate.tsx — rather than the clock running
+// silently from whenever they first open the page.
+function TimeLimitRow({
+    enabled,
+    onEnabledChange,
+    minutes,
+    onMinutesChange,
+}: {
+    enabled: boolean;
+    onEnabledChange: (_next: boolean) => void;
+    minutes: number;
+    onMinutesChange: (_next: number) => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <div className="rounded-xl border nice-shadow bg-white border-gray-100 overflow-hidden">
+            <div className="flex items-start justify-between gap-3 p-3">
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <div className="mt-0.5 flex-none">
+                        <Timer size={16} className="text-amber-500" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <p className="text-xs font-bold text-gray-900">
+                            {t('dashboard.assignments.modals.edit.form.time_limit_label', { defaultValue: 'Time limit' })}
+                        </p>
+                        <p className="text-[10px] text-gray-500 leading-snug mt-0.5">
+                            {t('dashboard.assignments.modals.edit.form.time_limit_description', {
+                                defaultValue: 'Learners must explicitly start the attempt; the clock then runs regardless of the due date above.',
+                            })}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onEnabledChange(!enabled)}
+                    aria-pressed={enabled}
+                    className={`relative flex-none inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        enabled ? 'bg-gray-900' : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                >
+                    <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            enabled ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
+                        }`}
+                    />
+                </button>
+            </div>
+            {enabled && (
+                <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/50">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold text-gray-700">
+                            {t('dashboard.assignments.modals.edit.form.time_limit_minutes_label', { defaultValue: 'Minutes' })}
+                        </p>
+                        <div className="flex-none flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => onMinutesChange(Math.max(1, minutes - 5))}
+                                className="h-7 w-7 rounded-md bg-white border border-gray-200 nice-shadow text-gray-600 hover:bg-gray-50 text-sm font-bold"
+                            >
+                                −
+                            </button>
+                            <input
+                                type="number"
+                                min={1}
+                                max={600}
+                                value={minutes}
+                                onChange={(e) => {
+                                    const raw = parseInt(e.target.value, 10);
+                                    onMinutesChange(isNaN(raw) ? 1 : Math.max(1, Math.min(600, raw)));
+                                }}
+                                className="w-16 h-7 text-center text-sm font-bold text-gray-900 bg-white border border-gray-200 rounded-md outline-none focus:ring-1 focus:ring-gray-300"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => onMinutesChange(Math.min(600, minutes + 5))}
+                                className="h-7 w-7 rounded-md bg-white border border-gray-200 nice-shadow text-gray-600 hover:bg-gray-50 text-sm font-bold"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
