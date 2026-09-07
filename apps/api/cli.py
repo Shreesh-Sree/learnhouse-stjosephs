@@ -440,6 +440,48 @@ async def _run_nudges(
 
 
 @cli.command()
+def digest_run(
+    dry_run: Annotated[bool, typer.Option(help="Render and log, but send nothing")] = False,
+    org_id: Annotated[int, typer.Option(help="Restrict to a single org id")] = 0,
+):
+    """
+    Weekly: send the student "here's what's due" digest.
+
+    Cron-invoked (an in-app weekly scheduler also runs this — see
+    services/digest/scheduler.py — this command is the manual/dry-run
+    escape hatch). Sends nothing unless LEARNHOUSE_WEEKLY_DIGEST_ENABLED is
+    set, except in --dry-run mode which always runs so it can be checked
+    before flipping the switch.
+    """
+    asyncio.run(_run_digest(dry_run=dry_run, org_id=org_id or None))
+
+
+async def _run_digest(*, dry_run: bool, org_id) -> None:
+    from src.services.digest.weekly_digest import run_weekly_digest
+
+    learnhouse_config = get_learnhouse_config()
+    sql_url = learnhouse_config.database_config.sql_connection_string  # type: ignore
+    async_engine = create_async_engine(_to_async_url(sql_url), echo=False, pool_pre_ping=True)
+
+    try:
+        async with AsyncSession(async_engine, expire_on_commit=False) as db_session:
+            stats = await run_weekly_digest(db_session, dry_run=dry_run, org_id=org_id)
+    finally:
+        await async_engine.dispose()
+
+    mode = "dry-run" if dry_run else "live"
+    result = stats.as_dict()
+    print(f"Weekly digest run ({mode}): sent={result['sent']} failed={result['failed']}")
+    print(
+        "  skipped: "
+        f"dedupe={result['skipped_dedupe']} "
+        f"optout={result['skipped_optout']} "
+        f"empty={result['skipped_empty']} "
+        f"inactive_org={result['skipped_inactive_org']}"
+    )
+
+
+@cli.command()
 def nudges_stats(
     days: Annotated[int, typer.Option(help="Window to report on")] = 30,
 ):

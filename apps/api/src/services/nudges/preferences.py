@@ -112,6 +112,67 @@ async def is_opted_out(db_session: AsyncSession, user_id: int) -> bool:
     return bool(pref and pref.lifecycle_opt_out)
 
 
+async def get_weekly_digest_opted_out_user_ids(
+    db_session: AsyncSession, user_ids: Iterable[int]
+) -> Set[int]:
+    """Same as :func:`get_opted_out_user_ids`, but for the weekly student
+    digest category — independent of ``lifecycle_opt_out`` (see
+    ``EmailPreference.weekly_digest_opt_out``'s own docstring for why),
+    while still honoring a hard bounce/spam-complaint suppression, which
+    applies to every category."""
+    ids = list(user_ids)
+    if not ids:
+        return set()
+
+    rows = (
+        await db_session.execute(
+            select(EmailPreference.user_id).where(
+                EmailPreference.user_id.in_(ids),
+                or_(
+                    EmailPreference.weekly_digest_opt_out.is_(True),
+                    EmailPreference.suppressed.is_(True),
+                ),
+            )
+        )
+    ).scalars().all()
+    return set(rows)
+
+
+async def set_weekly_digest_opt_out(
+    db_session: AsyncSession,
+    user_id: int,
+    opted_out: bool = True,
+    source: str = "email_link",
+) -> EmailPreference:
+    """Upsert the user's weekly-digest preference. Idempotent, mirrors
+    :func:`set_lifecycle_opt_out` for the separate digest category."""
+    pref = (
+        await db_session.execute(
+            select(EmailPreference).where(EmailPreference.user_id == user_id)
+        )
+    ).scalars().first()
+
+    now = datetime.now(timezone.utc)
+    if pref is None:
+        pref = EmailPreference(
+            user_id=user_id,
+            weekly_digest_opt_out=opted_out,
+            unsubscribed_at=now if opted_out else None,
+            source=source,
+        )
+        db_session.add(pref)
+    else:
+        pref.weekly_digest_opt_out = opted_out
+        if opted_out and pref.unsubscribed_at is None:
+            pref.unsubscribed_at = now
+        pref.source = source
+        db_session.add(pref)
+
+    await db_session.commit()
+    await db_session.refresh(pref)
+    return pref
+
+
 async def set_lifecycle_opt_out(
     db_session: AsyncSession,
     user_id: int,

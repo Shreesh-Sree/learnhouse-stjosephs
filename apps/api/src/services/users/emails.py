@@ -778,3 +778,90 @@ def send_nudge_email(
         headers=headers or None,
         sender_name=sender_name,
     )
+
+
+def _digest_item_list(items: list[dict], item_key: str, lang: str) -> str:
+    """Bulleted HTML list for one digest section. Every value is escaped
+    before it reaches the template — item text is course/assignment titles,
+    which authors control, not untrusted input, but this mailer escapes
+    everything uniformly rather than special-casing "trusted" fields."""
+    if not items:
+        return ""
+    rows = []
+    for item in items:
+        safe = {k: html.escape(str(v)) for k, v in item.items()}
+        rows.append(f"<li style=\"margin: 0 0 8px 0;\">{t(lang, item_key, **safe)}</li>")
+    return f'<ul style="{STYLES["p"]} padding-left: 20px; margin: 0 0 20px 0;">{"".join(rows)}</ul>'
+
+
+def send_weekly_digest_email(
+    email: EmailStr,
+    org_name: str,
+    cta_url: str,
+    unsubscribe_url: str,
+    due_this_week: list[dict],
+    not_started: list[dict],
+    lang: str = "en",
+    logo_url: str | None = None,
+    sender_name: str | None = None,
+):
+    """Send one weekly student digest. Caller (services.digest.weekly_digest)
+    guarantees at least one of ``due_this_week``/``not_started`` is non-empty
+    — an empty digest is worse than no email, so that check lives upstream
+    of this function, not here.
+
+    ``due_this_week`` items: ``{"title", "course_name", "due_date"}``.
+    ``not_started`` items: ``{"title", "course_name"}``.
+
+    Mirrors send_nudge_email's shape (layout, headers, escaping, swallowed
+    failures) but is deliberately simpler: no illustration/track system, no
+    catalog — this is one email type, not a family of them.
+    """
+    safe_org_name = html.escape(org_name)
+    heading = t(lang, "digest.heading")
+    intro = t(lang, "digest.intro", org_name=safe_org_name)
+
+    sections = ""
+    if due_this_week:
+        sections += (
+            f'<p style="{STYLES["p"]} font-weight: 700;">{t(lang, "digest.due_this_week.title")}</p>'
+            + _digest_item_list(due_this_week, "digest.due_this_week.item", lang)
+        )
+    if not_started:
+        sections += (
+            f'<p style="{STYLES["p"]} font-weight: 700;">{t(lang, "digest.not_started.title")}</p>'
+            + _digest_item_list(not_started, "digest.not_started.item", lang)
+        )
+
+    body_content = f"""
+        <h1 style="{STYLES['h1']}">{heading}</h1>
+        <p style="{STYLES['p']}">{intro}</p>
+        {sections}
+        <a href="{html.escape(cta_url)}" style="{STYLES['button']}">
+            {t(lang, "digest.cta", org_name=safe_org_name)}
+        </a>
+        <p style="{STYLES['link_text']}">{html.escape(cta_url)}</p>
+    """
+
+    preheader = _first_sentence(intro)
+
+    headers: dict[str, str] = {}
+    if unsubscribe_url:
+        headers["List-Unsubscribe"] = f"<{unsubscribe_url}>"
+        headers["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
+
+    return _send_notification_email(
+        to=email,
+        subject=t(lang, "digest.subject", org_name=org_name),
+        body=_email_layout(
+            title=heading,
+            body_content=body_content,
+            footer_note=t(lang, "digest.footer", org_name=safe_org_name),
+            logo_html=_org_logo_img(logo_url, org_name) if logo_url else LOGO_SVG,
+            unsubscribe_url=unsubscribe_url,
+            unsubscribe_label=t(lang, "digest.unsubscribe"),
+            preheader=preheader,
+        ),
+        headers=headers or None,
+        sender_name=sender_name,
+    )

@@ -972,6 +972,14 @@ for _nudge_lang, _nudge_keys in NUDGE_TRANSLATIONS.items():
     EMAIL_TRANSLATIONS.setdefault(_nudge_lang, {}).update(_nudge_keys)
 
 
+# Weekly student digest copy — see that module's docstring for the
+# English-only scope decision.
+from src.services.email.digest_translations import DIGEST_TRANSLATIONS  # noqa: E402
+
+for _digest_lang, _digest_keys in DIGEST_TRANSLATIONS.items():
+    EMAIL_TRANSLATIONS.setdefault(_digest_lang, {}).update(_digest_keys)
+
+
 def normalize_language(lang: str | None) -> str:
     """Return a supported locale code, falling back to English."""
     if not lang:

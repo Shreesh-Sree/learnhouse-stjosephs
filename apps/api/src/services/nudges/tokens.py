@@ -29,6 +29,9 @@ _TOKEN_VERSION = "v1"
 # mail can never be replayed to opt someone out of a different category (or
 # vice versa) once more categories exist.
 CATEGORY_LIFECYCLE = "lifecycle"
+# The weekly student digest is a separate opt-out category from admin
+# lifecycle nudges — see EmailPreference.weekly_digest_opt_out.
+CATEGORY_WEEKLY_DIGEST = "weekly_digest"
 
 _SIGNATURE_LENGTH = 32
 

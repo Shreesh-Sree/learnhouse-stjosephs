@@ -136,6 +136,13 @@ class EmailPreference(SQLModel, table=True):
     product_updates_opt_out: bool = Field(
         default=False, sa_column=Column(Boolean, nullable=False, default=False)
     )
+    # A different category from lifecycle_opt_out: a student may want their
+    # own "here's what's due" digest while an org admin who is also a
+    # student elsewhere opts out of the growth-nudge emails they get as an
+    # admin, or vice versa — see services/digest/weekly_digest.py.
+    weekly_digest_opt_out: bool = Field(
+        default=False, sa_column=Column(Boolean, nullable=False, default=False)
+    )
     unsubscribed_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)
     )

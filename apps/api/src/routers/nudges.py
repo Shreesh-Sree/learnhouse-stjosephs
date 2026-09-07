@@ -19,9 +19,10 @@ from src.core.events.database import get_db_session
 from src.services.nudges.preferences import (
     get_user_by_uuid,
     set_lifecycle_opt_out,
+    set_weekly_digest_opt_out,
     suppress_address,
 )
-from src.services.nudges.tokens import verify_unsubscribe_token
+from src.services.nudges.tokens import CATEGORY_LIFECYCLE, CATEGORY_WEEKLY_DIGEST, verify_unsubscribe_token
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ def _expired_page() -> HTMLResponse:
 async def unsubscribe_page(
     request: Request,
     token: str = Query(..., description="Unsubscribe token from the email link"),
+    category: Optional[str] = Query(default=None),
     db_session: AsyncSession = Depends(get_db_session),
 ) -> HTMLResponse:
     """Render a confirmation page. Deliberately free of side effects.
@@ -81,8 +83,14 @@ async def unsubscribe_page(
     Corporate mail scanners (Outlook Safe Links, Proofpoint and friends)
     prefetch every href in a message. If this GET unsubscribed people, those
     scanners would silently opt out users who never clicked anything.
+
+    ``category`` defaults to lifecycle nudges for links minted before the
+    weekly digest category existed; a mismatched category on a genuine token
+    simply fails verification (see links.unsubscribe_url) and falls through
+    to the expired-link page below.
     """
-    user_uuid = verify_unsubscribe_token(token)
+    is_digest = category == CATEGORY_WEEKLY_DIGEST
+    user_uuid = verify_unsubscribe_token(token, category=category or CATEGORY_LIFECYCLE)
     if not user_uuid:
         return _expired_page()
 
@@ -91,15 +99,25 @@ async def unsubscribe_page(
         return _expired_page()
 
     escaped_token = html.escape(token)
+    category_field = (
+        f'<input type="hidden" name="category" value="{html.escape(category)}" />' if category else ""
+    )
     form_html = f"""<form method="post" action="unsubscribe">
 <input type="hidden" name="token" value="{escaped_token}" />
+{category_field}
 <button type="submit" style="{_BUTTON_STYLE}">Confirm unsubscribe</button>
 </form>"""
+    description = (
+        "You'll stop receiving the weekly digest of what's due and what you "
+        f"haven't started at <strong>{html.escape(str(user.email))}</strong>."
+        if is_digest
+        else
+        f"You'll stop receiving tips and reminders at "
+        f"<strong>{html.escape(str(user.email))}</strong>."
+    ) + " Account emails like password resets and invitations will still reach you."
     return _page(
         "Unsubscribe from these emails?",
-        f"You'll stop receiving tips and reminders at "
-        f"<strong>{html.escape(str(user.email))}</strong>. Account emails like "
-        "password resets and invitations will still reach you.",
+        description,
         form_html,
     )
 
@@ -109,16 +127,21 @@ async def unsubscribe_confirm(
     request: Request,
     token: Optional[str] = Form(default=None),
     token_query: Optional[str] = Query(default=None, alias="token"),
+    category: Optional[str] = Form(default=None),
+    category_query: Optional[str] = Query(default=None, alias="category"),
     db_session: AsyncSession = Depends(get_db_session),
 ) -> HTMLResponse:
     """Apply the opt-out. Idempotent.
 
     This is also the RFC 8058 one-click target named by the
     ``List-Unsubscribe-Post`` header, which posts without a form body — hence
-    accepting the token from either the body or the query string.
+    accepting the token (and category) from either the body or the query
+    string.
     """
     supplied = token or token_query
-    user_uuid = verify_unsubscribe_token(supplied or "")
+    supplied_category = category or category_query
+    is_digest = supplied_category == CATEGORY_WEEKLY_DIGEST
+    user_uuid = verify_unsubscribe_token(supplied or "", category=supplied_category or CATEGORY_LIFECYCLE)
     if not user_uuid:
         return _expired_page()
 
@@ -126,14 +149,22 @@ async def unsubscribe_confirm(
     if user is None or user.id is None:
         return _expired_page()
 
-    await set_lifecycle_opt_out(db_session, user.id, opted_out=True, source="email_link")
-    logger.info("Lifecycle email opt-out recorded for user %s", user.id)
+    if is_digest:
+        await set_weekly_digest_opt_out(db_session, user.id, opted_out=True, source="email_link")
+        logger.info("Weekly digest opt-out recorded for user %s", user.id)
+        message = (
+            "You won't receive the weekly digest anymore. Account emails "
+            "like password resets and invitations will still reach you."
+        )
+    else:
+        await set_lifecycle_opt_out(db_session, user.id, opted_out=True, source="email_link")
+        logger.info("Lifecycle email opt-out recorded for user %s", user.id)
+        message = (
+            "You won't receive any more tips or reminders from us. Account emails "
+            "like password resets and invitations will still reach you."
+        )
 
-    return _page(
-        "You're unsubscribed",
-        "You won't receive any more tips or reminders from us. Account emails "
-        "like password resets and invitations will still reach you.",
-    )
+    return _page("You're unsubscribed", message)
 
 
 # --------------------------------------------------------------------------

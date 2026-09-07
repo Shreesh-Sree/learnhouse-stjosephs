@@ -445,9 +445,45 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   run it against.
 - Verifiable digital credentials for certificates (Open Badges or a signed
   PDF), extending the certificates that already exist.
-- Weekly digest email ("here's what's due, what you haven't started"),
-  student-facing — distinct from the existing org-admin lifecycle nudges
-  (`services/email/nudge_translations`), which only address admins.
+- ~~Weekly digest email~~ — **done**, a deliberately much smaller sibling of
+  the existing org-admin lifecycle nudges (`services/nudges/`) rather than
+  an extension of them: one email type, one weekly cadence, no catalog/
+  spec system, no per-track pacing. Runs on its own in-process weekly
+  scheduler (`services/digest/scheduler.py`, mirroring the nudge
+  scheduler's daily-tick pattern — Redis day-lock as an optimisation,
+  the send ledger's unique dedupe key as the actual correctness
+  guarantee) — **not SaaS-gated**, unlike nudges: a self-hosted college is
+  exactly this feature's intended audience, so the only gate is the
+  `LEARNHOUSE_WEEKLY_DIGEST_ENABLED` kill switch (default off) plus each
+  student's own opt-out. That opt-out is a NEW, independent
+  `EmailPreference.weekly_digest_opt_out` field — deliberately not reusing
+  `lifecycle_opt_out`, since an org admin who is also a student elsewhere
+  should be able to opt out of one without the other. For every
+  (student, org) enrollment with at least one signal, the email lists
+  "due this week" (published assignments whose effective due date —
+  extensions honored — falls in the next 7 days, not yet submitted) and
+  "you haven't started" (other unsubmitted published assignments), each
+  capped at 5 items; a student with nothing to show gets no email at all.
+  An operator dry-run is available via `python cli.py digest-run
+  --dry-run` (mirrors `nudges-run`). SCOPE DECISIONS, disclosed in the
+  service module's own docstring: (1) "haven't started" lists only
+  unsubmitted ASSIGNMENTS, never ordinary reading/content activities — a
+  content page has no deadline pressure, and listing every unread page
+  would make the email noisy rather than useful; (2) an assignment already
+  past its own effective due date is excluded from both sections — that's
+  the at-risk dashboard's job, not this email's, and repeating "this is
+  late" every Monday would read as a nag; (3) only English copy was
+  written (`services/email/digest_translations.py`) — every other locale
+  already falls back to English via the existing `t()` translation
+  helper's design, same disclosed limitation as this session's other
+  new UI copy. No frontend preference toggle was added — matches the
+  existing lifecycle-nudge precedent exactly (unsubscribe-link-only, no
+  account-settings UI for either category). The date-bucketing and
+  weekly dedupe-key logic were verified with standalone scripts; the
+  scheduler's day-of-week/hour math was verified the same way. Needs
+  real-environment verification like everything else this session,
+  especially a real Resend send and a real weekly tick across a
+  server restart.
 - Gamification (points, streaks, badges for consistent participation) —
   genuinely absent today; worth weighing carefully for a college audience,
   since it fits some course types far better than others.

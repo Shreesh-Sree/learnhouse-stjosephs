@@ -17,7 +17,7 @@ from typing import Optional
 from urllib.parse import quote
 
 from src.services.email.utils import get_org_signup_base_url
-from src.services.nudges.tokens import make_unsubscribe_token
+from src.services.nudges.tokens import CATEGORY_LIFECYCLE, make_unsubscribe_token
 
 # The `[subpage]` segment of the course editor route is a closed set; anything
 # else renders a broken tab rather than 404ing, which is harder to notice.
@@ -83,11 +83,27 @@ def public_course_url(base: str, course_uuid: str) -> str:
     return f"{base}/course/{bare}"
 
 
-def unsubscribe_url(api_base_url: str, user_uuid: str) -> str:
+def student_courses_url(base: str) -> str:
+    """The learner-facing "my courses" catalog page — the CTA target for the
+    weekly student digest (services.digest.weekly_digest), as distinct from
+    every other link in this module, which points into the admin dashboard."""
+    return f"{base}/courses"
+
+
+def unsubscribe_url(api_base_url: str, user_uuid: str, category: str = CATEGORY_LIFECYCLE) -> str:
     """One-click unsubscribe link, also used for the List-Unsubscribe header.
 
     Points at the API rather than the frontend: the endpoint is the action
     target for RFC 8058 one-click, which posts directly without loading a page.
+
+    ``category`` is carried as a plain query param alongside the token, not a
+    security boundary itself — the token's own HMAC is signed over
+    ``category:user_uuid`` (see services.nudges.tokens), so a tampered
+    category on an otherwise-untouched token simply fails verification and
+    falls back to the "expired link" page, the same as any other tampering.
     """
-    token = make_unsubscribe_token(user_uuid)
-    return f"{api_base_url.rstrip('/')}/api/v1/emails/unsubscribe?token={quote(token, safe='')}"
+    token = make_unsubscribe_token(user_uuid, category=category)
+    url = f"{api_base_url.rstrip('/')}/api/v1/emails/unsubscribe?token={quote(token, safe='')}"
+    if category != CATEGORY_LIFECYCLE:
+        url += f"&category={quote(category, safe='')}"
+    return url

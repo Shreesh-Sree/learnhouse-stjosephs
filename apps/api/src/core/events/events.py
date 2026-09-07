@@ -74,6 +74,13 @@ def startup_app(app: FastAPI) -> Callable:
         from src.services.nudges.scheduler import start_scheduler
         start_scheduler()
 
+        # The weekly student digest runs on its own weekly tick, same
+        # reasoning as the nudge scheduler above — but not SaaS-gated (a
+        # self-hosted college is this feature's intended audience). No-op
+        # unless LEARNHOUSE_WEEKLY_DIGEST_ENABLED; never raises.
+        from src.services.digest.scheduler import start_scheduler as start_digest_scheduler
+        start_digest_scheduler()
+
         # The shared demo organization refreshes itself on an interval, so the
         # feature needs no external scheduler. No-op unless
         # LEARNHOUSE_DEMO_ENABLED; never raises.
@@ -118,6 +125,9 @@ def shutdown_app(app: FastAPI) -> Callable:
         # Stop the daily nudge tick.
         from src.services.nudges.scheduler import stop_scheduler
         await stop_scheduler()
+        # Stop the weekly digest tick.
+        from src.services.digest.scheduler import stop_scheduler as stop_digest_scheduler
+        await stop_digest_scheduler()
         # Stop the demo refresh tick.
         from src.services.demo.scheduler import stop_scheduler as stop_demo_scheduler
         await stop_demo_scheduler()
