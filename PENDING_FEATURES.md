@@ -305,8 +305,47 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   verification like everything else this session, especially an actual
   launch from a real Canvas/Moodle sandbox rather than just the
   signature-math self-test this session could run.
-- Question-bank import (QTI format) for migrating existing quiz content from
-  other tools.
+- ~~Question-bank import (QTI format)~~ — **done, narrowly scoped.** QTI
+  **1.2** only (the classic `<questestinterop>` XML most legacy quiz tools —
+  Canvas's QTI export, Blackboard, ExamView, Respondus — still produce),
+  NOT the structurally different QTI 2.x/3.x schema. Item types: multiple-
+  choice (single- and select-all-that-apply) and true/false, which is just
+  a two-option multiple-choice under the hood; essay, short-answer/
+  fill-in-blank, matching, and ordering items are recognised and SKIPPED
+  (reported back by item identifier and reason) rather than silently
+  dropped or guessed at. A new "QTI Import" course-dashboard tab accepts a
+  single QTI XML file or a zip of several (an IMS Content Package's
+  per-item XML files); the parser is namespace-agnostic local-tag matching
+  (mirroring the existing SCORM importer's approach to the same
+  inconsistently-namespaced-export problem) over `defusedxml` (XXE
+  protection, also matching the SCORM importer) rather than a new XML
+  convention. "Correct answer" detection follows the conventional QTI 1.2
+  authoring pattern every major exporter uses: a `<respcondition>` marks
+  its referenced choice(s) correct when it awards a positive `SCORE` via
+  `<setvar>` — verified against hand-built single-response,
+  select-all-that-apply, true/false, and essay-should-skip fixtures
+  exercising that logic directly (this session's sandbox has neither
+  `defusedxml` nor `fastapi` installed, so the parsing/scoring functions
+  were verified with the stdlib `xml.etree.ElementTree` swapped in — an
+  API-compatible drop-in for everything exercised — rather than skipped).
+  A successful import creates ONE NEW activity (a custom content page
+  holding a single quiz block with every parsed question) in the chapter
+  the instructor picks, reusing the exact `blockQuiz` shape the AI quiz
+  generator already produces (`services/ai/quiz.py`'s `_to_block_quiz`) —
+  so an imported quiz is indistinguishable from a hand-authored or
+  AI-generated one once it lands in the editor, immediately reviewable/
+  editable before publishing. There is no separate "question bank" store
+  independent of course content; importing IS authoring a quiz activity.
+  KNOWN LIMITATIONS: (1) no partial-credit/weighted scoring is imported —
+  every question is pass/fail correct-or-not, matching the editor's own
+  quiz block, which has no notion of partial credit either; (2) item
+  metadata beyond the question/answer text (point values, feedback text,
+  images/attachments referenced by `<matimage>`) is discarded; (3) no Tool
+  Consumer-style export in the other direction (LearnHouse cannot produce
+  a QTI file from its own quizzes). Needs real-environment verification
+  like everything else this session, especially against a real QTI 1.2
+  export from Canvas/Blackboard/Respondus rather than just the synthetic
+  fixtures this session could build.
 - ~~Calendar/ICS feed of assignment due dates~~ — **done.** Per-user opaque
   token (`GET /users/me/calendar_feed_token`, regenerable) that stands in
   for authentication on `GET /calendar/feed/{token}.ics` — deliberately the

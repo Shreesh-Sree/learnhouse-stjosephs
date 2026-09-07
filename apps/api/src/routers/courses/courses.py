@@ -58,6 +58,7 @@ from src.services.courses.roster import (
     export_course_gradebook_csv,
     parse_roster_emails,
 )
+from src.services.courses.qti_import import import_qti_to_course
 from src.services.courses.transfer import (
     export_course,
     export_courses_batch,
@@ -1140,3 +1141,45 @@ async def api_export_course_gradebook(
     current_user: PublicUser = Depends(get_current_user),
 ):
     return await export_course_gradebook_csv(request, course_uuid, current_user, db_session)
+
+
+## QTI QUESTION-BANK IMPORT ##
+
+
+@router.post(
+    "/{course_uuid}/qti_import",
+    summary="Import a QTI 1.2 question bank as a new quiz activity",
+    description=(
+        "Instructor-only. Uploads a QTI 1.2 XML file (or a zip of several) "
+        "and creates one new activity in the given chapter holding every "
+        "multiple-choice/true-false item it could parse, as a blockQuiz. "
+        "Essay, short-answer, matching and ordering items are recognised "
+        "and skipped (reported by identifier and reason) rather than "
+        "mis-imported — see services/courses/qti_import.py for the full "
+        "scope decision (QTI 1.2 only, not the newer 2.x/3.x schema)."
+    ),
+    responses={
+        200: {"description": "Import report: activity created, questions imported, items skipped."},
+        400: {"description": "Unreadable upload, or no importable questions found."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to add content to this course"},
+        404: {"description": "Course or chapter not found"},
+    },
+)
+async def api_import_qti(
+    request: Request,
+    course_uuid: str,
+    chapter_id: int = Form(...),
+    activity_name: str | None = Form(None),
+    file: UploadFile | None = None,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: PublicUser = Depends(get_current_user),
+):
+    if file is None:
+        raise HTTPException(status_code=400, detail="No file uploaded.")
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    return await import_qti_to_course(
+        request, course_uuid, chapter_id, file.filename or "upload", content, activity_name, current_user, db_session
+    )
