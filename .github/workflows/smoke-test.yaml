@@ -1,0 +1,93 @@
+name: Post-deploy smoke test
+
+# Gates a deployment on scripts/smoke-test.sh actually passing against the
+# live environment — not the build, the running thing.
+#
+# This repo doesn't own the deploy step itself (self-host: LearnHouse ships
+# a Docker image, deploy targets are up to whoever runs it), so this workflow
+# doesn't deploy anything. It's meant to be invoked one of three ways:
+#
+#   1. workflow_dispatch — run it by hand against whatever STAGING_API_URL/
+#      STAGING_WEB_URL point at right now.
+#   2. repository_dispatch, event type "deployed" — have your actual deploy
+#      pipeline (Coolify/Render/Fly/a bare SSH+systemctl script/whatever)
+#      POST to this repo's dispatch endpoint once the new version is live:
+#        curl -X POST \
+#          -H "Authorization: token $GH_TOKEN" \
+#          -H "Accept: application/vnd.github+json" \
+#          https://api.github.com/repos/<owner>/<repo>/dispatches \
+#          -d '{"event_type":"deployed","client_payload":{"environment":"staging"}}'
+#      A failed run here is your signal to roll back — wire your deploy
+#      pipeline's next step (or a required status check on the tag/PR that
+#      triggered the deploy) to check this workflow's conclusion.
+#   3. workflow_call — reference this workflow from another one in this repo
+#      if a real deploy workflow is added here later:
+#        jobs:
+#          smoke-test:
+#            needs: deploy
+#            uses: ./.github/workflows/smoke-test.yaml
+#            secrets: inherit
+#
+# Configure once, per environment you want gated, under
+# Settings → Secrets and variables → Actions:
+#   Variables: STAGING_API_URL, STAGING_WEB_URL
+#   Secrets:   SMOKE_TEST_EMAIL, SMOKE_TEST_PASSWORD (a dedicated
+#              low-privilege account — this logs in for real on every run)
+# The job below no-ops (skips, doesn't fail) if STAGING_API_URL isn't set,
+# so this file is safe to merge before that configuration exists.
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Backend base URL (overrides the STAGING_API_URL variable)'
+        required: false
+      web_url:
+        description: 'Frontend base URL (overrides the STAGING_WEB_URL variable)'
+        required: false
+  repository_dispatch:
+    types: [deployed]
+  workflow_call:
+    inputs:
+      api_url:
+        type: string
+        required: false
+      web_url:
+        type: string
+        required: false
+    secrets:
+      SMOKE_TEST_EMAIL:
+        required: false
+      SMOKE_TEST_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      STAGING_API_URL: ${{ inputs.api_url || vars.STAGING_API_URL }}
+      STAGING_WEB_URL: ${{ inputs.web_url || vars.STAGING_WEB_URL }}
+      SMOKE_TEST_EMAIL: ${{ secrets.SMOKE_TEST_EMAIL }}
+      SMOKE_TEST_PASSWORD: ${{ secrets.SMOKE_TEST_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check environment is configured
+        id: configured
+        run: |
+          if [[ -z "$STAGING_API_URL" || -z "$STAGING_WEB_URL" ]]; then
+            echo "STAGING_API_URL/STAGING_WEB_URL not set — skipping (configure them under" >&2
+            echo "Settings → Secrets and variables → Actions → Variables to enable this gate)." >&2
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run smoke test
+        if: steps.configured.outputs.configured == 'true'
+        run: scripts/smoke-test.sh
