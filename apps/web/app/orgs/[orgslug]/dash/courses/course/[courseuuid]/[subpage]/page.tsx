@@ -3,7 +3,7 @@ import React, { use, useEffect } from 'react';
 import { CourseProvider } from '../../../../../../../../components/Contexts/CourseContext'
 import { CourseOverviewTop } from '@components/Dashboard/Misc/CourseOverviewTop'
 import { motion } from 'motion/react'
-import { GalleryVerticalEnd, Globe, Info, UserPen, Award, Lock, Search, ClipboardList, Link2, FileUp, Flag, AlertTriangle } from 'lucide-react'
+import { GalleryVerticalEnd, Globe, Info, UserPen, Award, Lock, Search, ClipboardList, Link2, FileUp, Flag, AlertTriangle, Video } from 'lucide-react'
 import { ChartBar } from '@phosphor-icons/react'
 import EditCourseStructure from '@components/Dashboard/Pages/Course/EditCourseStructure/EditCourseStructure'
 import EditCourseGeneral from '@components/Dashboard/Pages/Course/EditCourseGeneral/EditCourseGeneral'
@@ -16,6 +16,7 @@ import EditCourseLTI from '@components/Dashboard/Pages/Course/EditCourseLTI/Edit
 import EditCourseQTIImport from '@components/Dashboard/Pages/Course/EditCourseQTIImport/EditCourseQTIImport'
 import EditCourseQuizFlags from '@components/Dashboard/Pages/Course/EditCourseQuizFlags/EditCourseQuizFlags'
 import EditCourseAtRisk from '@components/Dashboard/Pages/Course/EditCourseAtRisk/EditCourseAtRisk'
+import EditCourseLiveSessions from '@components/Dashboard/Pages/Course/EditCourseLiveSessions/EditCourseLiveSessions'
 import { useCourseRights } from '@hooks/useCourseRights'
 import { useRouter } from 'next/navigation'
 import { getUriWithOrg } from '@services/config/config';
@@ -131,6 +132,13 @@ function CourseOverviewPage(props: { params: Promise<CourseOverviewParams> }) {
       label: t('dashboard.courses.settings.tabs.at_risk', { defaultValue: 'At-Risk' }),
       icon: AlertTriangle,
       href: `/dash/courses/course/${params.courseuuid}/at_risk`,
+      requiredPermission: 'update' as const
+    },
+    {
+      key: 'live_sessions',
+      label: t('dashboard.courses.settings.tabs.live_sessions', { defaultValue: 'Live Sessions' }),
+      icon: Video,
+      href: `/dash/courses/course/${params.courseuuid}/live_sessions`,
       requiredPermission: 'update' as const
     }
   ]
@@ -256,6 +264,9 @@ function CourseOverviewPage(props: { params: Promise<CourseOverviewParams> }) {
             ) : null}
             {!rightsLoading && params.subpage == 'at_risk' && hasPermission('update') ? (
               <EditCourseAtRisk orgslug={params.orgslug} />
+            ) : null}
+            {!rightsLoading && params.subpage == 'live_sessions' && hasPermission('update') ? (
+              <EditCourseLiveSessions orgslug={params.orgslug} />
             ) : null}
           </div>
         </motion.div>

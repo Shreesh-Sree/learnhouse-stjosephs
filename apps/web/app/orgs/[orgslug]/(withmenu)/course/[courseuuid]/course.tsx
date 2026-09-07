@@ -25,6 +25,7 @@ import { queryKeys } from '@/lib/query/keys'
 import { getActivityWithAuthHeader } from '@services/courses/activities'
 import { useTranslation } from 'react-i18next'
 import CourseCommunitySection from '@components/Objects/Communities/CourseCommunitySection'
+import UpcomingLiveSessions from '@components/Objects/Courses/UpcomingLiveSessions/UpcomingLiveSessions'
 import CourseShare from '@components/Objects/Courses/CourseShare/CourseShare'
 import { JsonLd } from '@components/SEO/JsonLd'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
@@ -684,6 +685,9 @@ const CourseClient = (props: any) => {
                 })}
               </div>
             </div>
+
+            {/* Upcoming live sessions */}
+            <UpcomingLiveSessions courseUuid={course.course_uuid} />
 
             {/* Community Section */}
             <Suspense fallback={<div className="animate-pulse h-48 bg-gray-100 rounded-lg mt-4" />}>

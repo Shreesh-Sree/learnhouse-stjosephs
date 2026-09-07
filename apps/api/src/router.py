@@ -29,6 +29,7 @@ from src.routers.courses import chapters, courses, assignments, certifications
 from src.routers.folders import folders as folders_router_module
 from src.routers.media import media as media_router_module
 from src.routers.courses import migration as migration_router_module
+from src.routers.courses import live_sessions as live_sessions_router_module
 from src.routers.courses import quiz_flags as quiz_flags_router_module
 from src.routers.communities import communities as communities_router_module
 from src.routers.communities import discussions as discussions_router_module
@@ -229,6 +230,11 @@ v1_router.include_router(
     prefix="/courses",
     tags=["migration"],
     dependencies=[Depends(require_authenticated_user)]
+)
+v1_router.include_router(
+    live_sessions_router_module.router,
+    prefix="/courses",
+    tags=["live_sessions"],
 )
 v1_router.include_router(search.router, prefix="/search", tags=["search"])
 v1_router.include_router(

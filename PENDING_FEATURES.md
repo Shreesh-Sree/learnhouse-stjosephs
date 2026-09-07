@@ -588,9 +588,34 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   real-environment verification like everything else this session,
   especially registering successfully across real browsers and surviving
   an actual campus-wifi dropout mid-session.
-- Live video conferencing / virtual classroom (embedded Zoom/Meet, or a
-  native WebRTC session) — Boards and Podcasts exist for collaboration and
-  async audio; nothing covers a live class session.
+- ~~Live video conferencing / virtual classroom~~ — **done, embedded
+  meeting link only, not native WebRTC.** A native in-app video call would
+  need a real-time media server, NAT traversal (TURN/STUN), and
+  room/participant management — categorically larger than a hand-rolled
+  feature in one pass, and this codebase has none of that infrastructure
+  today. Instead, a new "Live Sessions" course-dashboard tab lets an
+  instructor schedule a session with any http(s) meeting link (Zoom,
+  Google Meet, Teams, ...), a title/description, and a start/optional-end
+  time; the actual call happens entirely on the third-party platform the
+  link points at. Students see the schedule with a "Join" button directly
+  on the course page, AND the sessions now appear on the existing ICS
+  calendar feed (`services/users/calendar_feed.py`, built earlier this
+  session for assignment due dates) as VEVENTs carrying the meeting link
+  in the standard ICS `URL` property, so most calendar clients render it
+  as a clickable join link right on the event — a genuine free tie-in
+  between the two features. The meeting URL is server-side validated to
+  be a plain `http(s)` link before it's ever stored (rejects
+  `javascript:`/`data:`/other schemes) — since it's rendered as an
+  unescaped clickable href, an unvalidated value would otherwise be an
+  XSS vector for whoever clicks Join; verified against both legitimate
+  meeting links and a battery of malicious schemes with a standalone
+  script. KNOWN LIMITATIONS: (1) no recurring sessions — each one is a
+  single scheduled occurrence, a weekly standing class needs one row per
+  week; (2) no reminder notifications (no email/push before a session
+  starts) — the calendar feed is the only advance-notice mechanism;
+  (3) same floating-time (no per-org timezone) limitation the ICS feed
+  already disclosed for assignment due dates applies here identically.
+  Needs real-environment verification like everything else this session.
 - ~~Learning path / prerequisite enforcement~~ — **done, at both the
   course and the chapter level.** A course can require another course in
   the SAME org to be fully completed before a learner may self-enroll
