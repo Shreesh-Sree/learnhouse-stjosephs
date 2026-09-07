@@ -484,9 +484,32 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   real-environment verification like everything else this session,
   especially a real Resend send and a real weekly tick across a
   server restart.
-- Gamification (points, streaks, badges for consistent participation) —
-  genuinely absent today; worth weighing carefully for a college audience,
-  since it fits some course types far better than others.
+- ~~Gamification (points, streaks, badges)~~ — **done, deliberately
+  private.** Directly addresses the "weigh carefully for a college
+  audience" caution above by never becoming a public leaderboard: a new
+  "Achievements" account tab shows a student ONLY their own points,
+  current streak, and badges in one org — nothing ranks or compares
+  students, nothing is pushed via email/notification, and there is no
+  endpoint that lists another student's stats. Like the at-risk dashboard
+  and unlike the certificates feature, this is a LIVE aggregation over
+  existing durable data (the `user_audit_event` log plus discussions/
+  comments) — no new table, no stored point ledger. Points: 5 for
+  completing an activity, 5 for submitting an assignment (+10 bonus if it
+  was graded and passed), 100 for finishing a course, 50 for a
+  certificate, 10 per discussion post, 3 per comment. Streak: consecutive
+  calendar days with real coursework activity in that org (login alone
+  doesn't count — opening the app isn't participation), with a one-day
+  grace so the count doesn't reset to zero the instant midnight passes
+  before the student opens the app. Badges are a small code-defined
+  catalog (first activity, 7/30-day streaks, first discussion, 10
+  comments, 1st/3rd certificate, 100/500 points) — not admin-configurable,
+  the same way the nudge catalog is code rather than a table. The
+  streak-math (grace period, broken-streak, longest-vs-current) and the
+  badge-threshold logic were both verified with standalone scripts against
+  hand-built fixtures. Needs real-environment verification like everything
+  else this session, especially that the points/streak actually feel right
+  once real student activity accumulates rather than just being
+  arithmetically correct.
 
 **Access / scale**
 - Offline-capable course content (PWA + service worker caching), so a

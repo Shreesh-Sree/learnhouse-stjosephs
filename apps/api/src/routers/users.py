@@ -46,6 +46,7 @@ from src.services.users.users import (
 )
 from src.services.courses.courses import get_user_courses
 from src.services.users.calendar_feed import get_or_create_feed_token, regenerate_feed_token
+from src.services.gamification.gamification import GamificationStats, get_gamification_stats
 
 _get_redis_client = _get_redis_pool_client
 
@@ -849,3 +850,42 @@ async def api_regenerate_calendar_feed_token(
 ) -> dict:
     token = await regenerate_feed_token(current_user, db_session)
     return {"token": token}
+
+
+@router.get(
+    "/me/gamification/{org_id}",
+    response_model=GamificationStats,
+    summary="My points, streak, and badges in one org",
+    description=(
+        "Self-service only — a student's own points/streak/badges, computed "
+        "live from durable participation data. Never a leaderboard: there is "
+        "no endpoint that ranks or lists other students' stats."
+    ),
+    responses={
+        200: {"description": "The caller's gamification stats for this org.", "model": GamificationStats},
+        401: {"description": "Authentication required"},
+        403: {"description": "Caller is not a member of this org"},
+        404: {"description": "Org not found"},
+    },
+)
+async def api_get_my_gamification_stats(
+    request: Request,
+    org_id: int,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: PublicUser = Depends(get_authenticated_user),
+) -> GamificationStats:
+    from sqlmodel import select as _select
+
+    from src.db.organizations import Organization
+    from src.security.org_auth import is_org_member
+
+    org = (await db_session.execute(
+        _select(Organization).where(Organization.id == org_id)
+    )).scalars().first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    if not await is_org_member(current_user.id, org_id, db_session):
+        raise HTTPException(status_code=403, detail="You are not a member of this organization")
+
+    return await get_gamification_stats(db_session, current_user.id, org_id)
