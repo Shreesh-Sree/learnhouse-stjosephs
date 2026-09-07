@@ -3,7 +3,7 @@ import React, { use, useEffect } from 'react';
 import { CourseProvider } from '../../../../../../../../components/Contexts/CourseContext'
 import { CourseOverviewTop } from '@components/Dashboard/Misc/CourseOverviewTop'
 import { motion } from 'motion/react'
-import { GalleryVerticalEnd, Globe, Info, UserPen, Award, Lock, Search, ClipboardList } from 'lucide-react'
+import { GalleryVerticalEnd, Globe, Info, UserPen, Award, Lock, Search, ClipboardList, Link2 } from 'lucide-react'
 import { ChartBar } from '@phosphor-icons/react'
 import EditCourseStructure from '@components/Dashboard/Pages/Course/EditCourseStructure/EditCourseStructure'
 import EditCourseGeneral from '@components/Dashboard/Pages/Course/EditCourseGeneral/EditCourseGeneral'
@@ -12,6 +12,7 @@ import EditCourseContributors from '@components/Dashboard/Pages/Course/EditCours
 import EditCourseCertification from '@components/Dashboard/Pages/Course/EditCourseCertification/EditCourseCertification'
 import EditCourseSEO from '@components/Dashboard/Pages/Course/EditCourseSEO/EditCourseSEO'
 import EditCourseRoster from '@components/Dashboard/Pages/Course/EditCourseRoster/EditCourseRoster'
+import EditCourseLTI from '@components/Dashboard/Pages/Course/EditCourseLTI/EditCourseLTI'
 import { useCourseRights } from '@hooks/useCourseRights'
 import { useRouter } from 'next/navigation'
 import { getUriWithOrg } from '@services/config/config';
@@ -100,6 +101,13 @@ function CourseOverviewPage(props: { params: Promise<CourseOverviewParams> }) {
       icon: ClipboardList,
       href: `/dash/courses/course/${params.courseuuid}/roster`,
       requiredPermission: 'grade_assignments' as const
+    },
+    {
+      key: 'lti',
+      label: t('dashboard.courses.settings.tabs.lti', { defaultValue: 'LTI' }),
+      icon: Link2,
+      href: `/dash/courses/course/${params.courseuuid}/lti`,
+      requiredPermission: 'update' as const
     }
   ]
 
@@ -212,6 +220,9 @@ function CourseOverviewPage(props: { params: Promise<CourseOverviewParams> }) {
             ) : null}
             {!rightsLoading && params.subpage == 'roster' && hasPermission('grade_assignments') ? (
               <EditCourseRoster orgslug={params.orgslug} />
+            ) : null}
+            {!rightsLoading && params.subpage == 'lti' && hasPermission('update') ? (
+              <EditCourseLTI orgslug={params.orgslug} />
             ) : null}
           </div>
         </motion.div>

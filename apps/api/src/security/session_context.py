@@ -61,6 +61,12 @@ AUTH_METHOD_MAGIC_LOGIN = "magic_login"
 AUTH_METHOD_GOOGLE = "google"
 AUTH_METHOD_SSO = "sso"
 AUTH_METHOD_API_TOKEN = "api_token"
+# Sessions minted from a signed LTI launch. Like api_token, this is not in
+# POLICY_AUTH_METHODS: an org's member-facing "allowed sign-in methods" list
+# governs how a person picks to log in, but an LTI launch is admin-configured
+# per course (the LTILink itself is the opt-in — see services/lti/lti.py), not
+# a method a member chooses from a login page, so it is exempt from that policy.
+AUTH_METHOD_LTI = "lti"
 
 # The methods an org admin can allow/disallow (api_token is never in this set).
 POLICY_AUTH_METHODS = (

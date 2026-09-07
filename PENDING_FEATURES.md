@@ -261,8 +261,50 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   (`read_assignment_submissions`) rather than re-deriving grades. Needs
   real-environment verification like everything else this session,
   especially the invite-then-reimport flow.
-- LTI (Learning Tools Interoperability) support, to embed LearnHouse content
-  inside another LMS a college already runs, or vice versa.
+- ~~LTI (Learning Tools Interoperability) support~~ — **done, narrowly
+  scoped.** LearnHouse as an LTI **Tool Provider** only: a course can be
+  launched FROM another LMS (Canvas, Moodle, Blackboard, ...). The reverse
+  direction (LearnHouse embedding some other LMS's tool as a Tool
+  *Consumer*) is NOT built. Protocol version is **LTI 1.1** (OAuth 1.0a
+  HMAC-SHA1-signed launch POST) rather than the newer LTI Advantage 1.3
+  (OIDC + JWT + a services ecosystem) — 1.1 is what the large majority of
+  existing campus LMS deployments still speak for a basic launch, and it
+  avoids standing up a JWKS endpoint or an OIDC login-initiation flow for a
+  first integration. Hand-rolled OAuth 1.0a signing (`services/lti/oauth1.py`),
+  verified against the canonical RFC 5849 / OAuth 1.0 worked example
+  (HMAC-SHA1 of a known base string reproduces the spec's published
+  signature exactly) rather than adding an `oauthlib` dependency for one
+  signature check. An instructor creates an `LTILink` per course (its own
+  random consumer key + secret, secret encrypted at rest via the existing
+  webhook-secret Fernet helper) from a new "LTI" course-dashboard tab, and
+  pastes the resulting launch URL/key/secret into the external LMS's tool
+  config. A launch: verifies the signature over the exact URL it was POSTed
+  to, rejects a stale timestamp or a replayed nonce (deduped in Redis,
+  fails open to timestamp-only checking if Redis is down), finds-or-creates
+  a LearnHouse account for the external LMS's `user_id` (matching an
+  existing org member by email first if one is given; otherwise
+  provisioning a new account, with a synthetic `@lti.invalid` placeholder
+  address — RFC 2606's reserved-for-exactly-this TLD — when the launch
+  didn't include one, which many LMS tool configs don't by default),
+  enrolls it in the link's course (the same `Trail`/`TrailRun` primitive
+  every other enrollment path uses), and redirects the browser to the
+  course page with a freshly minted session. A new `lti` session-provenance
+  method is exempt from an org's member-facing "allowed sign-in methods"
+  policy, same as `api_token` — the `LTILink` itself is the opt-in, not a
+  choice a member makes from a login page. KNOWN LIMITATIONS, disclosed in
+  the service module's own comments: (1) the launch-to-redirect cookies are
+  set `SameSite=None` rather than the app's usual `lax`, which is
+  structurally required for a session to survive landing from a
+  cross-origin LMS-initiated POST — not a new forgery surface, since the
+  launch was already OAuth-signature-authenticated before any cookie is
+  set; (2) an account with 2FA enabled cannot complete an LTI launch (there
+  is no channel to prompt for a TOTP code inside an LMS-embedded launch) —
+  it gets a 409 telling it to sign in directly instead; (3) no Tool
+  Consumer direction, no LTI Advantage/1.3, no Deep Linking, no grade
+  passback (Outcomes) to the external LMS. Needs real-environment
+  verification like everything else this session, especially an actual
+  launch from a real Canvas/Moodle sandbox rather than just the
+  signature-math self-test this session could run.
 - Question-bank import (QTI format) for migrating existing quiz content from
   other tools.
 - ~~Calendar/ICS feed of assignment due dates~~ — **done.** Per-user opaque

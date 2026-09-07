@@ -35,6 +35,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.organization_config import OrganizationConfig
 from src.security.session_context import (
     AUTH_METHOD_API_TOKEN,
+    AUTH_METHOD_LTI,
     POLICY_AUTH_METHODS,
     SessionProvenance,
     get_session_provenance,
@@ -147,8 +148,12 @@ async def evaluate_org_auth(
 
                 # Machine credentials carry their own org boundary
                 # (_verify_api_token_org_boundary) and are exempt from the human
-                # auth-method policy.
-                if provenance.amr != AUTH_METHOD_API_TOKEN:
+                # auth-method policy. Same for an LTI-launched session: the
+                # LTILink an admin created for a specific course IS the opt-in
+                # (see services/lti/lti.py) — it is not one of the methods a
+                # member picks from the login page, so the org's member-facing
+                # allowed-methods list must not be able to lock it out.
+                if provenance.amr not in (AUTH_METHOD_API_TOKEN, AUTH_METHOD_LTI):
                     allowed = set(policy.allowed_auth_methods)
                     # A session with no ``amr`` means "we don't know how this
                     # user signed in", not "they used a forbidden method".

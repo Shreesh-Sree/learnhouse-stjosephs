@@ -17,6 +17,7 @@ from src.routers import stream
 from src.routers import api_tokens
 from src.routers import webhooks
 from src.routers import calendar as calendar_router_module
+from src.routers import lti as lti_router_module
 from src.routers.integrations import zapier as zapier_integration
 from src.routers.ai import ai, magicblocks, courseplanning, rag, images, quiz, assignment_gen, scenario, audio
 from src.routers.boards import boards_playground
@@ -81,6 +82,17 @@ v1_router.include_router(
     calendar_router_module.router,
     prefix="/calendar",
     tags=["calendar"],
+)
+# Mixed auth, deliberately NOT a router-level dependency: /lti/launch/{uuid}
+# is the public LTI 1.1 launch endpoint (see routers/lti.py's module
+# docstring — same unauthenticated rationale as /calendar above, for the
+# same reason: the caller is a different server, not a LearnHouse session),
+# while the /lti/courses/... admin endpoints each declare get_current_user
+# individually.
+v1_router.include_router(
+    lti_router_module.router,
+    prefix="/lti",
+    tags=["lti"],
 )
 v1_router.include_router(
     usergroups.router,
