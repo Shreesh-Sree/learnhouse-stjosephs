@@ -5,7 +5,7 @@ import math
 import random
 import re
 from datetime import datetime, timedelta
-from typing import Sequence
+from typing import Optional, Sequence
 from uuid import uuid4
 
 try:

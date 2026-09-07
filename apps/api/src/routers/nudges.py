@@ -254,7 +254,7 @@ async def delivery_events(
             # Transient or undetermined: the mailbox was full or the receiving
             # server was unhappy today. Suppressing here would throw away good
             # addresses.
-            return {"status": "ignored", "reason": f"non-permanent bounce ({bounce_type or "unknown"})"}
+            return {"status": "ignored", "reason": f"non-permanent bounce ({bounce_type or 'unknown'})"}
 
     recipients = data.get("to") or []
     if isinstance(recipients, str):
