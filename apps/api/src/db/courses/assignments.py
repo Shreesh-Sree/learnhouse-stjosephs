@@ -380,6 +380,14 @@ class AssignmentTaskSubmissionBase(SQLModel):
     # The aggregate grading pass skips server-side re-verification for these
     # rows so the teacher's deliberate override is not overwritten.
     manually_graded: bool = False
+    # Per-criterion points a teacher awarded against the task's rubric (see
+    # AssignmentTask.contents["rubric"]), keyed by criterion_uuid ->
+    # awarded points. Optional: a task can be graded with a plain number the
+    # same as before. When present, `grade` is DERIVED from this server-side
+    # (see services.courses.activities.rubric.compute_rubric_grade) rather
+    # than trusted from the client, same "server verifies" treatment every
+    # other scored task type already gets.
+    rubric_scores: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
     assignment_type: AssignmentTaskTypeEnum
 
     user_id: int
@@ -412,6 +420,7 @@ class AssignmentTaskSubmissionUpdate(SQLModel):
     grade: Optional[int] = None
     task_submission_grade_feedback: Optional[str] = None
     manually_graded: Optional[bool] = None
+    rubric_scores: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
     assignment_type: Optional[AssignmentTaskTypeEnum] = None
 
 
@@ -433,6 +442,7 @@ class AssignmentTaskSubmission(AssignmentTaskSubmissionBase, table=True):
     grade: int = 0  # Task-local raw score; aggregated into AssignmentUserSubmission.grade
     task_submission_grade_feedback: str
     manually_graded: bool = Field(default=False, nullable=False)
+    rubric_scores: Optional[Dict] = Field(default=None, sa_column=Column(JSON))
     assignment_type: AssignmentTaskTypeEnum
 
     user_id: int = Field(

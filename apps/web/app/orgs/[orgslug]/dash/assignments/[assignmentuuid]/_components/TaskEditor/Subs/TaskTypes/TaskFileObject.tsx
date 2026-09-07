@@ -243,7 +243,7 @@ export default function TaskFileObject({ view, user_id, assignmentTaskUUID, onGr
         }
     }
 
-    async function gradeCustomFC(grade: number, feedback?: string) {
+    async function gradeCustomFC(grade: number, feedback?: string, rubricScores?: Record<string, number>) {
         // Same guard as the sibling task types (TaskShortAnswerObject:259).
         // Without an existing submission uuid the grade is written against the
         // INSTRUCTOR's own row, where it is silently forced to 0 while the UI
@@ -264,6 +264,7 @@ export default function TaskFileObject({ view, user_id, assignmentTaskUUID, onGr
             username: session?.data?.user?.username,
             assignmentTaskSubmissionUUID: userSubmissions?.assignment_task_submission_uuid,
             taskSubmissionPayload: userSubmissions,
+            rubricScores,
             onSuccess: () => { getAssignmentTaskSubmissionFromIdentifiedUserUI(); onGraded?.(); },
         });
     }
@@ -293,7 +294,7 @@ export default function TaskFileObject({ view, user_id, assignmentTaskUUID, onGr
     }, [view, assignmentTaskUUID, assignment?.assignment_tasks, taskSubmissionsMap])
 
     return (
-        <AssignmentBoxUI submitFC={submitFC} dirtyValue={userSubmissions.fileUUID ?? ''} savedValue={initialUserSubmissions.fileUUID ?? ''} taskUUID={assignmentTaskUUID} view={view} gradeCustomFC={gradeCustomFC} currentPoints={userSubmissionObject?.grade} currentFeedback={userSubmissionObject?.task_submission_grade_feedback} maxPoints={assignmentTaskOutsideProvider?.max_grade_value} type="file">
+        <AssignmentBoxUI submitFC={submitFC} dirtyValue={userSubmissions.fileUUID ?? ''} savedValue={initialUserSubmissions.fileUUID ?? ''} taskUUID={assignmentTaskUUID} view={view} gradeCustomFC={gradeCustomFC} currentPoints={userSubmissionObject?.grade} currentFeedback={userSubmissionObject?.task_submission_grade_feedback} maxPoints={assignmentTaskOutsideProvider?.max_grade_value} rubric={assignmentTaskOutsideProvider?.contents?.rubric} currentRubricScores={userSubmissionObject?.rubric_scores} type="file">
             {view === 'teacher' && (
                 <div className='flex flex-col sm:flex-row py-5 sm:py-6 text-xs sm:text-sm justify-center mx-auto space-y-2 sm:space-y-0 sm:space-x-3 text-slate-600 px-4 sm:px-2 text-center sm:text-start bg-slate-50 rounded-lg border border-slate-100'>
                     <Info size={18} className="mx-auto sm:mx-0 text-slate-500" />

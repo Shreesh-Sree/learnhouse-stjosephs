@@ -89,6 +89,7 @@ from src.services.courses.activities.seb import (
     generate_seb_config_key,
     is_seb_user_agent,
 )
+from src.services.courses.activities.rubric import clamp_rubric_scores, compute_rubric_grade
 from src.services.courses.activities.ip_allowlist import (
     _enforce_ip_allowlist_if_required,
     is_ip_allowed,
@@ -2524,6 +2525,7 @@ _ASSIGNMENT_TASK_SUBMISSION_MUTABLE_FIELDS = {
     "grade",
     "task_submission_grade_feedback",
     "manually_graded",
+    "rubric_scores",
 }
 
 
@@ -2797,6 +2799,7 @@ async def handle_assignment_task_submission(
          and assignment_task_submission_object.grade != 0)
         or (assignment_task_submission_object.task_submission_grade_feedback is not None
             and assignment_task_submission_object.task_submission_grade_feedback != "")
+        or assignment_task_submission_object.rubric_scores is not None
     ):
         # An instructor writing a GRADE without naming a target submission has
         # nothing to grade. Falling through to the save-progress lookup below
@@ -2828,6 +2831,22 @@ async def handle_assignment_task_submission(
             AssignmentTaskSubmission.user_id == submitter.id,
         )
         assignment_task_submission = (await db_session.execute(statement)).scalars().first()
+
+    # Rubric-based grading: when the instructor sends rubric_scores, the
+    # task-local grade is DERIVED from it server-side rather than trusted
+    # from whatever `grade` value the client also sent — same "server
+    # verifies" treatment every other scored task type gets. Clamp the
+    # scores themselves too, so a stale/malformed payload can't persist
+    # points against a criterion that no longer exists on the rubric (e.g.
+    # after a teacher edits it) or exceed a criterion's own max_points.
+    if is_instructor and assignment_task_submission_object.rubric_scores is not None:
+        rubric = (assignment_task.contents or {}).get("rubric")
+        clamped_scores = clamp_rubric_scores(rubric, assignment_task_submission_object.rubric_scores)
+        derived_grade = compute_rubric_grade(rubric, clamped_scores)
+        assignment_task_submission_object.rubric_scores = clamped_scores
+        if derived_grade is not None:
+            assignment_task_submission_object.grade = derived_grade
+        assignment_task_submission_object.manually_graded = True
 
     # If submission exists, update it
     if assignment_task_submission:

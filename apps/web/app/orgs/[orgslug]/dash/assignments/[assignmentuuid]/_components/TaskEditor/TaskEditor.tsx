@@ -3,13 +3,14 @@ import { useAssignments } from '@components/Contexts/Assignments/AssignmentConte
 import { useAssignmentsTask, useAssignmentsTaskDispatch } from '@components/Contexts/Assignments/AssignmentsTaskContext';
 import { useLHSession } from '@components/Contexts/LHSessionContext';
 import { deleteAssignmentTask } from '@services/courses/assignments';
-import { GalleryVerticalEnd, Info, TentTree, Trash } from 'lucide-react'
+import { GalleryVerticalEnd, Info, ListChecks, TentTree, Trash } from 'lucide-react'
 import React, { useEffect } from 'react'
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/query/keys';
 import dynamic from 'next/dynamic';
 import { AssignmentTaskGeneralEdit } from './Subs/AssignmentTaskGeneralEdit';
+import { AssignmentTaskRubricEdit } from './Subs/AssignmentTaskRubricEdit';
 const AssignmentTaskContentEdit = dynamic(() => import('./Subs/AssignmentTaskContentEdit'))
 
 function AssignmentTaskEditor({ page }: any) {
@@ -94,6 +95,18 @@ function AssignmentTaskEditor({ page }: any) {
                                     <div>Content</div>
                                 </div>
                             </div>
+                            <div
+                                onClick={() => setSelectedSubPage('rubric')}
+                                className={`flex space-x-4 py-2 w-fit text-center border-black transition-all ease-linear ${selectedSubPage === 'rubric'
+                                    ? 'border-b-4'
+                                    : 'opacity-50'
+                                    } cursor-pointer`}
+                            >
+                                <div className="flex items-center space-x-2.5 mx-2">
+                                    <ListChecks size={16} />
+                                    <div>Rubric</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     {/* Scrollable body — only this area scrolls. flex-1
@@ -104,6 +117,7 @@ function AssignmentTaskEditor({ page }: any) {
                         <div className='ms-10 me-10 mt-10 mx-auto bg-white rounded-xl shadow-xs px-6 py-5 nice-shadow'>
                             {selectedSubPage === 'general' && <AssignmentTaskGeneralEdit />}
                             {selectedSubPage === 'content' && <AssignmentTaskContentEdit />}
+                            {selectedSubPage === 'rubric' && <AssignmentTaskRubricEdit />}
                         </div>
                     </div>
                 </>

@@ -170,8 +170,30 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   review of their submission is complete, to prevent inferring authorship
   from a partial reveal. Needs real-environment verification like
   everything else this session.
-- Rubric-based grading (multi-criteria weighted scoring, replacing/extending
-  the single `grading_type` score).
+- ~~Rubric-based grading~~ — **done**, as an optional per-task overlay rather
+  than a replacement for the existing single-number grade. A task's rubric
+  (a list of `{criterion_uuid, title, description, max_points}`) lives in
+  its own `contents["rubric"]` — the same no-migration opaque-JSON pattern
+  every other per-task config (pool_size, shuffle_questions,
+  response_type) already uses. Grading writes per-criterion points to a new
+  `AssignmentTaskSubmission.rubric_scores` JSON column; the task's normal
+  0-100 `grade` is DERIVED from those server-side
+  (`services.courses.activities.rubric.compute_rubric_grade`, clamped per
+  criterion) rather than trusted from the client — same "server verifies"
+  treatment every other scored task type gets — which means every existing
+  downstream consumer (aggregate grading, certificates, the activity trail)
+  keeps reading the same `grade` column it always has, completely unaware a
+  rubric was involved. Teacher UI: a new "Rubric" tab in the task editor.
+  Grading UI: `RubricGradingWidget.tsx`, a click-to-score overlay wired into
+  `AssignmentBoxUI` (the shared grading-controls component) that
+  auto-fills the plain grade input — grading without touching it still
+  works exactly as before. SCOPE LIMIT: the widget is only wired into
+  `TaskFileObject.tsx` (FILE_SUBMISSION, the most common manually-graded
+  type) in this pass; `AssignmentBoxUI`'s prop contract supports every
+  other type too (`gradeCustomFC`'s type change is backward-compatible), so
+  wiring CODE/SHORT_ANSWER/NUMBER_ANSWER/FORM in is a small follow-up, not
+  a redesign. Needs real-environment verification like everything else this
+  session.
 - Per-student extensions/grace periods on assignment deadlines.
 - Pluggable plagiarism/similarity check (third-party API or in-house
   cross-submission similarity), distinct from the existing `anti_copy_paste`

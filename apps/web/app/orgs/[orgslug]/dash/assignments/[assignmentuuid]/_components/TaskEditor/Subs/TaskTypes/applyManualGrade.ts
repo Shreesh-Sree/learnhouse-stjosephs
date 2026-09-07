@@ -31,6 +31,15 @@ interface ApplyManualGradeArgs {
      * task type stores a slightly different shape here, so callers pass it in.
      */
     taskSubmissionPayload: unknown
+    /**
+     * Per-criterion points awarded against the task's rubric (see
+     * RubricGradingWidget.tsx), keyed by criterion_uuid. When present the
+     * server DERIVES the actual stored grade from this rather than trusting
+     * `grade` above — that value is still sent (and still validated
+     * against maxPoints here) purely so a network hiccup can't produce a
+     * confusing "0 points" toast before the server's own number comes back.
+     */
+    rubricScores?: Record<string, number> | null
     onSuccess: () => void
 }
 
@@ -44,6 +53,7 @@ export async function applyManualGrade({
     username,
     assignmentTaskSubmissionUUID,
     taskSubmissionPayload,
+    rubricScores,
     onSuccess,
 }: ApplyManualGradeArgs): Promise<ManualGradeResult> {
     if (!assignmentTaskUUID) return { success: false, reason: 'missing-task' }
@@ -69,12 +79,15 @@ export async function applyManualGrade({
     const finalFeedback = trimmed && trimmed.length > 0
         ? trimmed
         : `Graded by teacher : @${username ?? ''}`
-    const values = {
+    const values: Record<string, unknown> = {
         assignment_task_submission_uuid: assignmentTaskSubmissionUUID,
         task_submission: taskSubmissionPayload,
         grade,
         task_submission_grade_feedback: finalFeedback,
         manually_graded: true,
+    }
+    if (rubricScores) {
+        values.rubric_scores = rubricScores
     }
     const res = await handleAssignmentTaskSubmission(
         values,

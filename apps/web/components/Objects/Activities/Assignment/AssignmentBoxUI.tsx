@@ -6,6 +6,7 @@ import { BookPlus, BookUser, Check, Code2, EllipsisVertical, FileUp, ListTodo, L
 import React from 'react'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { useTranslation } from 'react-i18next'
+import RubricGradingWidget from './RubricGradingWidget'
 
 // Options passed to a task's submitFC. `silent` suppresses user-facing toasts
 // so background auto-saves and the submit-time flush don't spam the learner.
@@ -23,8 +24,14 @@ type AssignmentBoxProps = {
     // terminal instead of looping a doomed save forever.
     submitFC?: (_opts?: TaskSubmitOptions) => void | Promise<SaveResult | void>
     gradeFC?: () => void
-    gradeCustomFC?: (_grade: number, _feedback?: string) => void
+    gradeCustomFC?: (_grade: number, _feedback?: string, _rubricScores?: Record<string, number>) => void
     autoGradable?: boolean
+    // Optional rubric (see RubricGradingWidget.tsx) — when this task defines
+    // one, a click-to-score widget renders above the plain grade input and
+    // drives it automatically. currentRubricScores pre-fills it from the
+    // submission's own last-saved scores, same idea as currentPoints below.
+    rubric?: { criterion_uuid: string; title: string; description?: string; max_points: number }[]
+    currentRubricScores?: Record<string, number> | null
     // Canonical serialization of the learner's CURRENT answer and the LAST-SAVED
     // baseline. Auto-save fires whenever they differ (student tasks only).
     dirtyValue?: string
@@ -41,12 +48,16 @@ type AssignmentBoxProps = {
 const isAutoFeedback = (s?: string) =>
     !!s && (/^Auto graded by system$/.test(s) || /^Graded by teacher : @/.test(s))
 
-function AssignmentBoxUI({ type, view, currentPoints, currentFeedback, maxPoints, saveFC, submitFC, gradeFC, gradeCustomFC, autoGradable, dirtyValue, savedValue, taskUUID, children }: AssignmentBoxProps) {
+function AssignmentBoxUI({ type, view, currentPoints, currentFeedback, maxPoints, saveFC, submitFC, gradeFC, gradeCustomFC, autoGradable, dirtyValue, savedValue, taskUUID, rubric, currentRubricScores, children }: AssignmentBoxProps) {
     const { t } = useTranslation()
     // Grading view manual input. Pre-filled from the server-side currentPoints
     // so teachers can tweak an existing grade instead of retyping it.
     const [manualGrade, setManualGrade] = React.useState<string>('')
     const [manualFeedback, setManualFeedback] = React.useState<string>('')
+    // Only set (and sent) when the rubric widget is actually used this
+    // session — leaving it null and grading with the plain number input
+    // still works exactly as before.
+    const [rubricScores, setRubricScores] = React.useState<Record<string, number> | null>(null)
     const submission = useAssignmentSubmission() as any
     const assignmentCtx = useAssignments() as any
     const session = useLHSession() as any
@@ -111,7 +122,7 @@ function AssignmentBoxUI({ type, view, currentPoints, currentFeedback, maxPoints
         const parsed = parseInt(manualGrade, 10)
         if (Number.isNaN(parsed)) return
         const trimmed = manualFeedback.trim()
-        gradeCustomFC(parsed, trimmed.length > 0 ? trimmed : undefined)
+        gradeCustomFC(parsed, trimmed.length > 0 ? trimmed : undefined, rubricScores ?? undefined)
     }
 
     const isGradingMode = (view === 'grading' || view === 'custom-grading') && !isUngraded
@@ -228,6 +239,21 @@ function AssignmentBoxUI({ type, view, currentPoints, currentFeedback, maxPoints
                             <p className='text-xs font-semibold'>{t('activities.save_answers', { defaultValue: 'Save answers' })}</p>
                         </div>
                     }
+
+                    {/* Rubric widget — an optional overlay on the same grading
+                        controls below. Interacting with it fills in the plain
+                        grade input automatically; grading without touching it
+                        still works exactly as before. */}
+                    {isGradingMode && gradeCustomFC && rubric && rubric.length > 0 && (
+                        <RubricGradingWidget
+                            rubric={rubric}
+                            initialScores={currentRubricScores}
+                            onChange={(scores, total) => {
+                                setRubricScores(scores)
+                                setManualGrade(String(total))
+                            }}
+                        />
+                    )}
 
                     {/* Grading controls — shared between 'grading' and 'custom-grading' views */}
                     {isGradingMode && maxPoints !== undefined && gradeCustomFC && (
