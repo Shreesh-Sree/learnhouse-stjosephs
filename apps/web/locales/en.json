@@ -1526,7 +1526,11 @@
       "grading_all_or_nothing": "All or nothing",
       "grading_partial_credit": "Partial credit",
       "grading_all_or_nothing_hint": "A question scores only when the selected answers match the key exactly.",
-      "grading_partial_credit_hint": "Select-all-that-apply questions earn part of the marks; each wrong selection cancels a right one."
+      "grading_partial_credit_hint": "Select-all-that-apply questions earn part of the marks; each wrong selection cancels a right one.",
+      "pool_label": "Question pool",
+      "pool_show": "Show",
+      "pool_of": "of {{total}} questions, picked at random per student",
+      "pool_hint": "Off: every student sees all {{total}} questions."
     },
     "form": {
       "expected_answer": "Expected"

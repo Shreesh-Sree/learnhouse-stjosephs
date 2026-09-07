@@ -82,7 +82,11 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   server-enforced via `_enforce_time_limit_if_set` on every learner-write
   path, auto-submit on expiry. Needs real-environment verification like
   everything else in this session (see that section above).
-- Randomized question pools (draw N questions per student from a larger bank).
+- ~~Randomized question pools~~ — **done.** `contents.pool_size` on a QUIZ
+  task, no new DB column — same deterministic-per-(user, task, attempt)
+  seeding approach as everything else here. Teacher toggle in the quiz task
+  editor. Needs real-environment verification like everything else in this
+  session.
 - Shuffled question/answer order per student (lighter-weight than pooling).
 - Webcam proctoring snapshots during a SEB-locked session.
 - Campus IP allowlisting for assignment submission, alongside the SEB check.

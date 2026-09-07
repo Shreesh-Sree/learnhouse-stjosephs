@@ -110,6 +110,12 @@ function TaskQuizObject({ view, assignmentTaskUUID, user_id, onGraded }: TaskQui
     // the pre-existing behaviour, so it stays the default for every task that
     // has no stored value.
     const [gradingMode, setGradingMode] = useState<QuizGradingMode>(QUIZ_GRADING_ALL_OR_NOTHING);
+    // Randomized question pool: null/unset means every question is shown to
+    // every student, same as before this existed. Selection itself happens
+    // server-side (contents.pool_size) — the teacher view here always
+    // receives every question regardless, since pooling only applies to
+    // students (see _select_quiz_pool_questions on the API side).
+    const [poolSize, setPoolSize] = useState<number | null>(null);
 
     const handleQuestionChange = (index: number, value: string) => {
         const updatedQuestions = [...questions];
@@ -199,6 +205,7 @@ function TaskQuizObject({ view, assignmentTaskUUID, user_id, onGraded }: TaskQui
             contents: {
                 questions,
                 grading_mode: gradingMode,
+                pool_size: poolSize,
             },
         };
         const res = await updateAssignmentTask(values, assignmentTaskState.assignmentTask.assignment_task_uuid, assignment.assignment_object.assignment_uuid, access_token);
@@ -590,6 +597,8 @@ function TaskQuizObject({ view, assignmentTaskUUID, user_id, onGraded }: TaskQui
         if (view == 'teacher' && assignmentTaskState.assignmentTask.contents?.questions) {
             setQuestions(assignmentTaskState.assignmentTask.contents.questions);
             setGradingMode(resolveQuizGradingMode(assignmentTaskState.assignmentTask.contents?.grading_mode));
+            const hydratedPoolSize = assignmentTaskState.assignmentTask.contents?.pool_size;
+            setPoolSize(typeof hydratedPoolSize === 'number' ? hydratedPoolSize : null);
         }
         // Student area: hydrate from already-fetched context payloads.
         else if (view == 'student') {
@@ -643,6 +652,49 @@ function TaskQuizObject({ view, assignmentTaskUUID, user_id, onGraded }: TaskQui
                                 ? t('assignments.quiz.grading_partial_credit_hint')
                                 : t('assignments.quiz.grading_all_or_nothing_hint')}
                         </p>
+                    </div>
+                )}
+                {view === 'teacher' && questions.length > 1 && (
+                    <div className="flex flex-wrap gap-2 items-center mb-4 py-2 px-3 bg-white rounded-md nice-shadow">
+                        <p className="text-xs font-bold text-slate-500">{t('assignments.quiz.pool_label', { defaultValue: 'Question pool' })}</p>
+                        <button
+                            type="button"
+                            aria-pressed={poolSize !== null}
+                            onClick={() => setPoolSize(poolSize === null ? Math.max(1, Math.min(questions.length - 1, 1)) : null)}
+                            className={`relative flex-none inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                                poolSize !== null ? 'bg-slate-800' : 'bg-slate-200 hover:bg-slate-300'
+                            }`}
+                        >
+                            <span
+                                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                                    poolSize !== null ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
+                                }`}
+                            />
+                        </button>
+                        {poolSize !== null && (
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-slate-500">{t('assignments.quiz.pool_show', { defaultValue: 'Show' })}</span>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={questions.length - 1}
+                                    value={poolSize}
+                                    onChange={(e) => {
+                                        const raw = parseInt(e.target.value, 10);
+                                        setPoolSize(isNaN(raw) ? 1 : Math.max(1, Math.min(questions.length - 1, raw)));
+                                    }}
+                                    className="w-14 h-6 text-center text-xs font-bold text-slate-900 bg-white border border-slate-200 rounded-md outline-none focus:ring-1 focus:ring-slate-300"
+                                />
+                                <span className="text-xs text-slate-500">
+                                    {t('assignments.quiz.pool_of', { defaultValue: 'of {{total}} questions, picked at random per student', total: questions.length })}
+                                </span>
+                            </div>
+                        )}
+                        {poolSize === null && (
+                            <p className="text-[11px] text-slate-400 basis-full sm:basis-auto">
+                                {t('assignments.quiz.pool_hint', { defaultValue: 'Off: every student sees all {{total}} questions.', total: questions.length })}
+                            </p>
+                        )}
                     </div>
                 )}
                 <div className="flex flex-col space-y-6">
