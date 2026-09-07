@@ -660,9 +660,20 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   to avoid adding per-viewer completion computation to the course-metadata
   endpoint's existing anonymous-response cache path. Needs
   real-environment verification like everything else this session.
-- Native mobile app wrapper (iOS/Android) — large, long-term scope; only
-  worth it once the web app's mobile experience is confirmed insufficient
-  on its own.
+- **Native mobile app wrapper (iOS/Android) — explicitly NOT attempted,
+  and not just deprioritized.** Every other item in this file is a code
+  change to the repo already checked out in this session; this one isn't
+  one at all. A native app is a SEPARATE codebase (Swift/Kotlin, or a
+  React Native/Capacitor project with its own build toolchain), plus an
+  App Store / Play Store developer account, signing certificates, and a
+  review/release pipeline — none of which exist here, none of which a
+  coding session against this web repo can create, and the offline-PWA
+  work earlier in this section (a real service worker + installable
+  manifest) already covers a meaningful slice of what a "wrapper" would
+  have bought without any of that. The doc's own original framing —
+  "only worth it once the web app's mobile experience is confirmed
+  insufficient on its own" — still holds and is the right bar before
+  anyone starts a real native project, not a coding-session task.
 
 ## Small cleanup items
 
