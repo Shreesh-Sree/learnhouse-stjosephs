@@ -286,11 +286,31 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   real-environment verification like everything else this session,
   especially against real calendar clients (Google/Outlook/Apple) rather
   than just RFC-shape checks.
-- Anonymous/pseudonymous question posting in course discussions — visible as
-  anonymous to classmates but still identified to the instructor (so it
-  can't be abused). Real, well-documented pain point in large lecture
-  courses: a lot of students won't ask a "dumb" question under their real
-  name, so it never gets asked or answered for anyone.
+- ~~Anonymous/pseudonymous question posting in course discussions~~ —
+  **done.** A "Post anonymously" checkbox on both discussion creation
+  (`CreateDiscussionModal`) and comment/reply creation (`CommentSection`).
+  `is_anonymous` is stored on the `Discussion`/`DiscussionComment` row
+  itself — the real `author_id` is ALWAYS written to the database; nothing
+  is anonymized at rest, only redacted on read. Redaction
+  (`_resolve_author_for_reader` in `services/communities/discussions.py`,
+  inlined equivalently in `comments.py`) always nulls `author` AND
+  `author_id` together for every reader except the real author and any
+  org admin/maintainer — never a partial reveal, since a bare `author_id`
+  integer would be enough to de-anonymize someone via the user-lookup
+  endpoint. `is_anonymous` is write-once at creation (not on the `Update`
+  models), so a post can't be retroactively laundered as anonymous after
+  the fact, nor un-anonymized by its author to hide the switch. List reads
+  (`get_discussions_by_community`, `get_comments_by_discussion`) compute
+  the admin-status check ONCE per page, not once per row. Frontend:
+  `DiscussionCard`/`CommentCard` render "Anonymous" explicitly when
+  `is_anonymous` is set and `author` is null, instead of falling through to
+  the generic "unknown user" string, which would otherwise read as a data
+  error rather than a deliberate choice. KNOWN LIMITATION: no i18n strings
+  added to the non-English locale files for the new UI text (uses
+  `t(key, { defaultValue })` so it degrades to English rather than showing
+  a raw key). Needs real-environment verification like everything else
+  this session, especially that an org admin viewing an anonymous post
+  really does see the true author (and that nobody else does).
 
 **Retention / engagement**
 - At-risk student dashboard (login gaps, multiple failing assignments,

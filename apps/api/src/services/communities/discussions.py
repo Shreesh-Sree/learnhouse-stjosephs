@@ -72,6 +72,47 @@ def validate_label(label: str) -> str:
     return label
 
 
+async def _resolve_author_for_reader(
+    discussion: Discussion,
+    author: Optional[User],
+    request: Request,
+    current_user: Union[PublicUser, AnonymousUser, APITokenUser],
+    community_uuid: str,
+    db_session: AsyncSession,
+) -> tuple:
+    """(author, author_id) to actually put on the outgoing response for
+    THIS reader. See Discussion.is_anonymous's own docstring for the
+    anonymity model: the author themselves and any org admin/maintainer on
+    the community always see the real identity; every other reader gets
+    (None, None) for a post marked anonymous — never a partial reveal (the
+    real author_id with a nulled-out author object, say), since author_id
+    alone is enough to look someone up.
+    """
+    if not discussion.is_anonymous:
+        return (
+            UserReadAuthor.model_validate(author.model_dump()) if author else None,
+            discussion.author_id,
+        )
+
+    acting_user_id = resolve_acting_user_id(current_user)
+    if acting_user_id != 0 and acting_user_id == discussion.author_id:
+        return (
+            UserReadAuthor.model_validate(author.model_dump()) if author else None,
+            discussion.author_id,
+        )
+
+    is_admin = await authorization_verify_based_on_org_admin_status(
+        request, acting_user_id, "update", community_uuid, db_session
+    )
+    if is_admin:
+        return (
+            UserReadAuthor.model_validate(author.model_dump()) if author else None,
+            discussion.author_id,
+        )
+
+    return (None, None)
+
+
 async def create_discussion(
     request: Request,
     community_uuid: str,
@@ -81,6 +122,7 @@ async def create_discussion(
     current_user: Union[PublicUser, AnonymousUser, APITokenUser],
     db_session: AsyncSession,
     emoji: Optional[str] = None,
+    is_anonymous: bool = False,
 ) -> DiscussionReadWithVoteStatus:
     """
     Create a new discussion in a community.
@@ -120,6 +162,7 @@ async def create_discussion(
         content=content,
         label=validated_label,
         emoji=emoji,
+        is_anonymous=is_anonymous,
         community_id=community.id,
         org_id=community.org_id,
         author_id=current_user.id,
@@ -212,6 +255,9 @@ async def get_discussion(
     # Get author info
     author_statement = select(User).where(User.id == discussion.author_id)
     author = (await db_session.execute(author_statement)).scalars().first()
+    display_author, display_author_id = await _resolve_author_for_reader(
+        discussion, author, request, current_user, community.community_uuid, db_session
+    )
 
     # Check if user has voted
     has_voted = False
@@ -224,8 +270,8 @@ async def get_discussion(
         has_voted = vote is not None
 
     return DiscussionReadWithVoteStatus(
-        **discussion.model_dump(),
-        author=UserReadAuthor.model_validate(author.model_dump()) if author else None,
+        **{**discussion.model_dump(), "author_id": display_author_id},
+        author=display_author,
         has_voted=has_voted,
     )
 
@@ -338,16 +384,34 @@ async def get_discussions_by_community(
         votes = (await db_session.execute(votes_query)).scalars().all()
         user_votes = {v.discussion_id for v in votes}
 
+    # is_admin is the same answer for every discussion in this list (one
+    # reader, one community) — computed once here rather than once per
+    # discussion via _resolve_author_for_reader, which would otherwise fire
+    # a redundant query per row on a page full of anonymous posts.
+    acting_user_id = resolve_acting_user_id(current_user)
+    any_anonymous = any(d.is_anonymous for d in discussions)
+    is_admin = False
+    if any_anonymous:
+        is_admin = await authorization_verify_based_on_org_admin_status(
+            request, acting_user_id, "update", community.community_uuid, db_session
+        )
+
     # Build response
     result = []
     for discussion in discussions:
         author = authors_map.get(discussion.author_id)
         has_voted = discussion.id in user_votes
 
+        if discussion.is_anonymous and acting_user_id != discussion.author_id and not is_admin:
+            display_author, display_author_id = None, None
+        else:
+            display_author = UserReadAuthor.model_validate(author.model_dump()) if author else None
+            display_author_id = discussion.author_id
+
         result.append(
             DiscussionReadWithVoteStatus(
-                **discussion.model_dump(),
-                author=UserReadAuthor.model_validate(author.model_dump()) if author else None,
+                **{**discussion.model_dump(), "author_id": display_author_id},
+                author=display_author,
                 has_voted=has_voted,
             )
         )

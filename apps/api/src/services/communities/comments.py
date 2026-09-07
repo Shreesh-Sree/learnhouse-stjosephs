@@ -14,7 +14,12 @@ from src.db.communities.discussion_comments import (
     DiscussionCommentUpdate,
 )
 from src.services.communities.comment_votes import get_user_votes_for_comments
-from src.security.rbac import check_resource_access, AccessAction, authorization_verify_if_user_is_anon
+from src.security.rbac import (
+    check_resource_access,
+    AccessAction,
+    authorization_verify_if_user_is_anon,
+    authorization_verify_based_on_org_admin_status,
+)
 from src.services.communities.moderation import validate_comment_content, enforce_auto_lock
 from src.services.webhooks.dispatch import dispatch_webhooks
 
@@ -25,6 +30,7 @@ async def create_comment(
     content: str,
     current_user: Union[PublicUser, AnonymousUser, APITokenUser],
     db_session: AsyncSession,
+    is_anonymous: bool = False,
 ) -> DiscussionCommentReadWithVoteStatus:
     """
     Create a new comment on a discussion.
@@ -72,6 +78,7 @@ async def create_comment(
     # Create comment
     comment = DiscussionComment(
         content=content,
+        is_anonymous=is_anonymous,
         discussion_id=discussion.id,
         author_id=current_user.id,
         comment_uuid=f"comment_{uuid4()}",
@@ -163,14 +170,28 @@ async def get_comments_by_discussion(
         comment_ids, current_user.id, db_session
     )
 
+    # Same anonymity model as discussions (see Discussion.is_anonymous) —
+    # is_admin computed once for the whole page rather than per comment.
+    any_anonymous = any(c.is_anonymous for c in comments)
+    is_admin = False
+    if any_anonymous:
+        is_admin = await authorization_verify_based_on_org_admin_status(
+            request, current_user.id, "update", community.community_uuid, db_session
+        )
+
     # Build response
     result = []
     for comment in comments:
         author = authors_map.get(comment.author_id)
+        if comment.is_anonymous and current_user.id != comment.author_id and not is_admin:
+            display_author, display_author_id = None, None
+        else:
+            display_author = UserReadAuthor.model_validate(author.model_dump()) if author else None
+            display_author_id = comment.author_id
         result.append(
             DiscussionCommentReadWithVoteStatus(
-                **comment.model_dump(),
-                author=UserReadAuthor.model_validate(author.model_dump()) if author else None,
+                **{**comment.model_dump(), "author_id": display_author_id},
+                author=display_author,
                 has_voted=user_votes.get(comment.id, False),
             )
         )

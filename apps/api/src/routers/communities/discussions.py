@@ -63,6 +63,7 @@ class DiscussionCreateRequest(BaseModel):
     content: str | None = None
     label: str | None = "general"
     emoji: str | None = None
+    is_anonymous: bool = False
 
 
 @router.get(
@@ -114,6 +115,7 @@ async def api_create_discussion(
         current_user,
         db_session,
         emoji=discussion_data.emoji,
+        is_anonymous=discussion_data.is_anonymous,
     )
 
 
@@ -379,6 +381,7 @@ async def api_get_user_votes_batch(
 
 class CommentCreateRequest(BaseModel):
     content: str
+    is_anonymous: bool = False
 
 
 @router.post(
@@ -412,6 +415,7 @@ async def api_create_comment(
         comment_data.content,
         current_user,
         db_session,
+        is_anonymous=comment_data.is_anonymous,
     )
 
 

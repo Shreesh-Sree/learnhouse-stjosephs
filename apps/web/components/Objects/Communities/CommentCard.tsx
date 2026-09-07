@@ -64,7 +64,9 @@ export function CommentCard({ comment, canManage = false, onDeleted, onUpdated }
   const timeAgo = dayjs(comment.creation_date).fromNow()
   const authorName = comment.author
     ? `${comment.author.first_name} ${comment.author.last_name}`.trim() || comment.author.username
-    : t('common.unknown')
+    : comment.is_anonymous
+      ? t('communities.anonymous', { defaultValue: 'Anonymous' })
+      : t('common.unknown')
 
   const handleEdit = async () => {
     if (!editContent.trim() || isSubmitting) return

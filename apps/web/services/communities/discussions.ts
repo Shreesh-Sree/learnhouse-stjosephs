@@ -27,12 +27,15 @@ export interface Discussion {
   id: number
   community_id: number
   org_id: number
-  author_id: number
+  // null when the post is anonymous and the reader is neither the author
+  // nor an instructor — see is_anonymous.
+  author_id: number | null
   discussion_uuid: string
   title: string
   content: string | null
   label: string
   emoji: string | null
+  is_anonymous: boolean
   upvote_count: number
   edit_count: number
   is_pinned: boolean
@@ -60,6 +63,7 @@ export interface DiscussionCreate {
   content?: string | null
   label?: string
   emoji?: string | null
+  is_anonymous?: boolean
 }
 
 export interface DiscussionUpdate {
@@ -263,9 +267,12 @@ export async function getUserVotesBatch(
 export interface DiscussionComment {
   id: number
   discussion_id: number
-  author_id: number
+  // null when the comment is anonymous and the reader is neither the
+  // author nor an instructor.
+  author_id: number | null
   comment_uuid: string
   content: string
+  is_anonymous: boolean
   upvote_count: number
   creation_date: string
   update_date: string
@@ -278,6 +285,7 @@ export interface DiscussionCommentWithAuthor extends DiscussionComment {
 
 export interface CommentCreate {
   content: string
+  is_anonymous?: boolean
 }
 
 export async function getComments(

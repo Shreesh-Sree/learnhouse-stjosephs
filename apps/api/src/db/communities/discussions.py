@@ -19,6 +19,14 @@ class DiscussionBase(SQLModel):
     content: Optional[str] = Field(default=None, sa_column=Column(Text))
     label: Optional[str] = Field(default="general", sa_column=Column(String(50)))
     emoji: Optional[str] = Field(default=None, sa_column=Column(String(50)))
+    # True when the author chose to post anonymously. author_id is ALWAYS
+    # stored — this never anonymizes the record itself, only what's shown
+    # to a non-instructor, non-author READER (see services.communities.
+    # discussions._resolve_author_for_reader). A large-lecture-course
+    # pain point: students who won't ask a "dumb" question under their
+    # real name simply don't ask it. Instructors always see the real
+    # author, so this can't be abused for unaccountable harassment.
+    is_anonymous: bool = Field(default=False, sa_column=Column(Boolean, default=False))
 
 
 class Discussion(DiscussionBase, table=True):
@@ -49,6 +57,7 @@ class DiscussionCreate(SQLModel):
     content: Optional[str] = None
     label: Optional[str] = "general"
     emoji: Optional[str] = None
+    is_anonymous: bool = False
     community_id: int = Field(default=None, foreign_key="community.id")
     org_id: int = Field(default=None, foreign_key="organization.id")
     author_id: int = Field(default=None, foreign_key="user.id")
@@ -75,9 +84,13 @@ class DiscussionRead(SQLModel):
     content: Optional[str] = None
     label: Optional[str] = "general"
     emoji: Optional[str] = None
+    is_anonymous: bool = False
     community_id: int = Field(default=None, foreign_key="community.id")
     org_id: int = Field(default=None, foreign_key="organization.id")
-    author_id: int = Field(default=None, foreign_key="user.id")
+    # None for a reader who isn't shown the real author — see
+    # services.communities.discussions._resolve_author_for_reader. Always
+    # populated for the real author, an instructor, or a non-anonymous post.
+    author_id: Optional[int] = Field(default=None, foreign_key="user.id")
     discussion_uuid: str
     upvote_count: int
     edit_count: int = 0

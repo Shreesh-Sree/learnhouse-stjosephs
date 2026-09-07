@@ -36,6 +36,7 @@ export function CommentSection({ discussionUuid, communityUuid, isLocked = false
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isAnonymous, setIsAnonymous] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -73,7 +74,7 @@ export function CommentSection({ discussionUuid, communityUuid, isLocked = false
     try {
       const comment = await createComment(
         discussionUuid,
-        { content: newComment.trim() },
+        { content: newComment.trim(), is_anonymous: isAnonymous },
         accessToken
       )
       track(AnalyticsEvent.CommentPosted, {
@@ -83,6 +84,7 @@ export function CommentSection({ discussionUuid, communityUuid, isLocked = false
       setComments((prev) => [...prev, comment])
       setNewComment('')
       setIsFocused(false)
+      setIsAnonymous(false)
     } catch (err: any) {
       const message =
         (err?.detail && typeof err.detail === 'object' && err.detail.message) ||
@@ -180,7 +182,16 @@ export function CommentSection({ discussionUuid, communityUuid, isLocked = false
                 />
 
                 {(isFocused || newComment) && (
-                  <div className="flex items-center justify-end px-2 py-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between px-2 py-2 border-t border-gray-100">
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isAnonymous}
+                        onChange={(e) => setIsAnonymous(e.target.checked)}
+                        className="rounded border-gray-300"
+                      />
+                      {t('communities.comments.post_anonymously', { defaultValue: 'Post anonymously' })}
+                    </label>
                     <button
                       type="submit"
                       disabled={!newComment.trim() || isSubmitting}

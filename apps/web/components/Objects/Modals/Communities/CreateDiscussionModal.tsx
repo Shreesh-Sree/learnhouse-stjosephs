@@ -53,6 +53,7 @@ export function CreateDiscussionModal({
   const [titleError, setTitleError] = useState<string | null>(null)
   const [selectedLabel, setSelectedLabel] = useState<string>('general')
   const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null)
+  const [isAnonymous, setIsAnonymous] = useState(false)
 
   const accessToken = session?.data?.tokens?.access_token
 
@@ -94,6 +95,7 @@ export function CreateDiscussionModal({
           content: content ? JSON.stringify(content) : null,
           label: selectedLabel,
           emoji: selectedEmoji,
+          is_anonymous: isAnonymous,
         },
         accessToken
       )
@@ -111,6 +113,7 @@ export function CreateDiscussionModal({
         setContent(null)
         setSelectedLabel('general')
         setSelectedEmoji(null)
+        setIsAnonymous(false)
         onClose()
       }
     } catch (err: any) {
@@ -140,6 +143,7 @@ export function CreateDiscussionModal({
           setTitleError(null)
           setSelectedLabel('general')
           setSelectedEmoji(null)
+          setIsAnonymous(false)
           onClose()
         }
       }}
@@ -233,6 +237,25 @@ export function CreateDiscussionModal({
               {t('communities.create_discussion.editor_hint')}
             </p>
           </div>
+
+          {/* Anonymous posting — visible to classmates as "Anonymous",
+              still identified to instructors so it can't be abused. */}
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            {t('communities.create_discussion.post_anonymously', { defaultValue: 'Post anonymously' })}
+          </label>
+          {isAnonymous && (
+            <p className="text-xs text-gray-500 -mt-3">
+              {t('communities.create_discussion.post_anonymously_hint', {
+                defaultValue: 'Classmates will see "Anonymous" — your instructor can still see it was you.',
+              })}
+            </p>
+          )}
 
           {/* Error message */}
           {error && (

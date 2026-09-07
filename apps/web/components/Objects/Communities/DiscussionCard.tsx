@@ -115,7 +115,9 @@ export function DiscussionCard({
 
   const authorName = discussion.author
     ? `${discussion.author.first_name} ${discussion.author.last_name}`.trim() || discussion.author.username
-    : t('common.unknown')
+    : discussion.is_anonymous
+      ? t('communities.anonymous', { defaultValue: 'Anonymous' })
+      : t('common.unknown')
 
   const discussionLink = getUriWithOrg(orgslug, `/community/${communityId}/discussion/${discussionId}`)
 
