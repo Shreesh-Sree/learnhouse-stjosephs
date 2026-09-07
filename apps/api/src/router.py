@@ -29,6 +29,7 @@ from src.routers.courses import chapters, courses, assignments, certifications
 from src.routers.folders import folders as folders_router_module
 from src.routers.media import media as media_router_module
 from src.routers.courses import migration as migration_router_module
+from src.routers.courses import quiz_flags as quiz_flags_router_module
 from src.routers.communities import communities as communities_router_module
 from src.routers.communities import discussions as discussions_router_module
 from src.routers.courses.activities import activities, blocks
@@ -264,6 +265,10 @@ v1_router.include_router(
     discussions_router_module.router,
     tags=["discussions"],
     dependencies=[Depends(require_plan_for_community("standard", "Communities"))]
+)
+v1_router.include_router(
+    quiz_flags_router_module.router,
+    tags=["quiz_flags"],
 )
 v1_router.include_router(
     podcasts_router_module.router,

@@ -3,7 +3,7 @@ import React, { use, useEffect } from 'react';
 import { CourseProvider } from '../../../../../../../../components/Contexts/CourseContext'
 import { CourseOverviewTop } from '@components/Dashboard/Misc/CourseOverviewTop'
 import { motion } from 'motion/react'
-import { GalleryVerticalEnd, Globe, Info, UserPen, Award, Lock, Search, ClipboardList, Link2, FileUp } from 'lucide-react'
+import { GalleryVerticalEnd, Globe, Info, UserPen, Award, Lock, Search, ClipboardList, Link2, FileUp, Flag } from 'lucide-react'
 import { ChartBar } from '@phosphor-icons/react'
 import EditCourseStructure from '@components/Dashboard/Pages/Course/EditCourseStructure/EditCourseStructure'
 import EditCourseGeneral from '@components/Dashboard/Pages/Course/EditCourseGeneral/EditCourseGeneral'
@@ -14,6 +14,7 @@ import EditCourseSEO from '@components/Dashboard/Pages/Course/EditCourseSEO/Edit
 import EditCourseRoster from '@components/Dashboard/Pages/Course/EditCourseRoster/EditCourseRoster'
 import EditCourseLTI from '@components/Dashboard/Pages/Course/EditCourseLTI/EditCourseLTI'
 import EditCourseQTIImport from '@components/Dashboard/Pages/Course/EditCourseQTIImport/EditCourseQTIImport'
+import EditCourseQuizFlags from '@components/Dashboard/Pages/Course/EditCourseQuizFlags/EditCourseQuizFlags'
 import { useCourseRights } from '@hooks/useCourseRights'
 import { useRouter } from 'next/navigation'
 import { getUriWithOrg } from '@services/config/config';
@@ -115,6 +116,13 @@ function CourseOverviewPage(props: { params: Promise<CourseOverviewParams> }) {
       label: t('dashboard.courses.settings.tabs.qti', { defaultValue: 'QTI Import' }),
       icon: FileUp,
       href: `/dash/courses/course/${params.courseuuid}/qti`,
+      requiredPermission: 'update' as const
+    },
+    {
+      key: 'quiz_flags',
+      label: t('dashboard.courses.settings.tabs.quiz_flags', { defaultValue: 'Flagged Questions' }),
+      icon: Flag,
+      href: `/dash/courses/course/${params.courseuuid}/quiz_flags`,
       requiredPermission: 'update' as const
     }
   ]
@@ -234,6 +242,9 @@ function CourseOverviewPage(props: { params: Promise<CourseOverviewParams> }) {
             ) : null}
             {!rightsLoading && params.subpage == 'qti' && hasPermission('update') ? (
               <EditCourseQTIImport orgslug={params.orgslug} />
+            ) : null}
+            {!rightsLoading && params.subpage == 'quiz_flags' && hasPermission('update') ? (
+              <EditCourseQuizFlags orgslug={params.orgslug} />
             ) : null}
           </div>
         </motion.div>

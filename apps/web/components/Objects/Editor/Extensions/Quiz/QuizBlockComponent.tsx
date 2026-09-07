@@ -15,6 +15,7 @@ import {
 import dynamic from 'next/dynamic'
 const ReactConfetti = dynamic(() => import('react-confetti'), { ssr: false })
 const AIQuizGeneratorModal = dynamic(() => import('@components/Objects/AI/AIQuizGeneratorModal'), { ssr: false })
+import QuizFlagButton from './QuizFlagButton'
 import { useEditorProvider } from '@components/Contexts/Editor/EditorContext'
 import { useTranslation } from 'react-i18next'
 import {
@@ -414,7 +415,7 @@ function QuizBlockComponent(props: any) {
                       </p>
                     )}
                   </div>
-                  {isEditable && (
+                  {isEditable ? (
                     <button
                       onClick={() => deleteQuestion(question.question_id)}
                       className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-neutral-400 hover:text-red-500 hover:bg-red-50 transition-colors outline-none"
@@ -424,6 +425,12 @@ function QuizBlockComponent(props: any) {
                     >
                       <Trash weight="duotone" size={12} />
                     </button>
+                  ) : (
+                    <QuizFlagButton
+                      activityUuid={activityUuid}
+                      quizId={props.node.attrs.quizId}
+                      questionId={question.question_id}
+                    />
                   )}
                 </div>
 

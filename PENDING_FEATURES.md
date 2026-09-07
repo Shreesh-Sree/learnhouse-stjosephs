@@ -242,8 +242,32 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   task — fine at a self-hosted college's classroom scale, not built for a
   MOOC-sized cohort. Needs real-environment verification like everything
   else this session.
-- Student-flaggable quiz questions ("something's wrong with this question")
-  feeding an instructor review queue.
+- ~~Student-flaggable quiz questions~~ — **done, scoped to the ungraded
+  in-content `blockQuiz` self-check block only** — the separate graded
+  ASSIGNMENT quiz task type has a different question shape entirely
+  (`services/ai/quiz.py`) and is not covered. A quiz question is not its
+  own database row (it lives inside a `blockQuiz` node in an activity's
+  Prosemirror content document), so `QuizQuestionFlag` references it by
+  `(activity_id, quiz_id, question_id)` and keeps a text SNAPSHOT of the
+  question at flag time — content can be edited or the block deleted after
+  a flag is raised, and the review queue must show what the student
+  actually saw, not whatever the block currently contains. A small flag
+  icon on each question in read/take mode (never shown in the editor's own
+  edit mode) opens an inline reason picker (wrong answer key / unclear
+  wording / typo / other) plus an optional note; a repeat flag from the
+  same student on the same still-open question is idempotent (returns the
+  existing row rather than duplicating), and a per-student, per-course cap
+  of 50 open flags backstops against flooding the queue. A new "Flagged
+  Questions" course-dashboard tab is the instructor review queue: reason,
+  question snapshot, note, who flagged it, and a link back into the
+  activity editor, with Resolve/Dismiss actions. `flagged_by`/
+  `resolved_by` are `SET NULL` on user deletion rather than cascading —
+  the flag stays useful as a content-quality signal even after the person
+  who raised or resolved it is gone. Needs real-environment verification
+  like everything else this session; the question-lookup and
+  idempotent-flag logic were verified with a standalone script against
+  synthetic Prosemirror documents (this sandbox has neither `fastapi` nor
+  a real DB to exercise the endpoints end-to-end).
 
 **Operations / integration**
 - ~~Bulk roster import (CSV) + gradebook export (CSV)~~ — **done.** New
