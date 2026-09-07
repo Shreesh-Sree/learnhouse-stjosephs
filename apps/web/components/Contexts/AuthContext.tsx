@@ -17,6 +17,7 @@ import { isSubdomainOf, isSameHost, isLocalhost as isLocalhostCheck } from '@ser
 import { safeRedirectUrl } from '@services/auth/redirects'
 import { safeExternalUrl } from '@services/security/url'
 import { AUTH_EXPIRED_EVENT, AUTH_REFRESHED_EVENT } from '@/lib/auth/events'
+import { clearOfflineCaches } from '@services/offline/clearOfflineCache'
 
 // Types matching NextAuth's session structure
 export interface Session {
@@ -275,6 +276,7 @@ export function SessionProvider({
         setStatus('unauthenticated')
         sessionCacheRef.current = null
         clearSessionMarker()
+        clearOfflineCaches()
       } else if (event.data.type === 'LOGIN') {
         // Another tab logged in. Refresh our session, but dedupe across tabs via
         // a shared localStorage timestamp so N open tabs don't all fire
@@ -1055,6 +1057,7 @@ export function SessionProvider({
     // Clear OAuth state
     clearOAuthStateCookie()
     clearSessionMarker()
+    clearOfflineCaches()
 
     // Notify other tabs about logout
     broadcastChannelRef.current?.postMessage({ type: 'LOGOUT' })
@@ -1285,6 +1288,7 @@ export async function signOut(options?: SignOutOptions): Promise<void> {
   // Clear OAuth state
   clearOAuthStateCookie()
   clearSessionMarker()
+  await clearOfflineCaches()
 
   // Try to notify other tabs (if BroadcastChannel is available)
   try {

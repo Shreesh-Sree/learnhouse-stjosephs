@@ -552,9 +552,42 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   arithmetically correct.
 
 **Access / scale**
-- Offline-capable course content (PWA + service worker caching), so a
-  student on unreliable campus wifi or at home can still read cached
-  lecture material. No such capability exists today.
+- ~~Offline-capable course content~~ — **done, narrowly scoped: data
+  caching, not a full offline app shell.** A hand-rolled service worker
+  (`public/sw.js` — no next-pwa/Workbox dependency added) caches, via an
+  ALLOWLIST of path patterns (`/api/v1/courses/`, `/api/v1/chapters/`,
+  `/api/v1/activities/` — never auth/users/payments/anything else), the
+  GET responses for course meta, chapter, and activity content using
+  stale-while-revalidate, plus Next.js's content-hashed static assets
+  (`/_next/static/*`) cache-first. Only GET requests are ever touched —
+  no offline write support (quiz answers, submissions) is attempted; that
+  is a background-sync problem this does not solve. A `manifest.json`
+  makes the app installable as a bonus. KNOWN LIMITATIONS, disclosed in
+  `sw.js`'s own docstring: (1) this caches content the student has
+  ALREADY opened in the current tab — it does not precache a whole
+  course, so it will not spare data by prefetching everything before a
+  trip; (2) a COLD full-page reload with zero connectivity is not
+  supported (no offline-fallback document caching) — that would need a
+  real Workbox/next-pwa build-time integration, a materially bigger
+  change than a runtime script can safely replicate by hand; reopening a
+  tab that was already loaded once while online, or navigating within an
+  already-open tab, both work offline for previously-viewed content.
+  PRIVACY LIMITATION, also disclosed there: the Cache API has no notion of
+  "which account" fetched a response, exactly like ordinary browser disk
+  cache — on a SHARED device, a second account logged into the same
+  browser profile could otherwise read the first account's cached
+  restricted content while offline. Mitigated, not eliminated: the app now
+  clears every service-worker cache on sign-out
+  (`services/offline/clearOfflineCache.ts`), wired into all three
+  logout paths (`AuthContext`'s `handleSignOut`, its standalone `signOut`
+  export, and the cross-tab `LOGOUT` broadcast handler) — this protects
+  anyone who actually signs out, not someone who just closes the tab.
+  The service-worker's own URL-pattern matching (which requests are
+  eligible for caching, and that mutating methods are never touched
+  regardless of path) was verified with a standalone script. Needs
+  real-environment verification like everything else this session,
+  especially registering successfully across real browsers and surviving
+  an actual campus-wifi dropout mid-session.
 - Live video conferencing / virtual classroom (embedded Zoom/Meet, or a
   native WebRTC session) — Boards and Podcasts exist for collaboration and
   async audio; nothing covers a live class session.

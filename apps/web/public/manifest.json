@@ -1,0 +1,23 @@
+{
+  "name": "LearnHouse",
+  "short_name": "LearnHouse",
+  "description": "Self-hosted learning platform — read your course content even when you're offline.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/learnhouse_icon.png",
+      "sizes": "590x590",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/learnhouse_bigicon.png",
+      "sizes": "1180x1180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

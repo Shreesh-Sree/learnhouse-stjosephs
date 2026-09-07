@@ -2,6 +2,8 @@ import '../styles/globals.css'
 import React from 'react'
 import Providers from '@components/Providers'
 import { Wix_Madefor_Text, Tajawal } from 'next/font/google'
+import ServiceWorkerRegistration from '@components/Offline/ServiceWorkerRegistration'
+import OfflineBanner from '@components/Offline/OfflineBanner'
 
 const wixMadeforText = Wix_Madefor_Text({
   subsets: ['latin'],
@@ -56,12 +58,18 @@ export default function RootLayout({
             Reads the optional ?bgcolor param (hex-validated) or defaults to dark. */}
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script src="/embed-bg.js" />
+        {/* Installability + the "read cached lecture material offline"
+            capability — see public/sw.js's own docstring for exact scope. */}
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#000000" />
       </head>
       <body suppressHydrationWarning>
+        <ServiceWorkerRegistration />
         <Providers>
           <main className="animate-fade-in">
             {children}
           </main>
+          <OfflineBanner />
         </Providers>
       </body>
     </html>
