@@ -188,6 +188,28 @@ export async function bulkRemoveContributors(course_uuid: string, data: any, acc
   return res
 }
 
+// Instructor-only. Uploads a CSV roster (an "email" column, or a bare
+// single-column list) to bulk-enroll existing org members and invite
+// everyone else to the org.
+export async function importCourseRoster(
+  course_uuid: string,
+  file: File,
+  access_token: string | null | undefined
+) {
+  const formData = new FormData()
+  formData.append('file', file)
+  const result: any = await fetch(
+    `${getAPIUrl()}courses/${course_uuid}/roster/import`,
+    RequestBodyFormWithAuthHeader('POST', formData, null, access_token || undefined)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export function getCourseGradebookExportUrl(course_uuid: string) {
+  return `${getAPIUrl()}courses/${course_uuid}/gradebook/export`
+}
+
 export async function getCourseRights(course_uuid: string, access_token: string | null | undefined) {
   const result: any = await fetch(
     `${getAPIUrl()}courses/${course_uuid}/rights`,

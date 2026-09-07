@@ -246,8 +246,21 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   feeding an instructor review queue.
 
 **Operations / integration**
-- Bulk roster import (CSV) + gradebook export (CSV) for onboarding/offboarding
-  a semester's students and handing grades to a registrar/SIS.
+- ~~Bulk roster import (CSV) + gradebook export (CSV)~~ — **done.** New
+  "Roster" tab on the course dashboard. Import: upload a CSV (an "email"
+  column, or a bare single-column list) — every email that already
+  resolves to an org member is enrolled immediately (a `Trail`/`TrailRun`
+  row, the same thing self-service enrollment writes); every other
+  well-formed email is invited to the ORGANIZATION via the existing,
+  already-hardened batch-invite flow (`invite_batch_users`) rather than a
+  new invite mechanism — there is deliberately no "pending course
+  enrollment for an email with no account yet" concept, so the admin
+  re-runs the import once an invited student has signed up. Export: one
+  CSV row per enrolled student, one column per assignment, reusing the
+  exact `display_grade` every other grading surface already computes
+  (`read_assignment_submissions`) rather than re-deriving grades. Needs
+  real-environment verification like everything else this session,
+  especially the invite-then-reimport flow.
 - LTI (Learning Tools Interoperability) support, to embed LearnHouse content
   inside another LMS a college already runs, or vice versa.
 - Question-bank import (QTI format) for migrating existing quiz content from

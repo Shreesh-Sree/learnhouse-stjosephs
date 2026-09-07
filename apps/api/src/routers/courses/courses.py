@@ -53,6 +53,11 @@ from src.services.courses.contributors import (
     remove_bulk_course_contributors,
 )
 from src.db.resource_authors import ResourceAuthorshipEnum, ResourceAuthorshipStatusEnum
+from src.services.courses.roster import (
+    bulk_enroll_roster,
+    export_course_gradebook_csv,
+    parse_roster_emails,
+)
 from src.services.courses.transfer import (
     export_course,
     export_courses_batch,
@@ -1076,3 +1081,62 @@ async def api_get_course_user_rights(
     - All permissions are calculated based on current user context
     """
     return await get_course_user_rights(request, course_uuid, current_user, db_session)
+
+
+## ROSTER / GRADEBOOK ##
+
+
+@router.post(
+    "/{course_uuid}/roster/import",
+    summary="Bulk-enroll students from a CSV roster",
+    description=(
+        "Instructor-only. Uploads a CSV of emails (a header row naming an "
+        "'email' column, or a bare single-column list). Every email that "
+        "already belongs to an org member is enrolled immediately; every "
+        "other well-formed email is invited to the organization (not "
+        "directly to the course) via the existing invite flow — re-run "
+        "this import once an invited student has signed up."
+    ),
+    responses={
+        200: {"description": "Import result (per-email status list)."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this course"},
+        404: {"description": "Course not found"},
+    },
+)
+async def api_import_course_roster(
+    request: Request,
+    course_uuid: str,
+    file: UploadFile,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: PublicUser = Depends(get_current_user),
+):
+    raw = await file.read()
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="CSV file must be UTF-8 encoded.")
+    emails = parse_roster_emails(text)
+    if not emails:
+        raise HTTPException(status_code=400, detail="No email addresses found in this file.")
+    return await bulk_enroll_roster(request, course_uuid, emails, current_user, db_session)
+
+
+@router.get(
+    "/{course_uuid}/gradebook/export",
+    summary="Export the course gradebook as CSV",
+    description="Instructor-only. One row per enrolled student, one column per assignment.",
+    responses={
+        200: {"description": "CSV file.", "content": {"text/csv": {}}},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this course"},
+        404: {"description": "Course not found"},
+    },
+)
+async def api_export_course_gradebook(
+    request: Request,
+    course_uuid: str,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: PublicUser = Depends(get_current_user),
+):
+    return await export_course_gradebook_csv(request, course_uuid, current_user, db_session)
