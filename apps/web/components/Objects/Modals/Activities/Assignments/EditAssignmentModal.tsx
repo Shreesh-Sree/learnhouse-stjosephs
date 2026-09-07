@@ -45,6 +45,7 @@ import {
     KeyRound,
     Timer,
     Download,
+    Camera,
 } from 'lucide-react';
 
 type GradingType = 'ALPHABET' | 'NUMERIC' | 'PERCENTAGE' | 'PASS_FAIL' | 'GPA_SCALE';
@@ -69,6 +70,7 @@ interface Assignment {
     require_safe_exam_browser?: boolean;
     seb_quit_password?: string | null;
     time_limit_minutes?: number | null;
+    require_webcam_proctoring?: boolean;
     assignment_tasks?: any[];
 }
 
@@ -236,6 +238,7 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             time_limit_enabled: typeof assignment.time_limit_minutes === 'number',
             time_limit_minutes:
                 typeof assignment.time_limit_minutes === 'number' ? assignment.time_limit_minutes : 60,
+            require_webcam_proctoring: assignment.require_webcam_proctoring || false,
         },
         enableReinitialize: true,
         onSubmit: async (values, { setSubmitting }) => {
@@ -540,6 +543,15 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
                     onEnabledChange={(v) => formik.setFieldValue('time_limit_enabled', v, true)}
                     minutes={formik.values.time_limit_minutes}
                     onMinutesChange={(v) => formik.setFieldValue('time_limit_minutes', v, true)}
+                />
+                <ToggleRow
+                    icon={<Camera size={16} className="text-rose-500" />}
+                    label={t('dashboard.assignments.modals.edit.form.webcam_proctoring_label', { defaultValue: 'Webcam proctoring' })}
+                    description={t('dashboard.assignments.modals.edit.form.webcam_proctoring_description', {
+                        defaultValue: 'Periodically captures a photo from the learner\'s webcam during the attempt, visible only to you. Learners see an explicit consent screen and can decline without being blocked.',
+                    })}
+                    checked={formik.values.require_webcam_proctoring}
+                    onChange={(v) => formik.setFieldValue('require_webcam_proctoring', v, true)}
                 />
             </div>
 

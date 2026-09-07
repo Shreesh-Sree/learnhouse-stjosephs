@@ -356,6 +356,56 @@ export async function startAssignmentAttempt(
   return res
 }
 
+// Uploads one webcam frame for the CURRENT user's own attempt. Opportunistic
+// — nothing on the backend requires this to have been called before a
+// submission is accepted.
+export async function uploadProctoringSnapshot(
+  assignmentUUID: string,
+  imageBlob: Blob,
+  access_token: string
+) {
+  const formData = new FormData()
+  formData.append('image_file', imageBlob, 'snapshot.jpg')
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/proctoring/snapshots`,
+    RequestBodyFormWithAuthHeader('POST', formData, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only.
+export async function getProctoringSnapshots(
+  assignmentUUID: string,
+  userId: number,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/proctoring/snapshots/user/${userId}`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only retention control.
+export async function deleteProctoringSnapshots(
+  assignmentUUID: string,
+  userId: number,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/proctoring/snapshots/user/${userId}`,
+    RequestBodyWithAuthHeader('DELETE', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export function getProctoringSnapshotUrl(assignmentUUID: string, snapshotUuid: string) {
+  return `${getAPIUrl()}assignments/${assignmentUUID}/proctoring/snapshots/file/${snapshotUuid}`
+}
+
 export async function retryAssignmentSubmission(
   assignmentUUID: string,
   access_token: string

@@ -53,6 +53,7 @@ const DocumentPdfActivity = lazy(() => import('@components/Objects/Activities/Do
 const AssignmentStudentActivity = lazy(() => import('@components/Objects/Activities/Assignment/AssignmentStudentActivity'))
 import AssignmentSebGate from '@components/Objects/Activities/Assignment/AssignmentSebGate'
 import AssignmentTimeLimitGate from '@components/Objects/Activities/Assignment/AssignmentTimeLimitGate'
+import AssignmentProctoringConsent from '@components/Objects/Activities/Assignment/AssignmentProctoringConsent'
 // Deadline rule shared with the learner activity view (and mirroring the
 // server's _is_assignment_past_due) so the submit/retry affordances agree with
 // what the API will actually accept. Static import: it's a pure function, and
@@ -368,21 +369,30 @@ function ActivityClient(props: ActivityClientProps) {
                   AssignmentProvider's gated load before firing its own
                   requests, adding an extra round-trip phase. */}
               <AssignmentSubmissionProvider assignment_uuid={assignment?.assignment_uuid}>
-                {/* Nested inside AssignmentSubmissionProvider so it can read
-                    the learner's own submission (started_at) via
-                    useAssignmentSubmission — same context AssignmentTools
-                    (in ActivityActions) reads to auto-submit on expiry. */}
-                <AssignmentTimeLimitGate
+                {/* Proctoring consent resolves BEFORE the timed-attempt gate
+                    below — a student shouldn't be deciding about camera
+                    access while their time limit clock is already running. */}
+                <AssignmentProctoringConsent
                   assignmentUuid={assignment?.assignment_uuid}
-                  timeLimitMinutes={assignment?.time_limit_minutes}
+                  requireWebcamProctoring={!!assignment?.require_webcam_proctoring}
                   accessToken={access_token}
                 >
-                  <AssignmentProvider assignment_uuid={assignment?.assignment_uuid}>
-                    <AssignmentsTaskProvider>
-                      <AssignmentStudentActivity />
-                    </AssignmentsTaskProvider>
-                  </AssignmentProvider>
-                </AssignmentTimeLimitGate>
+                  {/* Nested inside AssignmentSubmissionProvider so it can read
+                      the learner's own submission (started_at) via
+                      useAssignmentSubmission — same context AssignmentTools
+                      (in ActivityActions) reads to auto-submit on expiry. */}
+                  <AssignmentTimeLimitGate
+                    assignmentUuid={assignment?.assignment_uuid}
+                    timeLimitMinutes={assignment?.time_limit_minutes}
+                    accessToken={access_token}
+                  >
+                    <AssignmentProvider assignment_uuid={assignment?.assignment_uuid}>
+                      <AssignmentsTaskProvider>
+                        <AssignmentStudentActivity />
+                      </AssignmentsTaskProvider>
+                    </AssignmentProvider>
+                  </AssignmentTimeLimitGate>
+                </AssignmentProctoringConsent>
               </AssignmentSubmissionProvider>
             </AssignmentSebGate>
           </Suspense>

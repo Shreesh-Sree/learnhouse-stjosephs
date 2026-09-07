@@ -12,9 +12,16 @@ from src.db.courses.assignments import (
     AssignmentUserSubmissionCreate,
     AssignmentUserSubmissionRead,
 )
+from src.db.courses.proctoring import ProctoringSnapshotRead
 from src.db.users import PublicUser
 from src.core.events.database import get_db_session
 from src.security.auth import get_current_user
+from src.services.courses.activities.proctoring import (
+    delete_proctoring_snapshots,
+    list_proctoring_snapshots,
+    serve_proctoring_snapshot,
+    upload_proctoring_snapshot,
+)
 from src.services.courses.activities.assignments import (
     check_assignment_seb_status,
     create_assignment,
@@ -196,6 +203,99 @@ async def api_get_assignment_seb_config(
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post(
+    "/{assignment_uuid}/proctoring/snapshots",
+    response_model=ProctoringSnapshotRead,
+    summary="Upload a webcam proctoring snapshot",
+    description=(
+        "The current user uploads one webcam frame captured during their own "
+        "attempt. Opportunistic only — nothing checks that these exist before "
+        "allowing a submission; a student who declined the consent prompt "
+        "simply never calls this."
+    ),
+    responses={
+        200: {"description": "Snapshot stored.", "model": ProctoringSnapshotRead},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment not found"},
+        413: {"description": "Image exceeds the maximum upload size"},
+    },
+)
+async def api_upload_proctoring_snapshot(
+    request: Request,
+    assignment_uuid: str,
+    image_file: UploadFile,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> ProctoringSnapshotRead:
+    return await upload_proctoring_snapshot(request, assignment_uuid, image_file, current_user, db_session)
+
+
+@router.get(
+    "/{assignment_uuid}/proctoring/snapshots/user/{user_id}",
+    response_model=list[ProctoringSnapshotRead],
+    summary="List a student's proctoring snapshots",
+    description="Instructor-only. Every webcam snapshot captured for one student's attempt on this assignment.",
+    responses={
+        200: {"description": "Snapshot list.", "model": list[ProctoringSnapshotRead]},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_list_proctoring_snapshots(
+    request: Request,
+    assignment_uuid: str,
+    user_id: int,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> list[ProctoringSnapshotRead]:
+    return await list_proctoring_snapshots(request, assignment_uuid, user_id, current_user, db_session)
+
+
+@router.delete(
+    "/{assignment_uuid}/proctoring/snapshots/user/{user_id}",
+    summary="Delete a student's proctoring snapshots",
+    description="Instructor-only retention control. Permanently deletes every webcam snapshot captured for one student's attempt on this assignment.",
+    responses={
+        200: {"description": "Snapshots deleted."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_delete_proctoring_snapshots(
+    request: Request,
+    assignment_uuid: str,
+    user_id: int,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    deleted_count = await delete_proctoring_snapshots(request, assignment_uuid, user_id, current_user, db_session)
+    return {"success": True, "deleted_count": deleted_count}
+
+
+@router.get(
+    "/{assignment_uuid}/proctoring/snapshots/file/{snapshot_uuid}",
+    summary="Serve a proctoring snapshot's image",
+    description="Instructor-only. Streams one webcam snapshot's JPEG bytes.",
+    responses={
+        200: {"description": "Image bytes."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Snapshot not found"},
+    },
+)
+async def api_serve_proctoring_snapshot(
+    request: Request,
+    assignment_uuid: str,
+    snapshot_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> Response:
+    return await serve_proctoring_snapshot(request, snapshot_uuid, current_user, db_session)
 
 
 @router.put(

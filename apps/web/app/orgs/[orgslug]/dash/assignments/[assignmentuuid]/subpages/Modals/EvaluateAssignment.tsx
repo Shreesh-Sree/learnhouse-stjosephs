@@ -19,6 +19,7 @@ import { useLHSession } from '@components/Contexts/LHSessionContext';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics';
+import ProctoringSnapshotGallery from '@components/Objects/Activities/Assignment/ProctoringSnapshotGallery';
 
 function pctToLetterGrade(pct: number): string {
     if (pct >= 90) return 'A';
@@ -270,6 +271,13 @@ function EvaluateAssignment({ user_id }: any) {
                     </div>
                 </div>
             )}
+
+            <ProctoringSnapshotGallery
+                assignmentUuid={assignmentUuid}
+                userId={Number(user_id)}
+                accessToken={access_token}
+                requireWebcamProctoring={!!assignments?.assignment_object?.require_webcam_proctoring}
+            />
 
             {/* Tasks */}
             <div className='flex flex-col space-y-5 px-1 py-2'>

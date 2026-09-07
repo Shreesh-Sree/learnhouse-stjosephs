@@ -121,6 +121,15 @@ class AssignmentBase(SQLModel):
     # end) still has a real, honest start time.
     time_limit_minutes: Optional[int] = None
 
+    # Opportunistic webcam capture during the attempt, not an enforced
+    # requirement — never gated on in any submission-write path, since a
+    # consent-based feature must never become a reason a student literally
+    # cannot take the exam (see ProctoringSnapshot's own docstring). The
+    # capture interval is a fixed constant on the frontend, not configurable
+    # here, to keep this a plain on/off switch rather than a config surface
+    # nobody asked for.
+    require_webcam_proctoring: Optional[bool] = False
+
     org_id: int
     course_id: int
     chapter_id: int
@@ -182,6 +191,7 @@ class AssignmentUpdate(SQLModel):
     require_safe_exam_browser: Optional[bool] = None
     seb_quit_password: Optional[str] = None
     time_limit_minutes: Optional[int] = None
+    require_webcam_proctoring: Optional[bool] = None
     update_date: Optional[str] = None
 
 

@@ -92,7 +92,18 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   deterministic seed as the pool feature. Genuinely lighter than pooling
   turned out to be true: grading matches answers by UUID, never by
   position, so display-order shuffling needed zero grading-side changes.
-- Webcam proctoring snapshots during a SEB-locked session.
+- ~~Webcam proctoring snapshots~~ — **done.** Opt-in per assignment
+  (`assignment.require_webcam_proctoring`), enforced nowhere — declining the
+  frontend consent screen never blocks the attempt. A student who accepts
+  gets a persistent on-screen recording indicator and an ~90s-interval JPEG
+  frame uploaded to a new `proctoring_snapshot` table; only an instructor
+  (RBAC `UPDATE` on the course) can list, view, or bulk-delete a student's
+  captured snapshots — a student can never read back their own. Teacher
+  toggle in `EditAssignmentModal.tsx`, review gallery in
+  `EvaluateAssignment.tsx` (object-URL fetches, since the serve endpoint
+  needs a Bearer token a plain `<img src>` can't carry). Needs
+  real-environment verification like everything else in this session,
+  camera-permission UX across browsers especially.
 - Campus IP allowlisting for assignment submission, alongside the SEB check.
 
 **Assessment / grading**
