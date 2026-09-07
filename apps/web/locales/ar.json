@@ -1036,7 +1036,12 @@
     "grid_columns_4": "4 أعمدة",
     "add_card": "إضافة بطاقة",
     "ungroup_cards": "إلغاء تجميع البطاقات",
-    "group_into_grid": "تجميع في شبكة"
+    "group_into_grid": "تجميع في شبكة",
+    "seb_gate": {
+      "title": "يتطلب هذا الواجب استخدام متصفح الامتحان الآمن (Safe Exam Browser)",
+      "description": "لا يمكنك فتح هذا الواجب من متصفح عادي. اطلب من معلمك ملف إعداد الامتحان (.seb)، وثبّت Safe Exam Browser إذا لم يكن مثبتاً لديك، ثم افتح الواجب من داخله.",
+      "check_again": "تحقق مرة أخرى"
+    }
   },
   "assignments": {
     "submit_assignment": "تسليم الواجب",
@@ -1078,7 +1083,15 @@
       "grading_all_or_nothing": "الكل أو لا شيء",
       "grading_partial_credit": "درجة جزئية",
       "grading_all_or_nothing_hint": "لا يحصل السؤال على درجة إلا إذا طابقت الإجابات المختارة مفتاح الإجابة تمامًا.",
-      "grading_partial_credit_hint": "تحصل أسئلة «اختر كل ما ينطبق» على جزء من الدرجة؛ وكل اختيار خاطئ يلغي اختيارًا صحيحًا."
+      "grading_partial_credit_hint": "تحصل أسئلة «اختر كل ما ينطبق» على جزء من الدرجة؛ وكل اختيار خاطئ يلغي اختيارًا صحيحًا.",
+      "pool_label": "مجموعة الأسئلة",
+      "pool_show": "إظهار",
+      "pool_of": "من أصل {{total}} سؤال، تُختار عشوائياً لكل طالب",
+      "pool_hint": "عند الإيقاف: يرى كل طالب جميع الأسئلة البالغ عددها {{total}}.",
+      "shuffle_label": "الترتيب",
+      "shuffle_questions": "خلط ترتيب الأسئلة",
+      "shuffle_options": "خلط ترتيب الإجابات",
+      "shuffle_hint": "ترتيب مختلف لكل طالب — لا يؤثر ذلك على التصحيح."
     },
     "quick_grade": {
       "full": "كاملة",
@@ -4280,7 +4293,20 @@
             "solution_reveal_on_submission_hint": "يُفتح لحظة التسليم",
             "solution_reveal_after_grading": "بعد التقييم",
             "solution_reveal_after_grading_hint": "يُفتح بعد وضع الدرجة",
-            "allow_retries_description_ungraded": "السماح للمتعلمين بإعادة التسليم من جديد. كل محاولة تمحو العمل السابق وتُقفل الحل النموذجي مجدداً."
+            "allow_retries_description_ungraded": "السماح للمتعلمين بإعادة التسليم من جديد. كل محاولة تمحو العمل السابق وتُقفل الحل النموذجي مجدداً.",
+            "exam_security_label": "أمان الامتحان",
+            "seb_label": "طلب استخدام Safe Exam Browser",
+            "seb_description": "لا يمكن للمتعلمين التسليم إلا من جلسة Safe Exam Browser مقفلة. يتطلب أحدث إصدار من SEB على أجهزة الامتحان.",
+            "seb_quit_password_label": "كلمة مرور إنهاء الجلسة للمراقب (اختياري)",
+            "seb_quit_password_placeholder": "اتركه فارغاً لتعطيله",
+            "seb_quit_password_hint": "غير مطلوبة في السير العادي — يخرج الطلاب تلقائياً بعد التسليم. هذه فقط وسيلة للمراقب لإنهاء جلسة عالقة بالقوة.",
+            "seb_download": "تنزيل ملف إعداد SEB",
+            "seb_downloading": "جارٍ التحضير…",
+            "seb_download_error": "تعذّر تنزيل ملف إعداد SEB.",
+            "seb_save_first": "احفظ هذا الواجب وخيار التفعيل مفعّل قبل التنزيل — ملف الإعداد لا يقفل الطلاب إلا بعد الحفظ.",
+            "time_limit_label": "الحد الزمني",
+            "time_limit_description": "يجب على المتعلمين بدء المحاولة صراحةً؛ ثم تعمل المؤقّتة بغض النظر عن تاريخ الاستحقاق أعلاه.",
+            "time_limit_minutes_label": "الدقائق"
           },
           "toasts": {
             "updating": "جاري تحديث الواجب...",

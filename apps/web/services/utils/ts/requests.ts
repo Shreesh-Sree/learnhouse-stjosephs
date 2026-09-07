@@ -84,11 +84,11 @@ export const RequestBodyFormWithAuthHeader = (
   method: string,
   data: any,
   next: any,
-  access_token: string
+  access_token?: string
 ) => {
-  let HeadersConfig = new Headers({
-    Authorization: `Bearer ${access_token}`,
-  })
+  let HeadersConfig = new Headers(
+    access_token ? { Authorization: `Bearer ${access_token}` } : {}
+  )
   let options: any = {
     method: method,
     headers: HeadersConfig,

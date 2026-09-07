@@ -1177,9 +1177,9 @@ function GroupSubmissionRow({
 }: {
     checked: boolean;
     onChange: (_next: boolean) => void;
-    minSize: number | '';
+    minSize: number | string;
     onMinSizeChange: (_v: number | '') => void;
-    maxSize: number | '';
+    maxSize: number | string;
     onMaxSizeChange: (_v: number | '') => void;
 }) {
     const { t } = useTranslation();
