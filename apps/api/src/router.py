@@ -16,6 +16,7 @@ from src.routers import nudges as nudges_router_module
 from src.routers import stream
 from src.routers import api_tokens
 from src.routers import webhooks
+from src.routers import calendar as calendar_router_module
 from src.routers.integrations import zapier as zapier_integration
 from src.routers.ai import ai, magicblocks, courseplanning, rag, images, quiz, assignment_gen, scenario, audio
 from src.routers.boards import boards_playground
@@ -71,6 +72,15 @@ v1_router.include_router(
     prefix="/users",
     tags=["users"],
     dependencies=[Depends(get_non_api_token_user)]
+)
+# Deliberately no auth dependency: this router exists ONLY for the ICS
+# calendar feed, which a calendar client polls unauthenticated on its own
+# schedule — see services.users.calendar_feed's module docstring. The
+# opaque per-user token in the path is the sole credential.
+v1_router.include_router(
+    calendar_router_module.router,
+    prefix="/calendar",
+    tags=["calendar"],
 )
 v1_router.include_router(
     usergroups.router,

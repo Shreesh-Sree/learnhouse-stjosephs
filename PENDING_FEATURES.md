@@ -265,7 +265,27 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   inside another LMS a college already runs, or vice versa.
 - Question-bank import (QTI format) for migrating existing quiz content from
   other tools.
-- Calendar/ICS feed of assignment due dates.
+- ~~Calendar/ICS feed of assignment due dates~~ — **done.** Per-user opaque
+  token (`GET /users/me/calendar_feed_token`, regenerable) that stands in
+  for authentication on `GET /calendar/feed/{token}.ics` — deliberately the
+  only unauthenticated endpoint added this session, since a calendar app
+  polls a subscribed URL on its own schedule with no way to carry a
+  session Bearer token (the same trust model Canvas/Moodle use for their
+  own feeds). Lists every assignment due date across every course the
+  user has a `Trail`/`TrailRun` for (i.e. is enrolled in), using each
+  student's OWN effective due date (their extension if they have one —
+  nice free tie-in with the per-student-extensions feature). Hand-rolled
+  ICS output (VEVENT/escaping/RFC 5545 line folding), no external
+  `icalendar` dependency assumed. KNOWN LIMITATION, disclosed in the
+  service module's own docstring: due dates are emitted as "floating"
+  ICS times (no timezone), which is correct for a single-institution
+  deployment where students and the deadline share a timezone, but would
+  show a mismatched time in a multi-timezone deployment — there is no
+  per-org timezone setting to fix this properly. Settings UI: a "Calendar
+  feed" panel on the account page (copy/regenerate). Needs
+  real-environment verification like everything else this session,
+  especially against real calendar clients (Google/Outlook/Apple) rather
+  than just RFC-shape checks.
 - Anonymous/pseudonymous question posting in course discussions — visible as
   anonymous to classmates but still identified to the instructor (so it
   can't be abused). Real, well-documented pain point in large lecture

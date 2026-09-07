@@ -46,6 +46,7 @@ import { getUriWithoutOrg } from '@services/config/config';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useTranslation } from 'react-i18next';
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics';
+import CalendarFeedSettings from '@components/Objects/Account/subpages/CalendarFeedSettings';
 
 const SUPPORTED_FILES = constructAcceptValue(['jpg', 'png', 'webp', 'gif'])
 
@@ -664,6 +665,7 @@ function AccountGeneral() {
   }
 
   return (
+    <>
     <div className="bg-white rounded-xl nice-shadow">
       <Formik<FormValues>
         enableReinitialize
@@ -717,6 +719,8 @@ function AccountGeneral() {
         )}
       </Formik>
     </div>
+    <CalendarFeedSettings />
+    </>
   );
 }
 

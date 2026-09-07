@@ -45,6 +45,7 @@ from src.services.users.users import (
     update_user_password,
 )
 from src.services.courses.courses import get_user_courses
+from src.services.users.calendar_feed import get_or_create_feed_token, regenerate_feed_token
 
 _get_redis_client = _get_redis_pool_client
 
@@ -807,3 +808,44 @@ async def api_get_user_courses(
         page=page,
         limit=limit,
     )
+
+
+@router.get(
+    "/me/calendar_feed_token",
+    summary="My calendar feed token",
+    description=(
+        "Returns (creating on first call) the caller's own opaque token for "
+        "the ICS calendar feed of assignment due dates. Combine with "
+        "GET /calendar/feed/{token}.ics — that endpoint is deliberately "
+        "unauthenticated since calendar apps poll it without a session."
+    ),
+    responses={
+        200: {"description": "The caller's feed token."},
+        401: {"description": "Authentication required"},
+    },
+)
+async def api_get_calendar_feed_token(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: PublicUser = Depends(get_authenticated_user),
+) -> dict:
+    token = await get_or_create_feed_token(current_user, db_session)
+    return {"token": token}
+
+
+@router.post(
+    "/me/calendar_feed_token/regenerate",
+    summary="Regenerate my calendar feed token",
+    description="Invalidates the caller's existing feed URL (if any) and issues a new one — the standard response if a feed link leaked.",
+    responses={
+        200: {"description": "New feed token."},
+        401: {"description": "Authentication required"},
+    },
+)
+async def api_regenerate_calendar_feed_token(
+    request: Request,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: PublicUser = Depends(get_authenticated_user),
+) -> dict:
+    token = await regenerate_feed_token(current_user, db_session)
+    return {"token": token}
