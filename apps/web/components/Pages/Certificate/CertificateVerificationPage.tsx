@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { getCertificateByUuid } from '@services/courses/certifications';
+import { getCertificateByUuid, getOpenBadgeAssertionUrl } from '@services/courses/certifications';
 import CertificatePreview from '@components/Dashboard/Pages/Course/EditCourseCertification/CertificatePreview';
-import { Shield, CheckCircle, XCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Shield, CheckCircle, XCircle, AlertTriangle, ArrowLeft, Award } from 'lucide-react';
 import Link from 'next/link';
 import { getUriWithOrg, getAbsoluteUriWithOrg } from '@services/config/config';
 import { getCourseThumbnailMediaDirectory } from '@services/media/media';
@@ -157,6 +157,7 @@ const CertificateVerificationPage: React.FC<CertificateVerificationPageProps> = 
 
   // Absolute: encoded in the QR code and copied out of the app, so it must carry the host
   const qrCodeLink = getAbsoluteUriWithOrg(org?.org_slug || '', `/certificates/${certificateData.certificate_user.user_certification_uuid}/verify`);
+  const openBadgeAssertionUrl = getOpenBadgeAssertionUrl(certificateData.certificate_user.user_certification_uuid);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -350,6 +351,33 @@ const CertificateVerificationPage: React.FC<CertificateVerificationPageProps> = 
                 <li>• Certificate ID is cryptographically secure</li>
                 <li>• Timestamp verified and authenticated</li>
               </ul>
+            </div>
+
+            {/* Open Badges 2.0 — a portable, independently-verifiable credential
+                on top of the database check above: it lives at a stable public
+                URL that IS its own verification proof, so it still works even
+                if a verifier doesn't trust (or can't reach) this app's database. */}
+            <div className="bg-white rounded-2xl p-6 nice-shadow">
+              <div className="flex items-center space-x-3 mb-2">
+                <Award className="w-6 h-6 text-amber-500" />
+                <h3 className="text-lg font-semibold text-gray-900">Open Badges 2.0</h3>
+              </div>
+              <p className="text-gray-600 text-sm mb-3">
+                This certificate is also available as an Open Badges 2.0 credential —
+                a portable, standards-based format you can add to a Badgr backpack,
+                LinkedIn, or any Open Badges–aware verifier.
+              </p>
+              <a
+                href={openBadgeAssertionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center space-x-1 text-amber-600 hover:text-amber-700 transition-colors text-sm font-medium"
+              >
+                <span>View Open Badges assertion</span>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
             </div>
           </div>
         </div>

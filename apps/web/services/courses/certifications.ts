@@ -10,6 +10,16 @@ import {
  GET requests are called from the frontend using SWR (https://swr.vercel.app/)
 */
 
+/**
+ * The Open Badges 2.0 Assertion URL for one awarded certificate — public,
+ * unauthenticated, and IS the verification proof (OB2 "hosted" verification:
+ * valid because it lives at exactly this URL). See apps/api's
+ * services/courses/open_badges.py module docstring for the scope decision.
+ */
+export function getOpenBadgeAssertionUrl(user_certification_uuid: string) {
+  return `${getAPIUrl()}certifications/openbadges/assertion/${user_certification_uuid}.json`
+}
+
 export async function getCourseCertifications(
   course_uuid: string,
   org_id: number,

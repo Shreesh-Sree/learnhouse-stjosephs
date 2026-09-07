@@ -20,6 +20,7 @@ from src.services.courses.certifications import (
     get_certificate_by_user_certification_uuid,
     get_all_user_certificates,
 )
+from src.services.courses.open_badges import get_assertion, get_badge_class, get_issuer_profile
 
 router = APIRouter()
 
@@ -217,4 +218,68 @@ async def api_get_all_user_certificates(
     """
     return await get_all_user_certificates(
         request, current_user, db_session
-    ) 
+    )
+
+
+## OPEN BADGES 2.0 ##
+# Public, unauthenticated JSON — an OB2 verifier (Badgr, a recruiter's
+# browser, LinkedIn) has no LearnHouse session. See
+# services/courses/open_badges.py's module docstring for the scope
+# decision (OB2 "hosted" verification, not a signed PDF) and why a
+# revoked certificate 404s here identically to one that never existed.
+
+
+@router.get(
+    "/openbadges/issuer/{org_uuid}.json",
+    summary="Open Badges 2.0 Issuer Profile",
+    description="Public, unauthenticated. The issuing organization's Open Badges 2.0 Issuer Profile.",
+    responses={
+        200: {"description": "OB2 Issuer Profile JSON-LD."},
+        404: {"description": "Organization not found"},
+    },
+)
+async def api_get_openbadges_issuer(
+    request: Request,
+    org_uuid: str,
+    db_session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    return await get_issuer_profile(org_uuid, db_session)
+
+
+@router.get(
+    "/openbadges/badgeclass/{certification_uuid}.json",
+    summary="Open Badges 2.0 BadgeClass",
+    description="Public, unauthenticated. The Open Badges 2.0 BadgeClass this certification issues.",
+    responses={
+        200: {"description": "OB2 BadgeClass JSON-LD."},
+        404: {"description": "Certification, course, or organization not found"},
+    },
+)
+async def api_get_openbadges_badgeclass(
+    request: Request,
+    certification_uuid: str,
+    db_session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    return await get_badge_class(certification_uuid, db_session)
+
+
+@router.get(
+    "/openbadges/assertion/{user_certification_uuid}.json",
+    summary="Open Badges 2.0 Assertion",
+    description=(
+        "Public, unauthenticated. The Open Badges 2.0 Assertion for one "
+        "awarded certificate — this IS the verifiable credential; its "
+        "existence at this exact URL is the OB2 'hosted' verification proof. "
+        "404s for a revoked certificate identically to one that never existed."
+    ),
+    responses={
+        200: {"description": "OB2 Assertion JSON-LD."},
+        404: {"description": "Certificate not found (never issued, or revoked)"},
+    },
+)
+async def api_get_openbadges_assertion(
+    request: Request,
+    user_certification_uuid: str,
+    db_session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    return await get_assertion(user_certification_uuid, db_session)

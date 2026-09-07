@@ -443,8 +443,48 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   the DB-aggregation half needs real-environment verification like
   everything else this session, since this sandbox has no live Postgres to
   run it against.
-- Verifiable digital credentials for certificates (Open Badges or a signed
-  PDF), extending the certificates that already exist.
+- ~~Verifiable digital credentials for certificates~~ — **done, Open Badges
+  2.0, not a signed PDF.** A PDF would need a rendering dependency this
+  project doesn't have (no reportlab/weasyprint/etc. anywhere in
+  `pyproject.toml`), and would only ever prove authenticity to whoever
+  bothers to check a signature by hand; an Open Badges 2.0 assertion is a
+  real, portable, independently-verifiable credential a learner can hand to
+  a recruiter, add to a Badgr backpack, or feed to any OB2-aware verifier
+  — and needs nothing but JSON. Uses OB2's "hosted" verification method
+  (no signing keys, no key-rotation story): three new public,
+  unauthenticated endpoints under the existing `/certifications` router
+  serve an Issuer Profile (`/openbadges/issuer/{org_uuid}.json`), a
+  BadgeClass (`/openbadges/badgeclass/{certification_uuid}.json`), and an
+  Assertion (`/openbadges/assertion/{user_certification_uuid}.json`) — the
+  assertion's existence at that exact URL IS the verification proof.
+  Everything is assembled live from EXISTING rows (`CertificateUser`,
+  `Certifications`, `Course`, `Organization`) — no new table, the same
+  "pure transformation of durable data" shape as the at-risk dashboard and
+  gamification stats. A revoked certificate (`revoke_user_certificate`
+  DELETES the `CertificateUser` row) 404s here identically to one that
+  never existed, so there's no separate revocation flag to keep in sync —
+  the existing verification page already relied on the same guarantee. The
+  recipient's email is never exposed in the public assertion JSON: OB2's
+  recommended privacy-preserving hashed-identity format is used, salted
+  with a per-credential, app-secret-derived salt (stable across requests,
+  not guessable without the secret) — verified deterministic, per-
+  credential-unique, and non-leaking with a standalone script. The
+  existing certificate verification page gained an "Open Badges 2.0" card
+  linking to the assertion JSON. KNOWN LIMITATIONS: (1) the BadgeClass
+  `image` field falls back course thumbnail → org logo → omitted entirely
+  if neither exists, rather than baking a placeholder image — most OB2
+  verifiers tolerate a missing image despite the spec listing it as
+  required; (2) the Issuer endpoint's plan-gate dependency
+  (`require_plan_for_certifications`, shared with the rest of the
+  certificates feature) doesn't recognize an `org_uuid` path param, so in
+  SaaS mode that one endpoint's plan check silently no-ops rather than
+  enforcing — a pre-existing "soft ceiling, not the last line of defence"
+  fallback in that shared dependency, not something this feature
+  introduced, and irrelevant in OSS/self-hosted mode where the same
+  dependency always bypasses anyway. Needs real-environment verification
+  like everything else this session, especially feeding a real assertion
+  URL to an actual OB2 verifier (Badgr) rather than just checking the JSON
+  shape by eye.
 - ~~Weekly digest email~~ — **done**, a deliberately much smaller sibling of
   the existing org-admin lifecycle nudges (`services/nudges/`) rather than
   an extension of them: one email type, one weekly cadence, no catalog/
