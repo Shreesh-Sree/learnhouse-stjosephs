@@ -19,10 +19,13 @@ import {
     RotateCcw,
     Search,
     SendHorizonal,
+    Star,
     Users,
     X,
 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import { assignPeerReviews } from '@services/courses/assignments';
 import EvaluateAssignment from './Modals/EvaluateAssignment';
 import { AssignmentProvider } from '@components/Contexts/Assignments/AssignmentContext';
 import { AssignmentsTaskProvider } from '@components/Contexts/Assignments/AssignmentsTaskContext';
@@ -274,6 +277,26 @@ function AssignmentSubmissionsSubPage({ assignment_uuid }: { assignment_uuid: st
                             </>
                         )}
                     </div>
+
+                    {/* Peer review: a one-off bulk action, not tied to any single
+                        row below — the backend itself validates that peer review
+                        is enabled and there are enough submissions, so this
+                        button is always shown rather than threading the
+                        assignment's config into this already-data-heavy page. */}
+                    <button
+                        onClick={async () => {
+                            const res = await assignPeerReviews(assignment_uuid, access_token);
+                            if (res.success) {
+                                toast.success(res.data.message);
+                            } else {
+                                toast.error(res.data?.detail || t('common.something_went_wrong'));
+                            }
+                        }}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 nice-shadow rounded-full hover:bg-indigo-100/80 transition-colors"
+                    >
+                        <Star size={12} />
+                        <span>{t('dashboard.assignments.submissions.assign_peer_reviews', { defaultValue: 'Assign peer reviews' })}</span>
+                    </button>
                 </div>
             </div>
 

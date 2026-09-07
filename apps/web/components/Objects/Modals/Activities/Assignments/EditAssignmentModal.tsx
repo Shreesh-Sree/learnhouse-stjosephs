@@ -48,6 +48,7 @@ import {
     Camera,
     Wifi,
     Users,
+    Star,
 } from 'lucide-react';
 
 type GradingType = 'ALPHABET' | 'NUMERIC' | 'PERCENTAGE' | 'PASS_FAIL' | 'GPA_SCALE';
@@ -78,6 +79,8 @@ interface Assignment {
     allow_group_submission?: boolean;
     group_min_size?: number | null;
     group_max_size?: number | null;
+    enable_peer_review?: boolean;
+    peer_reviews_per_submission?: number | null;
     assignment_tasks?: any[];
 }
 
@@ -251,6 +254,9 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             allow_group_submission: assignment.allow_group_submission || false,
             group_min_size: typeof assignment.group_min_size === 'number' ? assignment.group_min_size : '',
             group_max_size: typeof assignment.group_max_size === 'number' ? assignment.group_max_size : '',
+            enable_peer_review: assignment.enable_peer_review || false,
+            peer_reviews_per_submission:
+                typeof assignment.peer_reviews_per_submission === 'number' ? assignment.peer_reviews_per_submission : 2,
         },
         enableReinitialize: true,
         onSubmit: async (values, { setSubmitting }) => {
@@ -598,6 +604,21 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
                     onMinSizeChange={(v) => formik.setFieldValue('group_min_size', v, true)}
                     maxSize={formik.values.group_max_size}
                     onMaxSizeChange={(v) => formik.setFieldValue('group_max_size', v, true)}
+                />
+            </div>
+
+            {/* Peer review */}
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <p className={labelClass}>
+                        {t('dashboard.assignments.modals.edit.form.peer_review_section_label', { defaultValue: 'Peer review' })}
+                    </p>
+                </div>
+                <PeerReviewRow
+                    checked={formik.values.enable_peer_review}
+                    onChange={(v) => formik.setFieldValue('enable_peer_review', v, true)}
+                    reviewsPerSubmission={formik.values.peer_reviews_per_submission}
+                    onReviewsPerSubmissionChange={(v) => formik.setFieldValue('peer_reviews_per_submission', v, true)}
                 />
             </div>
 
@@ -1207,6 +1228,101 @@ function GroupSubmissionRow({
                     <p className="text-[10px] text-gray-400 leading-snug mt-2">
                         {t('dashboard.assignments.modals.edit.form.group_submission_hint', {
                             defaultValue: 'Max size is enforced when joining a team. Min size is shown to students as guidance only — nothing blocks a smaller team from submitting.',
+                        })}
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Assigning WHO reviews WHOM is a separate, one-off instructor action (see
+// the "Assign peer reviews" button on the submissions page) triggered after
+// students have submitted — not something this modal configures. This row
+// only sets whether the feature is on and how many reviewers each
+// submission gets.
+function PeerReviewRow({
+    checked,
+    onChange,
+    reviewsPerSubmission,
+    onReviewsPerSubmissionChange,
+}: {
+    checked: boolean;
+    onChange: (_next: boolean) => void;
+    reviewsPerSubmission: number;
+    onReviewsPerSubmissionChange: (_v: number) => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <div className="rounded-xl border nice-shadow bg-white border-gray-100 overflow-hidden">
+            <div className="flex items-start justify-between gap-3 p-3">
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <div className="mt-0.5 flex-none">
+                        <Star size={16} className="text-amber-500" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <p className="text-xs font-bold text-gray-900">
+                            {t('dashboard.assignments.modals.edit.form.peer_review_label', { defaultValue: 'Enable peer review' })}
+                        </p>
+                        <p className="text-[10px] text-gray-500 leading-snug mt-0.5">
+                            {t('dashboard.assignments.modals.edit.form.peer_review_description', {
+                                defaultValue: 'Classmates review each other\'s submissions. Feedback is advisory — you still set the final grade.',
+                            })}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onChange(!checked)}
+                    aria-pressed={checked}
+                    className={`relative flex-none inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        checked ? 'bg-gray-900' : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                >
+                    <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
+                        }`}
+                    />
+                </button>
+            </div>
+            {checked && (
+                <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/50">
+                    <div className="flex items-center justify-between gap-3">
+                        <p className="text-[11px] font-semibold text-gray-700">
+                            {t('dashboard.assignments.modals.edit.form.peer_reviews_per_submission_label', { defaultValue: 'Reviewers per submission' })}
+                        </p>
+                        <div className="flex-none flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => onReviewsPerSubmissionChange(Math.max(1, reviewsPerSubmission - 1))}
+                                className="h-7 w-7 rounded-md bg-white border border-gray-200 nice-shadow text-gray-600 hover:bg-gray-50 text-sm font-bold"
+                            >
+                                −
+                            </button>
+                            <input
+                                type="number"
+                                min={1}
+                                max={10}
+                                value={reviewsPerSubmission}
+                                onChange={(e) => {
+                                    const raw = parseInt(e.target.value, 10);
+                                    if (!Number.isNaN(raw)) onReviewsPerSubmissionChange(Math.max(1, Math.min(10, raw)));
+                                }}
+                                className="w-14 text-center px-2 py-1 text-sm rounded-md bg-white border border-gray-200"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => onReviewsPerSubmissionChange(Math.min(10, reviewsPerSubmission + 1))}
+                                className="h-7 w-7 rounded-md bg-white border border-gray-200 nice-shadow text-gray-600 hover:bg-gray-50 text-sm font-bold"
+                            >
+                                +
+                            </button>
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-snug mt-2">
+                        {t('dashboard.assignments.modals.edit.form.peer_review_hint', {
+                            defaultValue: 'Reviewer and reviewee identities are never shown to each other, only to you. Trigger "Assign peer reviews" from the submissions page once enough students have submitted.',
                         })}
                     </p>
                 </div>

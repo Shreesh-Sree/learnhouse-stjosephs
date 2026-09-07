@@ -150,8 +150,26 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   one especially — it's the largest change to the submission write path of
   anything built this session, and the recursive `create_assignment_submission`
   reuse in particular has not run against a real database.
-- Peer review workflow (students grade each other's submissions before an
-  instructor finalizes).
+- ~~Peer review workflow~~ — **done.** New `PeerReview` table (one row per
+  (reviewer, target) pair) plus `assignment.enable_peer_review` /
+  `peer_reviews_per_submission`. Instructor triggers "Assign peer reviews"
+  (submissions page) once enough students have submitted — a shuffled
+  circular assignment hands each submitted learner N classmates' work to
+  review, idempotent on re-run (only creates new pairs). Identity anonymity
+  is hard-coded, not configurable, in BOTH directions: a reviewer never
+  learns whose work they're grading, and a reviewee never learns who
+  reviewed them, even after the fact — only the instructor ever sees both
+  sides (`PeerReviewSummaryPanel.tsx` in the grading UI). Peer scores are
+  purely advisory: nothing here ever writes to the actual grade, which
+  stays entirely the instructor's own action. Student UI:
+  `AssignmentPeerReviewPanel.tsx` (review queue + a modal to view the
+  target's answers and submit score/feedback; the answer rendering is
+  generic JSON-ish text, not per-task-type polish — reusing the real
+  TaskXxxObject components in a dedicated read-only mode is a follow-up, not
+  done here). A reviewee's feedback stays hidden until every assigned
+  review of their submission is complete, to prevent inferring authorship
+  from a partial reveal. Needs real-environment verification like
+  everything else this session.
 - Rubric-based grading (multi-criteria weighted scoring, replacing/extending
   the single `grading_type` score).
 - Per-student extensions/grace periods on assignment deadlines.

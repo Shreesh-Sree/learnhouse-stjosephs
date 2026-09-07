@@ -56,6 +56,7 @@ import AssignmentIpAllowlistGate from '@components/Objects/Activities/Assignment
 import AssignmentTimeLimitGate from '@components/Objects/Activities/Assignment/AssignmentTimeLimitGate'
 import AssignmentProctoringConsent from '@components/Objects/Activities/Assignment/AssignmentProctoringConsent'
 import AssignmentGroupPanel from '@components/Objects/Activities/Assignment/AssignmentGroupPanel'
+import AssignmentPeerReviewPanel from '@components/Objects/Activities/Assignment/AssignmentPeerReviewPanel'
 // Deadline rule shared with the learner activity view (and mirroring the
 // server's _is_assignment_past_due) so the submit/retry affordances agree with
 // what the API will actually accept. Static import: it's a pure function, and
@@ -408,6 +409,11 @@ function ActivityClient(props: ActivityClientProps) {
                           allowGroupSubmission={!!assignment?.allow_group_submission}
                           groupMinSize={assignment?.group_min_size}
                           groupMaxSize={assignment?.group_max_size}
+                          accessToken={access_token}
+                        />
+                        <AssignmentPeerReviewPanel
+                          assignmentUuid={assignment?.assignment_uuid}
+                          enablePeerReview={!!assignment?.enable_peer_review}
                           accessToken={access_token}
                         />
                         <AssignmentStudentActivity />

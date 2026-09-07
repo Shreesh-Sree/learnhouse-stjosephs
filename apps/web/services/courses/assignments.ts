@@ -403,6 +403,78 @@ export async function gradeAssignmentGroup(
   return res
 }
 
+// Peer review //
+
+// Instructor-only.
+export async function assignPeerReviews(assignmentUUID: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/peer_reviews/assign`,
+    RequestBodyWithAuthHeader('POST', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export async function getMyPeerReviewsToDo(assignmentUUID: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/peer_reviews/to_do`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export async function getPeerReviewSubmissionView(
+  assignmentUUID: string,
+  reviewUUID: string,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/peer_reviews/${reviewUUID}/submission`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export async function submitPeerReview(
+  assignmentUUID: string,
+  reviewUUID: string,
+  score: number | null,
+  feedback: string | null,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/peer_reviews/${reviewUUID}/submit`,
+    RequestBodyWithAuthHeader('POST', { score, feedback }, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export async function getMyPeerReviewsReceived(assignmentUUID: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/peer_reviews/received`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only.
+export async function getPeerReviewSummaryForUser(
+  assignmentUUID: string,
+  userId: number,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/peer_reviews/user/${userId}/summary`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
 export async function submitAssignmentForGrading(
   assignmentUUID: string,
   access_token: string

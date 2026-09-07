@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics';
 import ProctoringSnapshotGallery from '@components/Objects/Activities/Assignment/ProctoringSnapshotGallery';
+import PeerReviewSummaryPanel from '@components/Objects/Activities/Assignment/PeerReviewSummaryPanel';
 
 function pctToLetterGrade(pct: number): string {
     if (pct >= 90) return 'A';
@@ -319,6 +320,12 @@ function EvaluateAssignment({ user_id }: any) {
                 userId={Number(user_id)}
                 accessToken={access_token}
                 requireWebcamProctoring={!!assignments?.assignment_object?.require_webcam_proctoring}
+            />
+            <PeerReviewSummaryPanel
+                assignmentUuid={assignmentUuid}
+                userId={Number(user_id)}
+                accessToken={access_token}
+                enablePeerReview={!!assignments?.assignment_object?.enable_peer_review}
             />
 
             {/* Tasks */}

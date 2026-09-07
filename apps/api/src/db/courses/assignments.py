@@ -158,6 +158,18 @@ class AssignmentBase(SQLModel):
     group_min_size: Optional[int] = None
     group_max_size: Optional[int] = None
 
+    # Peer review. When True, an instructor can trigger
+    # services.courses.activities.peer_reviews.assign_peer_reviews to hand
+    # every submitted learner `peer_reviews_per_submission` classmates'
+    # submissions to review. Peer scores/feedback are advisory input for the
+    # instructor (surfaced in the grading UI) — a peer review NEVER writes
+    # to AssignmentUserSubmission.grade itself; only the instructor's own
+    # grading action does that. See db.courses.peer_reviews' module
+    # docstring for the (non-configurable, both-directions) identity
+    # anonymity rule.
+    enable_peer_review: Optional[bool] = False
+    peer_reviews_per_submission: Optional[int] = 2
+
     org_id: int
     course_id: int
     chapter_id: int
@@ -225,6 +237,8 @@ class AssignmentUpdate(SQLModel):
     allow_group_submission: Optional[bool] = None
     group_min_size: Optional[int] = None
     group_max_size: Optional[int] = None
+    enable_peer_review: Optional[bool] = None
+    peer_reviews_per_submission: Optional[int] = None
     update_date: Optional[str] = None
 
 

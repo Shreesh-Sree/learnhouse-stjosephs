@@ -14,6 +14,7 @@ from src.db.courses.assignments import (
 )
 from src.db.courses.proctoring import ProctoringSnapshotRead
 from src.db.courses.assignment_groups import AssignmentGroupRead
+from src.db.courses.peer_reviews import PeerReviewRead
 from src.db.users import PublicUser
 from src.core.events.database import get_db_session
 from src.security.auth import get_current_user
@@ -30,6 +31,14 @@ from src.services.courses.activities.assignment_groups import (
     join_group,
     leave_group,
     list_groups,
+)
+from src.services.courses.activities.peer_reviews import (
+    assign_peer_reviews,
+    get_peer_review_submission_view,
+    get_peer_review_summary_for_user,
+    list_my_peer_reviews_to_do,
+    list_peer_reviews_received,
+    submit_peer_review,
 )
 from src.services.courses.activities.assignments import (
     check_assignment_ip_allowlist_status,
@@ -661,6 +670,144 @@ async def api_delete_assignment_from_activity(
     return await delete_assignment_from_activity_uuid(
         request, activity_uuid, current_user, db_session
     )
+
+
+## PEER REVIEW ##
+
+
+class SubmitPeerReviewBody(BaseModel):
+    score: Optional[int] = None
+    feedback: Optional[str] = None
+
+
+@router.post(
+    "/{assignment_uuid}/peer_reviews/assign",
+    summary="Assign peer reviews",
+    description="Instructor-only. Hands every learner who has submitted this assignment a set of classmates' submissions to review. Idempotent — re-running only creates new pairings, never duplicates or resets an existing review.",
+    responses={
+        200: {"description": "Peer reviews assigned."},
+        400: {"description": "Peer review not enabled, or not enough submissions yet"},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_assign_peer_reviews(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    return await assign_peer_reviews(request, assignment_uuid, current_user, db_session)
+
+
+@router.get(
+    "/{assignment_uuid}/peer_reviews/to_do",
+    response_model=list[PeerReviewRead],
+    summary="List peer reviews assigned to me",
+    description="Every review the caller has been assigned as reviewer for this assignment. Never reveals whose submission it is.",
+    responses={
+        200: {"description": "Review list.", "model": list[PeerReviewRead]},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_list_my_peer_reviews_to_do(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> list[PeerReviewRead]:
+    return await list_my_peer_reviews_to_do(request, assignment_uuid, current_user, db_session)
+
+
+@router.get(
+    "/{assignment_uuid}/peer_reviews/{review_uuid}/submission",
+    summary="View the submission for an assigned peer review",
+    description="The caller must be the assigned reviewer. Returns the target's task definitions (answer keys stripped) and their submitted answers, with the target's identity withheld.",
+    responses={
+        200: {"description": "Submission content to review."},
+        401: {"description": "Authentication required"},
+        403: {"description": "This review isn't assigned to you"},
+        404: {"description": "Assignment or review not found"},
+    },
+)
+async def api_get_peer_review_submission_view(
+    request: Request,
+    assignment_uuid: str,
+    review_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    return await get_peer_review_submission_view(request, assignment_uuid, review_uuid, current_user, db_session)
+
+
+@router.post(
+    "/{assignment_uuid}/peer_reviews/{review_uuid}/submit",
+    response_model=PeerReviewRead,
+    summary="Submit a peer review",
+    description="The caller must be the assigned reviewer. One-shot — marks the review COMPLETED.",
+    responses={
+        200: {"description": "Review submitted.", "model": PeerReviewRead},
+        400: {"description": "Score out of range"},
+        401: {"description": "Authentication required"},
+        403: {"description": "This review isn't assigned to you"},
+        404: {"description": "Assignment or review not found"},
+    },
+)
+async def api_submit_peer_review(
+    request: Request,
+    assignment_uuid: str,
+    review_uuid: str,
+    body: SubmitPeerReviewBody,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> PeerReviewRead:
+    return await submit_peer_review(
+        request, assignment_uuid, review_uuid, body.score, body.feedback, current_user, db_session
+    )
+
+
+@router.get(
+    "/{assignment_uuid}/peer_reviews/received",
+    summary="View feedback received from peer reviewers",
+    description="The caller's own received peer feedback, withheld until every assigned review of their submission is complete. Never reveals reviewer identity.",
+    responses={
+        200: {"description": "Received feedback (or a not-yet-revealed progress count)."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_list_peer_reviews_received(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    return await list_peer_reviews_received(request, assignment_uuid, current_user, db_session)
+
+
+@router.get(
+    "/{assignment_uuid}/peer_reviews/user/{user_id}/summary",
+    summary="Instructor summary of peer feedback for one student",
+    description="Instructor-only. Every review received by one student, with reviewer identities, plus an average score — for reference while grading. Never gates on completeness.",
+    responses={
+        200: {"description": "Peer review summary."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_get_peer_review_summary_for_user(
+    request: Request,
+    assignment_uuid: str,
+    user_id: int,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    return await get_peer_review_summary_for_user(request, assignment_uuid, user_id, current_user, db_session)
 
 
 ## ASSIGNMENTS Tasks ##
