@@ -121,8 +121,35 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   a real deployment sits behind.
 
 **Assessment / grading**
-- Group/team assignments (`AssignmentUserSubmission` is currently keyed to a
-  single user only).
+- ~~Group/team assignments~~ — **done**, with a deliberate architectural choice
+  worth calling out. `AssignmentUserSubmission`/`AssignmentTaskSubmission`
+  stay keyed to a single user — restructuring them to be group-keyed would
+  touch grading, certificates, the activity trail, and analytics everywhere
+  they read those tables, for a self-hosted college's actual need (a team
+  hands in once and is graded once). Instead: new `AssignmentGroup` /
+  `AssignmentGroupMember` tables track self-formed teams (`allow_group_submission`,
+  `group_min_size`/`group_max_size` on the assignment), and every per-user row
+  is kept in sync by fan-out at three points — every task-answer autosave
+  copies to teammates' own rows (skipping a teammate whose row is already
+  locked in), a new "submit for the whole team" endpoint syncs once more then
+  advances every member's own submission via the existing single-user
+  `create_assignment_submission` (reused unmodified, with a new
+  `skip_environment_checks` flag for the teammates who aren't at the
+  submitting student's machine — SEB/IP/time-limit are checked once, for
+  real, against the actual submitter), and a new "grade whole team" endpoint
+  applies one grade + feedback to every member by looping the existing
+  `_apply_grade_and_finalize` primitive (already documented as safe for
+  multiple callers). A member who can't be advanced/graded (not enrolled,
+  nothing submitted yet) is skipped and reported rather than failing the
+  whole team. Student UI: `AssignmentGroupPanel.tsx` (create/join/leave/
+  submit-for-team, shown alongside the assignment, not gating it). Instructor
+  UI: team size toggle in `EditAssignmentModal.tsx`, "Grade whole team"
+  button in `EvaluateAssignment.tsx`. NOT enforced: `group_min_size` is
+  guidance only, nothing blocks a smaller team from submitting. Needs
+  real-environment verification like everything else in this session, this
+  one especially — it's the largest change to the submission write path of
+  anything built this session, and the recursive `create_assignment_submission`
+  reuse in particular has not run against a real database.
 - Peer review workflow (students grade each other's submissions before an
   instructor finalizes).
 - Rubric-based grading (multi-criteria weighted scoring, replacing/extending

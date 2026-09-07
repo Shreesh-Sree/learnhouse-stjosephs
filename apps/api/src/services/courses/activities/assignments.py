@@ -93,6 +93,8 @@ from src.services.courses.activities.ip_allowlist import (
     _enforce_ip_allowlist_if_required,
     is_ip_allowed,
 )
+from src.services.courses.activities.assignment_groups import get_group_member_ids
+from src.db.courses.assignment_groups import AssignmentGroup, AssignmentGroupMember
 from src.services.security.rate_limiting import get_client_ip
 from src.services.email.utils import get_base_url_from_request
 
@@ -2525,6 +2527,122 @@ _ASSIGNMENT_TASK_SUBMISSION_MUTABLE_FIELDS = {
 }
 
 
+async def _upsert_task_answer_for_user(
+    assignment_task: AssignmentTask,
+    assignment: Assignment,
+    target_user_id: int,
+    submission_object: AssignmentTaskSubmissionUpdate,
+    db_session: AsyncSession,
+) -> AssignmentTaskSubmission:
+    """Create-or-update ``target_user_id``'s own AssignmentTaskSubmission row
+    for this task from ``submission_object``'s content. Mirrors the
+    single-user "save progress" upsert in handle_assignment_task_submission,
+    but targets an arbitrary user rather than the caller — used only by
+    `_fanout_group_task_answer` to copy a group member's answer into every
+    teammate's own row. Never writes a grade, regardless of what
+    ``submission_object`` carries — group fan-out only ever runs on the
+    student answer-save path, which already has grade/feedback stripped by
+    its own caller.
+    """
+    statement = select(AssignmentTaskSubmission).where(
+        AssignmentTaskSubmission.assignment_task_id == assignment_task.id,
+        AssignmentTaskSubmission.user_id == target_user_id,
+    )
+    existing = (await db_session.execute(statement)).scalars().first()
+
+    if existing:
+        existing.task_submission = submission_object.task_submission
+        existing.update_date = str(datetime.now())
+        db_session.add(existing)
+        await db_session.commit()
+        await db_session.refresh(existing)
+        return existing
+
+    current_time = str(datetime.now())
+    new_row = AssignmentTaskSubmission(
+        assignment_task_submission_uuid=f"assignmenttasksubmission_{uuid4()}",
+        task_submission=submission_object.task_submission,
+        grade=0,
+        task_submission_grade_feedback="",
+        assignment_task_id=int(assignment_task.id),  # type: ignore
+        assignment_type=assignment_task.assignment_type,
+        activity_id=assignment.activity_id,
+        course_id=assignment.course_id,
+        chapter_id=assignment.chapter_id,
+        user_id=target_user_id,
+        creation_date=current_time,
+        update_date=current_time,
+    )
+    db_session.add(new_row)
+    try:
+        await db_session.commit()
+        await db_session.refresh(new_row)
+        return new_row
+    except IntegrityError:  # pragma: no cover - concurrent-save race recovery
+        await db_session.rollback()
+        existing = (await db_session.execute(
+            select(AssignmentTaskSubmission).where(
+                AssignmentTaskSubmission.assignment_task_id == assignment_task.id,
+                AssignmentTaskSubmission.user_id == target_user_id,
+            )
+        )).scalars().first()
+        if existing is None:
+            raise
+        existing.task_submission = submission_object.task_submission
+        existing.update_date = str(datetime.now())
+        db_session.add(existing)
+        await db_session.commit()
+        await db_session.refresh(existing)
+        return existing
+
+
+async def _fanout_group_task_answer(
+    assignment: Assignment,
+    assignment_task: AssignmentTask,
+    acting_user_id: int,
+    submission_object: AssignmentTaskSubmissionUpdate,
+    db_session: AsyncSession,
+) -> None:
+    """Copy a group member's just-saved task answer into every OTHER member
+    of their group's own AssignmentTaskSubmission row, so a team assignment
+    shows one shared, in-progress answer no matter which member is actually
+    typing. Row-level fan-out, not a shared row — see
+    db.courses.assignment_groups' module docstring for why.
+
+    Skips a teammate whose own AssignmentUserSubmission has already moved
+    past PENDING/NOT_SUBMITTED (already handed in, or graded) — the same
+    answer-freeze rule the acting student's own save is subject to (see
+    handle_assignment_task_submission) protects a teammate's locked-in
+    attempt from being silently overwritten by someone else's later edits.
+    """
+    if not assignment.allow_group_submission or assignment.id is None:
+        return
+    member_ids = await get_group_member_ids(assignment.id, acting_user_id, db_session)
+    other_ids = [uid for uid in member_ids if uid != acting_user_id]
+    if not other_ids:
+        return
+
+    statement = select(
+        AssignmentUserSubmission.user_id, AssignmentUserSubmission.submission_status
+    ).where(
+        AssignmentUserSubmission.assignment_id == assignment.id,
+        AssignmentUserSubmission.user_id.in_(other_ids),  # type: ignore[attr-defined]
+    )
+    locked_ids = {
+        uid
+        for uid, status in (await db_session.execute(statement)).all()
+        if status
+        not in (AssignmentUserSubmissionStatus.PENDING, AssignmentUserSubmissionStatus.NOT_SUBMITTED)
+    }
+
+    for member_id in other_ids:
+        if member_id in locked_ids:
+            continue
+        await _upsert_task_answer_for_user(
+            assignment_task, assignment, member_id, submission_object, db_session
+        )
+
+
 async def handle_assignment_task_submission(
     request: Request,
     assignment_task_uuid: str,
@@ -2786,6 +2904,16 @@ async def handle_assignment_task_submission(
             await db_session.commit()
             await db_session.refresh(existing)
             assignment_task_submission = existing
+
+    # Group fan-out: only on the student (or token-submit-on-behalf) answer
+    # path, never an instructor grading a submission — is_instructor is
+    # False for both, and a student can only ever reach this point having
+    # written their OWN row (RBAC above rejects touching anyone else's),
+    # which is exactly the row that should propagate to teammates.
+    if not is_instructor and assignment.allow_group_submission:
+        await _fanout_group_task_answer(
+            assignment, assignment_task, submitter.id, assignment_task_submission_object, db_session
+        )
 
     # return assignment task submission read
     return AssignmentTaskSubmissionRead.model_validate(assignment_task_submission)
@@ -3323,7 +3451,21 @@ async def create_assignment_submission(
     current_user: PublicUser | AnonymousUser | APITokenUser,
     db_session: AsyncSession,
     on_behalf_of_user_id: int | None = None,
+    skip_environment_checks: bool = False,
 ):
+    """``skip_environment_checks`` is for internal reuse only (see
+    `submit_group_assignment`): when a group's SEB/IP/time-limit gates have
+    already been verified once against the ACTUAL submitting student's
+    request, and this same function is being called again per teammate to
+    replicate the submission onto their own row, those checks would be
+    testing the acting student's browser/network against a teammate who
+    isn't even at that machine — meaningless at best, and wrongly blocking
+    at worst if the acting student's own session happens to fail a
+    per-teammate time-limit check that has nothing to do with them. The
+    deadline check is NOT skipped: it's a plain timestamp comparison with no
+    per-request state, so re-running it per teammate is harmless and keeps
+    this parameter narrowly scoped to the environment-bound checks only.
+    """
     # Check if assignment exists
     statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
     assignment = (await db_session.execute(statement)).scalars().first()
@@ -3370,11 +3512,12 @@ async def create_assignment_submission(
             status_code=403,
             detail="Assignment deadline has passed",
         )
-    _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit)
-    _enforce_ip_allowlist_if_required(assignment, request, is_instructor, is_token_submit)
-    await _enforce_time_limit_if_set(
-        assignment, submitter.id, is_instructor, is_token_submit, db_session=db_session
-    )
+    if not skip_environment_checks:
+        _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit)
+        _enforce_ip_allowlist_if_required(assignment, request, is_instructor, is_token_submit)
+        await _enforce_time_limit_if_set(
+            assignment, submitter.id, is_instructor, is_token_submit, db_session=db_session
+        )
     if assignment.require_safe_exam_browser:
         # Audit trail only — see services.courses.activities.seb module
         # docstring for why the Config Key hash isn't verified server-side.
@@ -3713,6 +3856,249 @@ async def create_assignment_submission(
 
     # return assignment user submission read
     return AssignmentUserSubmissionRead.model_validate(assignment_user_submission)
+
+
+async def _sync_group_task_answers(
+    assignment: Assignment,
+    source_user_id: int,
+    member_ids: list[int],
+    db_session: AsyncSession,
+) -> None:
+    """Copy ``source_user_id``'s current answer for every task onto every
+    other member's own row. Autosave already keeps rows in sync as answers
+    are typed (see `_fanout_group_task_answer`), but this catches gaps —
+    e.g. a student joined the group after already answering solo, or a
+    teammate's row was locked at save time and only became writable again
+    later. Called once, right before a group submits, rather than on every
+    keystroke, since the incremental fan-out already covers the common case.
+    """
+    other_ids = [uid for uid in member_ids if uid != source_user_id]
+    if not other_ids or assignment.id is None:
+        return
+
+    tasks_statement = select(AssignmentTask).where(AssignmentTask.assignment_id == assignment.id)
+    tasks = (await db_session.execute(tasks_statement)).scalars().all()
+    tasks_by_id = {t.id: t for t in tasks if t.id is not None}
+    if not tasks_by_id:
+        return
+
+    source_statement = select(AssignmentTaskSubmission).where(
+        AssignmentTaskSubmission.assignment_task_id.in_(list(tasks_by_id.keys())),  # type: ignore[attr-defined]
+        AssignmentTaskSubmission.user_id == source_user_id,
+    )
+    source_rows = (await db_session.execute(source_statement)).scalars().all()
+    if not source_rows:
+        return
+
+    status_statement = select(
+        AssignmentUserSubmission.user_id, AssignmentUserSubmission.submission_status
+    ).where(
+        AssignmentUserSubmission.assignment_id == assignment.id,
+        AssignmentUserSubmission.user_id.in_(other_ids),  # type: ignore[attr-defined]
+    )
+    locked_ids = {
+        uid
+        for uid, status in (await db_session.execute(status_statement)).all()
+        if status
+        not in (AssignmentUserSubmissionStatus.PENDING, AssignmentUserSubmissionStatus.NOT_SUBMITTED)
+    }
+
+    for source_row in source_rows:
+        task = tasks_by_id.get(source_row.assignment_task_id)
+        if task is None:
+            continue
+        content = AssignmentTaskSubmissionUpdate(task_submission=source_row.task_submission)
+        for member_id in other_ids:
+            if member_id in locked_ids:
+                continue
+            await _upsert_task_answer_for_user(task, assignment, member_id, content, db_session)
+
+
+async def submit_group_assignment(
+    request: Request,
+    assignment_uuid: str,
+    group_uuid: str,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> dict:
+    """Submit for the whole group at once. The caller must be a member of
+    the named group. Their current per-task answers are synced onto every
+    teammate's own row (see `_sync_group_task_answers`), then every member's
+    own AssignmentUserSubmission is advanced to SUBMITTED by calling
+    `create_assignment_submission` once per member — reusing its
+    trail/auto-grade/certificate/analytics logic completely unchanged rather
+    than re-implementing it here. SEB/IP/time-limit are verified once
+    against the caller's own real request; the per-teammate calls pass
+    ``skip_environment_checks=True`` (see that function's docstring for why).
+
+    A teammate who can't be advanced (not enrolled any more, or already past
+    the deadline while the caller's own check just barely made it in) is
+    skipped rather than failing the whole group's submission — the response
+    lists who succeeded and who didn't so the acting student can flag a real
+    problem (e.g. a teammate removed from the course) to their instructor.
+    """
+    _block_api_tokens(current_user)
+
+    statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
+    assignment = (await db_session.execute(statement)).scalars().first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if not assignment.allow_group_submission:
+        raise HTTPException(status_code=400, detail="This assignment does not use group submission.")
+
+    statement = select(Course).where(Course.id == assignment.course_id)
+    course = (await db_session.execute(statement)).scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.READ)
+
+    statement = select(AssignmentGroup).where(
+        AssignmentGroup.group_uuid == group_uuid,
+        AssignmentGroup.assignment_id == assignment.id,
+    )
+    group = (await db_session.execute(statement)).scalars().first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    membership_statement = select(AssignmentGroupMember).where(
+        AssignmentGroupMember.group_id == group.id,
+        AssignmentGroupMember.user_id == current_user.id,
+    )
+    membership = (await db_session.execute(membership_statement)).scalars().first()
+    if not membership:
+        raise HTTPException(status_code=403, detail="You are not a member of this group.")
+
+    member_ids = await get_group_member_ids(assignment.id, current_user.id, db_session)
+
+    # Real gate check, once, against the caller's own request.
+    is_instructor = await authorization_verify_based_on_roles(
+        request, current_user.id, "update", course.course_uuid, db_session
+    )
+    if not is_instructor and _is_assignment_past_due(assignment):
+        raise HTTPException(status_code=403, detail="Assignment deadline has passed")
+    _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit=False)
+    _enforce_ip_allowlist_if_required(assignment, request, is_instructor, is_token_submit=False)
+    await _enforce_time_limit_if_set(
+        assignment, current_user.id, is_instructor, is_token_submit=False, db_session=db_session
+    )
+
+    await _sync_group_task_answers(assignment, current_user.id, member_ids, db_session)
+
+    submitted: list[int] = []
+    skipped: list[int] = []
+    for member_id in member_ids:
+        statement = select(User).where(User.id == member_id)
+        member_user = (await db_session.execute(statement)).scalars().first()
+        if not member_user:
+            skipped.append(member_id)
+            continue
+        try:
+            await create_assignment_submission(
+                request,
+                assignment_uuid,
+                PublicUser(**member_user.model_dump()),
+                db_session,
+                skip_environment_checks=(member_id != current_user.id),
+            )
+            submitted.append(member_id)
+        except HTTPException:
+            # A teammate who is no longer enrolled, or whose row is already
+            # in a non-resubmittable state, is reported rather than failing
+            # the whole group's submission.
+            skipped.append(member_id)
+
+    return {
+        "message": f"Submitted for {len(submitted)} of {len(member_ids)} group member(s).",
+        "submitted_user_ids": submitted,
+        "skipped_user_ids": skipped,
+    }
+
+
+async def grade_group_assignment(
+    request: Request,
+    assignment_uuid: str,
+    group_uuid: str,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+    overall_feedback: str | None = None,
+) -> dict:
+    """Instructor-only: finalize the same grade + feedback for every member
+    of a group at once, by calling the existing single-user
+    `_apply_grade_and_finalize` primitive once per member (it explicitly
+    documents itself as safe for multiple callers to share) rather than
+    duplicating its scoring/webhook/audit logic. A member who hasn't handed
+    in anything yet (submission_status still PENDING/NOT_SUBMITTED) is
+    skipped and reported, mirroring the single-learner grading endpoint's
+    own guard against grading an empty attempt.
+    """
+    statement = select(Assignment).where(Assignment.assignment_uuid == assignment_uuid)
+    assignment = (await db_session.execute(statement)).scalars().first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    statement = select(Course).where(Course.id == assignment.course_id)
+    course = (await db_session.execute(statement)).scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    await authorize_assignment_access(request, db_session, current_user, course.course_uuid, AccessAction.UPDATE)
+
+    statement = select(AssignmentGroup).where(
+        AssignmentGroup.group_uuid == group_uuid,
+        AssignmentGroup.assignment_id == assignment.id,
+    )
+    group = (await db_session.execute(statement)).scalars().first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    statement = select(AssignmentGroupMember.user_id).where(AssignmentGroupMember.group_id == group.id)
+    member_ids = list((await db_session.execute(statement)).scalars().all())
+    if not member_ids:
+        raise HTTPException(status_code=400, detail="This group has no members.")
+
+    results: dict[int, dict] = {}
+    skipped: list[int] = []
+    for member_id in member_ids:
+        statement = select(AssignmentUserSubmission).where(
+            AssignmentUserSubmission.user_id == member_id,
+            AssignmentUserSubmission.assignment_id == assignment.id,
+        )
+        submission = (await db_session.execute(statement)).scalars().first()
+        if not submission or submission.submission_status in (
+            AssignmentUserSubmissionStatus.PENDING,
+            AssignmentUserSubmissionStatus.NOT_SUBMITTED,
+        ):
+            skipped.append(member_id)
+            continue
+        computed = await _apply_grade_and_finalize(
+            assignment=assignment,
+            course=course,
+            user_id=member_id,
+            assignment_user_submission=submission,
+            db_session=db_session,
+            overall_feedback=overall_feedback,
+            auto_graded=False,
+        )
+        results[member_id] = computed
+
+        if course.id:
+            try:
+                await check_course_completion_and_create_certificate(
+                    request, member_id, course.id, db_session
+                )
+                if not await are_course_assignments_passed(member_id, course.id, db_session):
+                    await revoke_user_certificate(
+                        member_id, course.id, db_session, reason="regraded_below_threshold"
+                    )
+            except Exception:
+                pass
+
+    return {
+        "message": f"Graded {len(results)} of {len(member_ids)} group member(s).",
+        "results": results,
+        "skipped_user_ids": skipped,
+    }
 
 
 async def read_assignment_submissions(

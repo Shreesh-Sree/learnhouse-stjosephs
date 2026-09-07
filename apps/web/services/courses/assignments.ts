@@ -286,6 +286,123 @@ export async function updateSubFile(
 
 // submissions
 
+// Assignment groups (team submission) //
+
+export async function createAssignmentGroup(
+  assignmentUUID: string,
+  name: string,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/groups`,
+    RequestBodyWithAuthHeader('POST', { name }, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export async function getAssignmentGroups(
+  assignmentUUID: string,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/groups`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export async function joinAssignmentGroup(
+  assignmentUUID: string,
+  groupUUID: string,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/groups/${groupUUID}/join`,
+    RequestBodyWithAuthHeader('POST', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export async function leaveAssignmentGroup(
+  assignmentUUID: string,
+  groupUUID: string,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/groups/${groupUUID}/leave`,
+    RequestBodyWithAuthHeader('POST', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only.
+export async function deleteAssignmentGroup(
+  assignmentUUID: string,
+  groupUUID: string,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/groups/${groupUUID}`,
+    RequestBodyWithAuthHeader('DELETE', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only.
+export async function removeAssignmentGroupMember(
+  assignmentUUID: string,
+  groupUUID: string,
+  userId: number,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/groups/${groupUUID}/members/${userId}`,
+    RequestBodyWithAuthHeader('DELETE', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Submits for every member of the group at once — see the backend
+// endpoint's docstring for how teammates' rows get synced and advanced.
+export async function submitAssignmentGroupForGrading(
+  assignmentUUID: string,
+  groupUUID: string,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/groups/${groupUUID}/submit`,
+    RequestBodyWithAuthHeader('POST', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only: finalizes the same grade + feedback for every member of
+// the group at once.
+export async function gradeAssignmentGroup(
+  assignmentUUID: string,
+  groupUUID: string,
+  access_token: string,
+  overall_feedback?: string | null
+) {
+  const body =
+    overall_feedback !== undefined && overall_feedback !== null
+      ? { overall_feedback }
+      : null
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/groups/${groupUUID}/grade`,
+    RequestBodyWithAuthHeader('POST', body, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
 export async function submitAssignmentForGrading(
   assignmentUUID: string,
   access_token: string

@@ -1,5 +1,5 @@
 import { useAssignments } from '@components/Contexts/Assignments/AssignmentContext';
-import { BookOpenCheck, Check, CircleHelp, ClipboardCheck, Download, Info, MessageSquare, UserCheck, X } from 'lucide-react';
+import { BookOpenCheck, Check, CircleHelp, ClipboardCheck, Download, Info, MessageSquare, UserCheck, Users, X } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,7 +14,7 @@ import TaskShortAnswerObject from '../../_components/TaskEditor/Subs/TaskTypes/T
 import TaskNumberAnswerObject from '../../_components/TaskEditor/Subs/TaskTypes/TaskNumberAnswerObject';
 import { useOrg } from '@components/Contexts/OrgContext';
 import { getTaskRefFileDir } from '@services/media/media';
-import { deleteUserSubmission, getFinalGrade, markActivityAsDoneForUser, putFinalGrade } from '@services/courses/assignments';
+import { deleteUserSubmission, getAssignmentGroups, getFinalGrade, gradeAssignmentGroup, markActivityAsDoneForUser, putFinalGrade } from '@services/courses/assignments';
 import { useLHSession } from '@components/Contexts/LHSessionContext';
 import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -120,6 +120,26 @@ function EvaluateAssignment({ user_id }: any) {
     // a plain "handed in" review of the learner's work.
     const isUngraded = !!assignments?.assignment_object?.ungraded;
 
+    // This student's own team, when the assignment uses group submission —
+    // looked up from the full group list (instructors see every member) so
+    // "Grade whole team" can apply the same grade to every teammate in one
+    // action instead of the teacher repeating this modal per member.
+    const allowGroupSubmission = !!assignments?.assignment_object?.allow_group_submission;
+    const [myGroup, setMyGroup] = useState<{ group_uuid: string; name: string; member_count: number } | null>(null);
+    useEffect(() => {
+        if (!allowGroupSubmission || !assignmentUuid || !access_token || !user_id) return;
+        let cancelled = false;
+        (async () => {
+            const res = await getAssignmentGroups(assignmentUuid, access_token);
+            if (cancelled || !res.success || !Array.isArray(res.data)) return;
+            const found = res.data.find((g: any) =>
+                Array.isArray(g.members) && g.members.some((m: any) => m.user_id === Number(user_id))
+            );
+            setMyGroup(found ?? null);
+        })();
+        return () => { cancelled = true; };
+    }, [allowGroupSubmission, assignmentUuid, access_token, user_id]);
+
     // Re-pull the aggregate grade + per-task breakdown. Called on open and after
     // a child task is inline-graded, so the header banner and per-task badges
     // reflect the new score immediately instead of staying stale until the
@@ -170,6 +190,28 @@ function EvaluateAssignment({ user_id }: any) {
         else {
             // FastAPI error bodies carry `detail`, never `message` — reading
             // `.message` rendered a wordless red toast for 404/403/500 alike.
+            toast.error(res.data?.detail || t('common.something_went_wrong'))
+        }
+    }
+
+    async function gradeWholeTeam() {
+        if (!myGroup) return;
+        const res = await gradeAssignmentGroup(assignmentUuid, myGroup.group_uuid, access_token, feedback ?? null);
+        if (res.success) {
+            toast.success(res.data.message)
+            refreshGradePreview();
+            const rawUuid = assignmentUuid?.replace('assignment_', '') ?? ''
+            queryClient.invalidateQueries({ queryKey: queryKeys.assignments.allSubmissions(rawUuid) })
+            queryClient.invalidateQueries({ queryKey: queryKeys.assignments.analytics(rawUuid) })
+            if (res.data.skipped_user_ids?.length) {
+                toast.error(
+                    t('dashboard.assignments.submissions.group.some_skipped', {
+                        defaultValue: '{{count}} teammate(s) had nothing to grade yet.',
+                        count: res.data.skipped_user_ids.length,
+                    })
+                )
+            }
+        } else {
             toast.error(res.data?.detail || t('common.something_went_wrong'))
         }
     }
@@ -423,6 +465,30 @@ function EvaluateAssignment({ user_id }: any) {
                             <span>{t('dashboard.assignments.submissions.actions.set_final_grade')}</span>
                         </button>
                         <ToolTip side='top' slateBlack sideOffset={6} content={t('dashboard.assignments.submissions.actions.set_final_grade_description')}>
+                            <div className='text-gray-300 hover:text-gray-500 transition-colors cursor-help'>
+                                <CircleHelp size={14} />
+                            </div>
+                        </ToolTip>
+                    </div>
+                    )}
+                    {!isUngraded && myGroup && (
+                    <div className='flex items-center space-x-1.5'>
+                        <button
+                            onClick={gradeWholeTeam}
+                            className='flex items-center space-x-1.5 px-3.5 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 rounded-lg nice-shadow hover:bg-indigo-100/80 transition-colors cursor-pointer'
+                        >
+                            <Users size={14} />
+                            <span>
+                                {t('dashboard.assignments.submissions.group.grade_whole_team', {
+                                    defaultValue: 'Grade whole team ({{count}})',
+                                    count: myGroup.member_count,
+                                })}
+                            </span>
+                        </button>
+                        <ToolTip side='top' slateBlack sideOffset={6} content={t('dashboard.assignments.submissions.group.grade_whole_team_description', {
+                            defaultValue: 'Applies this same grade and feedback to every member of {{name}}.',
+                            name: myGroup.name,
+                        })}>
                             <div className='text-gray-300 hover:text-gray-500 transition-colors cursor-help'>
                                 <CircleHelp size={14} />
                             </div>

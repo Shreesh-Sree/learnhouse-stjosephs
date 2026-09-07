@@ -47,6 +47,7 @@ import {
     Download,
     Camera,
     Wifi,
+    Users,
 } from 'lucide-react';
 
 type GradingType = 'ALPHABET' | 'NUMERIC' | 'PERCENTAGE' | 'PASS_FAIL' | 'GPA_SCALE';
@@ -74,6 +75,9 @@ interface Assignment {
     require_webcam_proctoring?: boolean;
     require_ip_allowlist?: boolean;
     ip_allowlist?: string | null;
+    allow_group_submission?: boolean;
+    group_min_size?: number | null;
+    group_max_size?: number | null;
     assignment_tasks?: any[];
 }
 
@@ -244,6 +248,9 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             require_webcam_proctoring: assignment.require_webcam_proctoring || false,
             require_ip_allowlist: assignment.require_ip_allowlist || false,
             ip_allowlist: assignment.ip_allowlist || '',
+            allow_group_submission: assignment.allow_group_submission || false,
+            group_min_size: typeof assignment.group_min_size === 'number' ? assignment.group_min_size : '',
+            group_max_size: typeof assignment.group_max_size === 'number' ? assignment.group_max_size : '',
         },
         enableReinitialize: true,
         onSubmit: async (values, { setSubmitting }) => {
@@ -264,6 +271,16 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             // it in the DB rather than storing an empty string.
             payload.seb_quit_password = values.seb_quit_password || null;
             payload.ip_allowlist = values.ip_allowlist || null;
+            // Blank -> null (no bound in that direction), same convention as
+            // pass_threshold_percentage above.
+            payload.group_min_size =
+                values.group_min_size === '' || values.group_min_size === null
+                    ? null
+                    : Math.max(1, Number(values.group_min_size));
+            payload.group_max_size =
+                values.group_max_size === '' || values.group_max_size === null
+                    ? null
+                    : Math.max(1, Number(values.group_max_size));
             // time_limit_enabled is a form-only toggle, never sent — it just
             // decides whether time_limit_minutes goes out as a number or an
             // explicit null (clearing it, same convention as due_date above).
@@ -564,6 +581,23 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
                     onChange={(v) => formik.setFieldValue('require_ip_allowlist', v, true)}
                     allowlist={formik.values.ip_allowlist}
                     onAllowlistChange={(v) => formik.setFieldValue('ip_allowlist', v, true)}
+                />
+            </div>
+
+            {/* Group submission */}
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <p className={labelClass}>
+                        {t('dashboard.assignments.modals.edit.form.group_submission_section_label', { defaultValue: 'Team submission' })}
+                    </p>
+                </div>
+                <GroupSubmissionRow
+                    checked={formik.values.allow_group_submission}
+                    onChange={(v) => formik.setFieldValue('allow_group_submission', v, true)}
+                    minSize={formik.values.group_min_size}
+                    onMinSizeChange={(v) => formik.setFieldValue('group_min_size', v, true)}
+                    maxSize={formik.values.group_max_size}
+                    onMaxSizeChange={(v) => formik.setFieldValue('group_max_size', v, true)}
                 />
             </div>
 
@@ -1077,6 +1111,102 @@ function IpAllowlistRow({
                     <p className="text-[10px] text-gray-400 leading-snug">
                         {t('dashboard.assignments.modals.edit.form.ip_allowlist_hint', {
                             defaultValue: 'One IP or CIDR range per line (commas also work). Ask your IT department for the campus range. An empty list blocks every learner while this is on.',
+                        })}
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Students self-organize into teams (see AssignmentGroupPanel on the
+// student side) sized between minSize and maxSize — either bound optional.
+// The toggle here only flips the DB flag; team formation, the shared
+// answers, and the single "submit for the whole team" action are all a
+// separate, dedicated flow (assignment_groups service + endpoints), not
+// something this modal configures further.
+function GroupSubmissionRow({
+    checked,
+    onChange,
+    minSize,
+    onMinSizeChange,
+    maxSize,
+    onMaxSizeChange,
+}: {
+    checked: boolean;
+    onChange: (_next: boolean) => void;
+    minSize: number | '';
+    onMinSizeChange: (_v: number | '') => void;
+    maxSize: number | '';
+    onMaxSizeChange: (_v: number | '') => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <div className="rounded-xl border nice-shadow bg-white border-gray-100 overflow-hidden">
+            <div className="flex items-start justify-between gap-3 p-3">
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <div className="mt-0.5 flex-none">
+                        <Users size={16} className="text-indigo-500" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <p className="text-xs font-bold text-gray-900">
+                            {t('dashboard.assignments.modals.edit.form.group_submission_label', { defaultValue: 'Allow team submission' })}
+                        </p>
+                        <p className="text-[10px] text-gray-500 leading-snug mt-0.5">
+                            {t('dashboard.assignments.modals.edit.form.group_submission_description', {
+                                defaultValue: 'Learners form their own teams and hand in — and are graded — together, one submission per team.',
+                            })}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onChange(!checked)}
+                    aria-pressed={checked}
+                    className={`relative flex-none inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        checked ? 'bg-gray-900' : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                >
+                    <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
+                        }`}
+                    />
+                </button>
+            </div>
+            {checked && (
+                <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/50">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-gray-700">
+                                {t('dashboard.assignments.modals.edit.form.group_min_size_label', { defaultValue: 'Min team size' })}
+                            </label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={minSize}
+                                onChange={(e) => onMinSizeChange(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                                placeholder={t('dashboard.assignments.modals.edit.form.group_size_placeholder', { defaultValue: 'No minimum' })}
+                                className={inputClass}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-gray-700">
+                                {t('dashboard.assignments.modals.edit.form.group_max_size_label', { defaultValue: 'Max team size' })}
+                            </label>
+                            <input
+                                type="number"
+                                min={1}
+                                value={maxSize}
+                                onChange={(e) => onMaxSizeChange(e.target.value === '' ? '' : parseInt(e.target.value, 10))}
+                                placeholder={t('dashboard.assignments.modals.edit.form.group_size_placeholder', { defaultValue: 'No maximum' })}
+                                className={inputClass}
+                            />
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 leading-snug mt-2">
+                        {t('dashboard.assignments.modals.edit.form.group_submission_hint', {
+                            defaultValue: 'Max size is enforced when joining a team. Min size is shown to students as guidance only — nothing blocks a smaller team from submitting.',
                         })}
                     </p>
                 </div>

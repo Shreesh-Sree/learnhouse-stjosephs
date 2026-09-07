@@ -55,6 +55,7 @@ import AssignmentSebGate from '@components/Objects/Activities/Assignment/Assignm
 import AssignmentIpAllowlistGate from '@components/Objects/Activities/Assignment/AssignmentIpAllowlistGate'
 import AssignmentTimeLimitGate from '@components/Objects/Activities/Assignment/AssignmentTimeLimitGate'
 import AssignmentProctoringConsent from '@components/Objects/Activities/Assignment/AssignmentProctoringConsent'
+import AssignmentGroupPanel from '@components/Objects/Activities/Assignment/AssignmentGroupPanel'
 // Deadline rule shared with the learner activity view (and mirroring the
 // server's _is_assignment_past_due) so the submit/retry affordances agree with
 // what the API will actually accept. Static import: it's a pure function, and
@@ -398,6 +399,17 @@ function ActivityClient(props: ActivityClientProps) {
                   >
                     <AssignmentProvider assignment_uuid={assignment?.assignment_uuid}>
                       <AssignmentsTaskProvider>
+                        {/* Team formation + "submit for the whole team" is a
+                            separate, dedicated action from the individual
+                            per-task flow below it — see the panel's own
+                            docstring. */}
+                        <AssignmentGroupPanel
+                          assignmentUuid={assignment?.assignment_uuid}
+                          allowGroupSubmission={!!assignment?.allow_group_submission}
+                          groupMinSize={assignment?.group_min_size}
+                          groupMaxSize={assignment?.group_max_size}
+                          accessToken={access_token}
+                        />
                         <AssignmentStudentActivity />
                       </AssignmentsTaskProvider>
                     </AssignmentProvider>

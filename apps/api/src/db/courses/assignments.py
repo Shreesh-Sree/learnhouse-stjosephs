@@ -145,6 +145,19 @@ class AssignmentBase(SQLModel):
     # reformatting it.
     ip_allowlist: Optional[str] = None
 
+    # Group/team submission. Students self-organize into
+    # AssignmentGroups (see db.courses.assignment_groups) sized between
+    # group_min_size and group_max_size (either bound optional — None means
+    # unbounded that direction). AssignmentUserSubmission/
+    # AssignmentTaskSubmission stay per-user; a group changes how those rows
+    # get filled in (fan-out on every task-answer save) and finalized
+    # (grading one member grades the whole group at once) — see
+    # services.courses.activities.assignments: _fanout_group_task_answer,
+    # submit_group_assignment, grade_group_assignment.
+    allow_group_submission: Optional[bool] = False
+    group_min_size: Optional[int] = None
+    group_max_size: Optional[int] = None
+
     org_id: int
     course_id: int
     chapter_id: int
@@ -209,6 +222,9 @@ class AssignmentUpdate(SQLModel):
     require_webcam_proctoring: Optional[bool] = None
     require_ip_allowlist: Optional[bool] = None
     ip_allowlist: Optional[str] = None
+    allow_group_submission: Optional[bool] = None
+    group_min_size: Optional[int] = None
+    group_max_size: Optional[int] = None
     update_date: Optional[str] = None
 
 

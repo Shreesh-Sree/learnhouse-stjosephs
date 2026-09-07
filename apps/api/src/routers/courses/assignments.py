@@ -13,6 +13,7 @@ from src.db.courses.assignments import (
     AssignmentUserSubmissionRead,
 )
 from src.db.courses.proctoring import ProctoringSnapshotRead
+from src.db.courses.assignment_groups import AssignmentGroupRead
 from src.db.users import PublicUser
 from src.core.events.database import get_db_session
 from src.security.auth import get_current_user
@@ -21,6 +22,14 @@ from src.services.courses.activities.proctoring import (
     list_proctoring_snapshots,
     serve_proctoring_snapshot,
     upload_proctoring_snapshot,
+)
+from src.services.courses.activities.assignment_groups import (
+    create_group,
+    instructor_delete_group,
+    instructor_remove_member,
+    join_group,
+    leave_group,
+    list_groups,
 )
 from src.services.courses.activities.assignments import (
     check_assignment_ip_allowlist_status,
@@ -38,6 +47,7 @@ from src.services.courses.activities.assignments import (
     get_assignments_from_course,
     get_grade_assignment_submission,
     grade_assignment_submission,
+    grade_group_assignment,
     handle_assignment_task_submission,
     mark_activity_as_done_for_user,
     put_assignment_solution_file,
@@ -56,6 +66,7 @@ from src.services.courses.activities.assignments import (
     read_user_assignment_task_submissions_me_batch,
     retry_assignment_submission,
     start_assignment_attempt,
+    submit_group_assignment,
     update_assignment,
     update_assignment_submission,
     update_assignment_task,
@@ -325,6 +336,198 @@ async def api_serve_proctoring_snapshot(
     db_session=Depends(get_db_session),
 ) -> Response:
     return await serve_proctoring_snapshot(request, snapshot_uuid, current_user, db_session)
+
+
+## ASSIGNMENT GROUPS ##
+
+
+class CreateGroupBody(BaseModel):
+    name: str
+
+
+@router.post(
+    "/{assignment_uuid}/groups",
+    response_model=AssignmentGroupRead,
+    summary="Create an assignment group",
+    description="Create a new group for a group-submission assignment. A student is immediately its first member; an instructor can create an empty group for students to join.",
+    responses={
+        200: {"description": "Group created.", "model": AssignmentGroupRead},
+        400: {"description": "Assignment doesn't use group submission, missing name, or already in a group"},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_create_group(
+    request: Request,
+    assignment_uuid: str,
+    body: CreateGroupBody,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> AssignmentGroupRead:
+    return await create_group(request, assignment_uuid, body.name, current_user, db_session)
+
+
+@router.get(
+    "/{assignment_uuid}/groups",
+    response_model=list[AssignmentGroupRead],
+    summary="List assignment groups",
+    description="Every group for this assignment. A student sees every group's name/size (to decide which to join) but member identities only for their own group; an instructor sees everything.",
+    responses={
+        200: {"description": "Group list.", "model": list[AssignmentGroupRead]},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_list_groups(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> list[AssignmentGroupRead]:
+    return await list_groups(request, assignment_uuid, current_user, db_session)
+
+
+@router.post(
+    "/{assignment_uuid}/groups/{group_uuid}/join",
+    response_model=AssignmentGroupRead,
+    summary="Join an assignment group",
+    description="Join a group for this assignment. Fails if you're already in a different group for it, or the group is full.",
+    responses={
+        200: {"description": "Group joined.", "model": AssignmentGroupRead},
+        400: {"description": "Assignment doesn't use group submission, or already in a different group"},
+        401: {"description": "Authentication required"},
+        403: {"description": "Group is full"},
+        404: {"description": "Assignment or group not found"},
+    },
+)
+async def api_join_group(
+    request: Request,
+    assignment_uuid: str,
+    group_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> AssignmentGroupRead:
+    return await join_group(request, assignment_uuid, group_uuid, current_user, db_session)
+
+
+@router.post(
+    "/{assignment_uuid}/groups/{group_uuid}/leave",
+    summary="Leave an assignment group",
+    description="Leave a group you belong to for this assignment. The group is deleted automatically if you were its last member.",
+    responses={
+        200: {"description": "Left the group."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment, group, or membership not found"},
+    },
+)
+async def api_leave_group(
+    request: Request,
+    assignment_uuid: str,
+    group_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    await leave_group(request, assignment_uuid, group_uuid, current_user, db_session)
+    return {"success": True}
+
+
+@router.delete(
+    "/{assignment_uuid}/groups/{group_uuid}",
+    summary="Delete an assignment group",
+    description="Instructor-only. Deletes a group and every membership row in it.",
+    responses={
+        200: {"description": "Group deleted."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment or group not found"},
+    },
+)
+async def api_delete_group(
+    request: Request,
+    assignment_uuid: str,
+    group_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    await instructor_delete_group(request, assignment_uuid, group_uuid, current_user, db_session)
+    return {"success": True}
+
+
+@router.delete(
+    "/{assignment_uuid}/groups/{group_uuid}/members/{user_id}",
+    summary="Remove a member from an assignment group",
+    description="Instructor-only. Removes one member from a group; deletes the group automatically if that was its last member.",
+    responses={
+        200: {"description": "Member removed."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment, group, or membership not found"},
+    },
+)
+async def api_remove_group_member(
+    request: Request,
+    assignment_uuid: str,
+    group_uuid: str,
+    user_id: int,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    await instructor_remove_member(request, assignment_uuid, group_uuid, user_id, current_user, db_session)
+    return {"success": True}
+
+
+@router.post(
+    "/{assignment_uuid}/groups/{group_uuid}/submit",
+    summary="Submit an assignment for the whole group",
+    description="The caller must be a member of this group. Syncs the caller's current task answers onto every teammate's own row, then advances every member's own submission to SUBMITTED.",
+    responses={
+        200: {"description": "Group submission result (per-member success/skip list)."},
+        400: {"description": "Assignment doesn't use group submission"},
+        401: {"description": "Authentication required"},
+        403: {"description": "Not a member of this group, or a submission-time gate (SEB/IP/time limit/deadline) failed"},
+        404: {"description": "Assignment or group not found"},
+    },
+)
+async def api_submit_group_assignment(
+    request: Request,
+    assignment_uuid: str,
+    group_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    return await submit_group_assignment(request, assignment_uuid, group_uuid, current_user, db_session)
+
+
+@router.post(
+    "/{assignment_uuid}/groups/{group_uuid}/grade",
+    summary="Finalize the grade for a whole group",
+    description="Instructor-only. Applies the same grade + optional overall feedback to every member of a group who has handed in an attempt; a member who hasn't is skipped and reported.",
+    responses={
+        200: {"description": "Group grading result (per-member grade + skip list)."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to grade this assignment"},
+        404: {"description": "Assignment or group not found"},
+    },
+)
+async def api_grade_group_assignment(
+    request: Request,
+    assignment_uuid: str,
+    group_uuid: str,
+    body: Optional[GradeSubmissionBody] = None,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    return await grade_group_assignment(
+        request,
+        assignment_uuid,
+        group_uuid,
+        current_user,
+        db_session,
+        overall_feedback=body.overall_feedback if body else None,
+    )
 
 
 @router.put(
