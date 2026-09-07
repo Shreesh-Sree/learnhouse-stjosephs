@@ -15,6 +15,7 @@ from src.db.courses.assignments import (
 from src.db.courses.proctoring import ProctoringSnapshotRead
 from src.db.courses.assignment_groups import AssignmentGroupRead
 from src.db.courses.peer_reviews import PeerReviewRead
+from src.db.courses.assignment_extensions import AssignmentExtensionRead
 from src.db.users import PublicUser
 from src.core.events.database import get_db_session
 from src.security.auth import get_current_user
@@ -39,6 +40,12 @@ from src.services.courses.activities.peer_reviews import (
     list_my_peer_reviews_to_do,
     list_peer_reviews_received,
     submit_peer_review,
+)
+from src.services.courses.activities.assignment_extensions import (
+    get_my_extension,
+    grant_extension,
+    list_extensions,
+    revoke_extension,
 )
 from src.services.courses.activities.assignments import (
     check_assignment_ip_allowlist_status,
@@ -808,6 +815,103 @@ async def api_get_peer_review_summary_for_user(
     db_session=Depends(get_db_session),
 ):
     return await get_peer_review_summary_for_user(request, assignment_uuid, user_id, current_user, db_session)
+
+
+## ASSIGNMENT EXTENSIONS ##
+
+
+class GrantExtensionBody(BaseModel):
+    extended_due_date: str
+    reason: Optional[str] = None
+
+
+@router.put(
+    "/{assignment_uuid}/extensions/{user_id}",
+    response_model=AssignmentExtensionRead,
+    summary="Grant or update a per-student deadline extension",
+    description="Instructor-only. Sets this student's effective due date for this assignment, overriding the assignment's own due_date for them.",
+    responses={
+        200: {"description": "Extension granted.", "model": AssignmentExtensionRead},
+        400: {"description": "Missing extended_due_date"},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_grant_extension(
+    request: Request,
+    assignment_uuid: str,
+    user_id: int,
+    body: GrantExtensionBody,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> AssignmentExtensionRead:
+    return await grant_extension(
+        request, assignment_uuid, user_id, body.extended_due_date, body.reason, current_user, db_session
+    )
+
+
+@router.delete(
+    "/{assignment_uuid}/extensions/{user_id}",
+    summary="Revoke a per-student deadline extension",
+    description="Instructor-only. Removes this student's extension, if any; the assignment's own due_date applies to them again.",
+    responses={
+        200: {"description": "Extension revoked (or none existed)."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_revoke_extension(
+    request: Request,
+    assignment_uuid: str,
+    user_id: int,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    await revoke_extension(request, assignment_uuid, user_id, current_user, db_session)
+    return {"success": True}
+
+
+@router.get(
+    "/{assignment_uuid}/extensions",
+    response_model=list[AssignmentExtensionRead],
+    summary="List every extension granted on this assignment",
+    description="Instructor-only.",
+    responses={
+        200: {"description": "Extension list.", "model": list[AssignmentExtensionRead]},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to edit this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_list_extensions(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> list[AssignmentExtensionRead]:
+    return await list_extensions(request, assignment_uuid, current_user, db_session)
+
+
+@router.get(
+    "/{assignment_uuid}/extensions/me",
+    summary="My own extension for this assignment",
+    description="The caller's own extension, if any — null when they don't have one.",
+    responses={
+        200: {"description": "Extension, or null."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_get_my_extension(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+):
+    return await get_my_extension(request, assignment_uuid, current_user, db_session)
 
 
 ## ASSIGNMENTS Tasks ##

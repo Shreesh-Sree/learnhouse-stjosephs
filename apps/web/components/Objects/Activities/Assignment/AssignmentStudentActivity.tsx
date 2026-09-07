@@ -114,9 +114,14 @@ function AssignmentStudentActivity() {
         : 50;
 
   // Deadline state. Past the due date the server rejects EVERY write with a 403
-  // (see `_is_assignment_past_due`), so the learner needs to be told before
-  // auto-save starts failing behind their back.
-  const dueDateRaw = assignments?.assignment_object?.due_date as string | undefined;
+  // (see `_is_assignment_past_due_for_user`), so the learner needs to be told
+  // before auto-save starts failing behind their back. Prefer
+  // effective_due_date — this reader's own extension-aware deadline (see
+  // AssignmentRead.effective_due_date) — over the assignment's plain
+  // due_date, so a student with an individual extension sees THEIR actual
+  // deadline, not the one that no longer applies to them.
+  const dueDateRaw = (assignments?.assignment_object?.effective_due_date ??
+    assignments?.assignment_object?.due_date) as string | undefined;
   const [now, setNow] = useState<number>(() => Date.now());
   useEffect(() => {
     if (!parseDueDate(dueDateRaw)) return;

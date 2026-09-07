@@ -194,7 +194,28 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   wiring CODE/SHORT_ANSWER/NUMBER_ANSWER/FORM in is a small follow-up, not
   a redesign. Needs real-environment verification like everything else this
   session.
-- Per-student extensions/grace periods on assignment deadlines.
+- ~~Per-student extensions/grace periods~~ — **done.** New `AssignmentExtension`
+  table (one row per (assignment, student)) whose `extended_due_date`
+  REPLACES `assignment.due_date` for that student outright — not just a
+  later date, so the same mechanism also covers a legitimate earlier
+  individual deadline (an accommodation, or fixing a mistaken extension).
+  `_is_assignment_past_due` was split into a pure `_is_date_past(raw)` plus
+  a new async `_is_assignment_past_due_for_user(assignment, user_id,
+  db_session)` that resolves the effective per-student deadline first; all
+  6 deadline gates in the assignments service (file upload, task-answer
+  save, submit-for-grading, start-attempt, group-submit, retry) were
+  migrated to the per-user form. Group submission gets this for free: since
+  `submit_group_assignment` already re-checks the deadline per teammate
+  when it calls `create_assignment_submission` for each one, every group
+  member's own extension is automatically honored with no group-specific
+  code. `AssignmentRead` gained `effective_due_date`, populated only for a
+  real learner reader (never an instructor, who needs the plain
+  `due_date` to manage the assignment) — the student activity view prefers
+  it over `due_date` so an extended student sees their actual deadline.
+  Instructor UI: a compact "extend" button per submission row
+  (`AssignmentSubmissionsSubPage.tsx`) to grant/revoke one student's
+  extension. Needs real-environment verification like everything else this
+  session.
 - Pluggable plagiarism/similarity check (third-party API or in-house
   cross-submission similarity), distinct from the existing `anti_copy_paste`
   UI deterrent.

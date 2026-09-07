@@ -200,6 +200,15 @@ class AssignmentRead(AssignmentBase):
     # whenever a corrigé exists.
     has_solution: Optional[bool] = None
     solution_unlocked: Optional[bool] = None
+    # This reader's OWN effective deadline, computed per-reader by the read
+    # services (services.courses.activities.assignment_extensions.
+    # get_effective_due_date): their personal extension's date if they have
+    # one on file, otherwise identical to `due_date`. Populated only for a
+    # real learner reader — never for an instructor, who needs the plain
+    # `due_date` to see/edit the assignment's own config, not any one
+    # student's override. The frontend prefers this over `due_date` for a
+    # student-facing deadline display when it's present.
+    effective_due_date: Optional[str] = None
 
 
 class AssignmentUpdate(SQLModel):

@@ -10,6 +10,7 @@ import {
     AlertTriangle,
     ArrowUpDown,
     Calendar,
+    CalendarClock,
     CheckCircle2,
     ChevronDown,
     CircleDashed,
@@ -25,7 +26,12 @@ import {
 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { assignPeerReviews } from '@services/courses/assignments';
+import {
+    assignPeerReviews,
+    getAssignmentExtensions,
+    grantAssignmentExtension,
+    revokeAssignmentExtension,
+} from '@services/courses/assignments';
 import EvaluateAssignment from './Modals/EvaluateAssignment';
 import { AssignmentProvider } from '@components/Contexts/Assignments/AssignmentContext';
 import { AssignmentsTaskProvider } from '@components/Contexts/Assignments/AssignmentsTaskContext';
@@ -662,7 +668,128 @@ function SubmissionRow({
                     </div>
                 }
             />
+            <ExtensionButton assignment_uuid={assignment_uuid} user_id={submission.user_id} />
         </div>
+    );
+}
+
+// Per-student deadline override. A student with no extension on file is
+// governed by the assignment's plain due_date; setting one here replaces
+// it outright for just this student (see the backend module docstring for
+// why "replace" rather than "always later").
+function ExtensionButton({ assignment_uuid, user_id }: { assignment_uuid: string; user_id: number }) {
+    const { t } = useTranslation();
+    const session = useLHSession() as any;
+    const access_token = session?.data?.tokens?.access_token;
+    const [open, setOpen] = useState(false);
+    const [existing, setExisting] = useState<any>(null);
+    const [dueDate, setDueDate] = useState('');
+    const [reason, setReason] = useState('');
+    const [busy, setBusy] = useState(false);
+
+    const load = async () => {
+        const res = await getAssignmentExtensions(assignment_uuid, access_token);
+        if (res.success && Array.isArray(res.data)) {
+            const mine = res.data.find((e: any) => e.user_id === user_id) ?? null;
+            setExisting(mine);
+            setDueDate(mine?.extended_due_date?.slice(0, 10) ?? '');
+            setReason(mine?.reason ?? '');
+        }
+    };
+
+    const handleGrant = async () => {
+        if (!dueDate) return;
+        setBusy(true);
+        try {
+            const res = await grantAssignmentExtension(assignment_uuid, user_id, dueDate, reason || null, access_token);
+            if (res.success) {
+                toast.success(t('dashboard.assignments.submissions.extension.granted', { defaultValue: 'Extension saved.' }));
+                setOpen(false);
+            } else {
+                toast.error(res.data?.detail || t('common.something_went_wrong'));
+            }
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleRevoke = async () => {
+        setBusy(true);
+        try {
+            const res = await revokeAssignmentExtension(assignment_uuid, user_id, access_token);
+            if (res.success) {
+                toast.success(t('dashboard.assignments.submissions.extension.revoked', { defaultValue: 'Extension removed.' }));
+                setOpen(false);
+            } else {
+                toast.error(res.data?.detail || t('common.something_went_wrong'));
+            }
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <Modal
+            isDialogOpen={open}
+            onOpenChange={(next: boolean) => {
+                if (next) load();
+                setOpen(next);
+            }}
+            minWidth="sm"
+            dialogContent={
+                <div className="p-1 space-y-3">
+                    <div className="space-y-1">
+                        <label className="text-xs font-semibold text-gray-700">
+                            {t('dashboard.assignments.submissions.extension.due_date_label', { defaultValue: 'Extended due date' })}
+                        </label>
+                        <input
+                            type="date"
+                            value={dueDate}
+                            onChange={(e) => setDueDate(e.target.value)}
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 border border-gray-200 outline-none"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-semibold text-gray-700">
+                            {t('dashboard.assignments.submissions.extension.reason_label', { defaultValue: 'Reason (optional, visible only to you)' })}
+                        </label>
+                        <textarea
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            rows={2}
+                            className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 border border-gray-200 outline-none resize-none"
+                        />
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                        {existing && (
+                            <button
+                                type="button"
+                                onClick={handleRevoke}
+                                disabled={busy}
+                                className="text-xs font-bold text-rose-600 hover:text-rose-700 disabled:opacity-50"
+                            >
+                                {t('dashboard.assignments.submissions.extension.revoke', { defaultValue: 'Remove extension' })}
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={handleGrant}
+                            disabled={busy || !dueDate}
+                            className="ms-auto inline-flex items-center justify-center px-3 py-1.5 text-xs font-bold text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                        >
+                            {t('dashboard.assignments.submissions.extension.save', { defaultValue: 'Save' })}
+                        </button>
+                    </div>
+                </div>
+            }
+            dialogTitle={t('dashboard.assignments.submissions.extension.title', { defaultValue: 'Deadline extension' })}
+            dialogDescription={t('dashboard.assignments.submissions.extension.description', { defaultValue: 'Overrides this student\'s due date for this assignment only.' })}
+            dialogTrigger={
+                <div className="ms-2 bg-white hover:bg-gray-50 text-gray-600 border border-gray-200 font-bold py-1.5 px-2.5 rounded-md text-xs cursor-pointer nice-shadow transition-colors flex items-center gap-1">
+                    <CalendarClock size={12} />
+                </div>
+            }
+        />
     );
 }
 

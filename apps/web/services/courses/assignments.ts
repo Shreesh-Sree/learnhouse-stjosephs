@@ -475,6 +475,57 @@ export async function getPeerReviewSummaryForUser(
   return res
 }
 
+// Per-student deadline extensions //
+
+// Instructor-only.
+export async function grantAssignmentExtension(
+  assignmentUUID: string,
+  userId: number,
+  extended_due_date: string,
+  reason: string | null,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/extensions/${userId}`,
+    RequestBodyWithAuthHeader('PUT', { extended_due_date, reason }, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only.
+export async function revokeAssignmentExtension(
+  assignmentUUID: string,
+  userId: number,
+  access_token: string
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/extensions/${userId}`,
+    RequestBodyWithAuthHeader('DELETE', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+// Instructor-only.
+export async function getAssignmentExtensions(assignmentUUID: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/extensions`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
+export async function getMyAssignmentExtension(assignmentUUID: string, access_token: string) {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/extensions/me`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res
+}
+
 export async function submitAssignmentForGrading(
   assignmentUUID: string,
   access_token: string

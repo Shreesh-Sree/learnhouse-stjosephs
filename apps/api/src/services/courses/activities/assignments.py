@@ -96,6 +96,7 @@ from src.services.courses.activities.ip_allowlist import (
 )
 from src.services.courses.activities.assignment_groups import get_group_member_ids
 from src.db.courses.assignment_groups import AssignmentGroup, AssignmentGroupMember
+from src.services.courses.activities.assignment_extensions import get_effective_due_date
 from src.services.security.rate_limiting import get_client_ip
 from src.services.email.utils import get_base_url_from_request
 
@@ -196,16 +197,14 @@ async def _is_assignment_instructor(
     )
 
 
-def _is_assignment_past_due(assignment: Assignment) -> bool:
-    """Return True if the assignment has a due_date set and it is in the past.
-
-    due_date is stored as a free-form string. We parse it defensively: if it
-    is empty or unparseable, we treat the deadline as NOT set (return False)
-    so a malformed value never locks students out. Comparison is done with a
-    naive ``datetime.now()`` to match the rest of this module (all timestamps
-    here are naive local-time strings produced by ``datetime.now()``).
+def _is_date_past(raw: Optional[str]) -> bool:
+    """Return True if ``raw`` (a free-form ISO-ish deadline string) is in
+    the past. Parsed defensively: empty or unparseable means "not a
+    deadline" (returns False) so a malformed value never locks students
+    out. Comparison is done with a naive ``datetime.now()`` to match the
+    rest of this module (all timestamps here are naive local-time strings
+    produced by ``datetime.now()``).
     """
-    raw = getattr(assignment, "due_date", None)
     if not raw or not str(raw).strip():
         return False
     raw_str = str(raw).strip()
@@ -222,6 +221,30 @@ def _is_assignment_past_due(assignment: Assignment) -> bool:
     if "T" not in raw_str and ":" not in raw_str:
         parsed = parsed + timedelta(days=1)
     return parsed < datetime.now()
+
+
+def _is_assignment_past_due(assignment: Assignment) -> bool:
+    """Return True if the assignment's own due_date (ignoring any
+    per-student extension — see _is_assignment_past_due_for_user) is set
+    and in the past.
+    """
+    return _is_date_past(getattr(assignment, "due_date", None))
+
+
+async def _is_assignment_past_due_for_user(
+    assignment: Assignment, user_id: int, db_session: AsyncSession
+) -> bool:
+    """Same as _is_assignment_past_due, but resolves this student's
+    EFFECTIVE deadline first — their own extension's date if
+    services.courses.activities.assignment_extensions has one on file for
+    them, otherwise the assignment's own due_date. This is what every
+    learner-facing deadline gate should call; _is_assignment_past_due
+    (assignment-only) remains for callers that have no specific student in
+    hand (there are none among this module's own call sites — every gate
+    below was migrated to the per-user form).
+    """
+    effective_due_date = await get_effective_due_date(assignment, user_id, db_session)
+    return _is_date_past(effective_due_date)
 
 
 def _is_time_limit_expired(assignment: Assignment, started_at: Optional[str]) -> bool:
@@ -643,6 +666,27 @@ def _apply_solution_visibility(
     if not unlocked:
         result.solution = None
         result.solution_file = None
+    return result
+
+
+async def _apply_effective_due_date(
+    result: AssignmentRead,
+    assignment: Assignment,
+    request: Request,
+    current_user,
+    course_uuid: str,
+    db_session: AsyncSession,
+) -> AssignmentRead:
+    """Stamp `result.effective_due_date` with this reader's own deadline
+    (extension-aware) when they're a real learner — never for an
+    instructor, who should see the assignment's plain due_date to manage
+    it, not any one student's override. See AssignmentRead.effective_due_date.
+    """
+    if not isinstance(current_user, PublicUser) or assignment.id is None:
+        return result
+    if await _is_assignment_instructor(request, current_user, course_uuid, db_session):
+        return result
+    result.effective_due_date = await get_effective_due_date(assignment, current_user.id, db_session)
     return result
 
 
@@ -1415,7 +1459,8 @@ async def read_assignment(
     unlocked = await _resolve_solution_visibility(
         request, db_session, current_user, course_uuid, assignment
     )
-    return _apply_solution_visibility(result, assignment, unlocked=unlocked)
+    result = _apply_solution_visibility(result, assignment, unlocked=unlocked)
+    return await _apply_effective_due_date(result, assignment, request, current_user, course_uuid, db_session)
 
 
 async def read_assignment_from_activity_uuid(
@@ -1450,7 +1495,8 @@ async def read_assignment_from_activity_uuid(
     unlocked = await _resolve_solution_visibility(
         request, db_session, current_user, course_uuid, assignment
     )
-    return _apply_solution_visibility(result, assignment, unlocked=unlocked)
+    result = _apply_solution_visibility(result, assignment, unlocked=unlocked)
+    return await _apply_effective_due_date(result, assignment, request, current_user, course_uuid, db_session)
 
 
 # Static exit page the frontend navigates the SEB browser to right after a
@@ -2223,7 +2269,7 @@ async def put_assignment_task_submission_file(
     is_instructor = await authorization_verify_based_on_roles(
         request, current_user.id, "update", course.course_uuid, db_session
     )
-    if not is_instructor and _is_assignment_past_due(assignment):
+    if not is_instructor and await _is_assignment_past_due_for_user(assignment, current_user.id, db_session):
         raise HTTPException(
             status_code=403,
             detail="Assignment deadline has passed",
@@ -2715,7 +2761,7 @@ async def handle_assignment_task_submission(
                     detail="You must be enrolled in this course to submit assignments"
                 )
 
-            if _is_assignment_past_due(assignment):
+            if await _is_assignment_past_due_for_user(assignment, current_user.id, db_session):
                 raise HTTPException(
                     status_code=403,
                     detail="Assignment deadline has passed",
@@ -3405,7 +3451,7 @@ async def start_assignment_attempt(
 
     if not await authorization_verify_based_on_roles(request, current_user.id, "read", course.course_uuid, db_session):
         raise HTTPException(status_code=403, detail="You must be enrolled in this course to start this assignment")
-    if _is_assignment_past_due(assignment):
+    if await _is_assignment_past_due_for_user(assignment, current_user.id, db_session):
         raise HTTPException(status_code=403, detail="Assignment deadline has passed")
     _enforce_seb_if_required(assignment, request, is_instructor=False, is_token_submit=False)
     _enforce_ip_allowlist_if_required(assignment, request, is_instructor=False, is_token_submit=False)
@@ -3526,7 +3572,9 @@ async def create_assignment_submission(
 
     # Session students are bound by the deadline; a token writing on behalf of a
     # learner is an authorized external writer (the custom frontend owns it).
-    if not is_instructor and not is_token_submit and _is_assignment_past_due(assignment):
+    if not is_instructor and not is_token_submit and await _is_assignment_past_due_for_user(
+        assignment, submitter.id, db_session
+    ):
         raise HTTPException(
             status_code=403,
             detail="Assignment deadline has passed",
@@ -3994,7 +4042,7 @@ async def submit_group_assignment(
     is_instructor = await authorization_verify_based_on_roles(
         request, current_user.id, "update", course.course_uuid, db_session
     )
-    if not is_instructor and _is_assignment_past_due(assignment):
+    if not is_instructor and await _is_assignment_past_due_for_user(assignment, current_user.id, db_session):
         raise HTTPException(status_code=403, detail="Assignment deadline has passed")
     _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit=False)
     _enforce_ip_allowlist_if_required(assignment, request, is_instructor, is_token_submit=False)
@@ -4555,7 +4603,7 @@ async def retry_assignment_submission(
     is_instructor = await _is_assignment_instructor(
         request, current_user, course.course_uuid, db_session
     )
-    if _is_assignment_past_due(assignment) and not is_instructor:
+    if not is_instructor and await _is_assignment_past_due_for_user(assignment, current_user.id, db_session):
         raise HTTPException(
             status_code=403,
             detail="Assignment deadline has passed",
