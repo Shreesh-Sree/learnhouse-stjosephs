@@ -7,9 +7,13 @@ Rate limits:
 - Verification resend: 5 attempts per 5 minutes per email
 """
 import ipaddress
+import logging
 from typing import Tuple
 from fastapi import HTTPException, Request
+from redis.exceptions import RedisError
 from src.core.redis import get_redis_client as _get_redis_pool_client
+
+logger = logging.getLogger(__name__)
 
 
 class RateLimitExceeded(Exception):
@@ -21,14 +25,12 @@ class RateLimitExceeded(Exception):
 
 
 def get_redis_connection():
-    """Get Redis connection from shared pool."""
-    r = _get_redis_pool_client()
-    if r is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Redis connection string not found",
-        )
-    return r
+    """Get Redis connection from shared pool, or ``None`` when Redis isn't
+    configured/reachable. Redis is optional everywhere else in this codebase
+    (``get_redis_client() -> Optional[Redis]``, treated as non-fatal by pack
+    reconciliation, the captions consumer, etc.) — rate limiting follows the
+    same contract instead of raising, so callers can fail open."""
+    return _get_redis_pool_client()
 
 
 def _is_trusted_proxy(ip: str) -> bool:
@@ -104,36 +106,49 @@ def check_rate_limit(
 
     Returns:
         Tuple of (is_allowed, current_count, seconds_until_reset)
+
+    Fails OPEN (allowed, uncounted) when Redis isn't configured or isn't
+    reachable — rate limiting is a defense-in-depth measure, not the only
+    thing standing between an attacker and the login endpoint, and a self-host
+    deployment routinely runs without Redis at all. The alternative (fail
+    closed) would mean a Redis blip locks every user out of login/signup
+    entirely, which is worse than a temporary loss of brute-force throttling.
     """
     if r is None:
         r = get_redis_connection()
+    if r is None:
+        return True, 0, window_seconds
 
     rate_limit_key = f"rate_limit:{key}"
 
-    # Get current count
-    current_count = r.get(rate_limit_key)
-    ttl = r.ttl(rate_limit_key)
+    try:
+        # Get current count
+        current_count = r.get(rate_limit_key)
+        ttl = r.ttl(rate_limit_key)
 
-    if current_count is None:
-        # First attempt - set counter with expiry
-        r.setex(rate_limit_key, window_seconds, 1)
-        return True, 1, window_seconds
+        if current_count is None:
+            # First attempt - set counter with expiry
+            r.setex(rate_limit_key, window_seconds, 1)
+            return True, 1, window_seconds
 
-    current_count = int(current_count)
+        current_count = int(current_count)
 
-    if current_count >= max_attempts:
-        # Rate limit exceeded
-        return False, current_count, ttl if ttl > 0 else window_seconds
+        if current_count >= max_attempts:
+            # Rate limit exceeded
+            return False, current_count, ttl if ttl > 0 else window_seconds
 
-    # Increment counter atomically. If the key expired between the GET above
-    # and this INCR, Redis recreates it WITHOUT a TTL, which would leave a
-    # counter that never resets and permanently blocks the key. Re-assert the
-    # expiry whenever the key has no TTL so the window always rolls over.
-    new_count = r.incr(rate_limit_key)
-    if new_count == 1 or ttl is None or ttl < 0:
-        r.expire(rate_limit_key, window_seconds)
-        ttl = window_seconds
-    return True, new_count, ttl if ttl > 0 else window_seconds
+        # Increment counter atomically. If the key expired between the GET above
+        # and this INCR, Redis recreates it WITHOUT a TTL, which would leave a
+        # counter that never resets and permanently blocks the key. Re-assert the
+        # expiry whenever the key has no TTL so the window always rolls over.
+        new_count = r.incr(rate_limit_key)
+        if new_count == 1 or ttl is None or ttl < 0:
+            r.expire(rate_limit_key, window_seconds)
+            ttl = window_seconds
+        return True, new_count, ttl if ttl > 0 else window_seconds
+    except RedisError:
+        logger.warning("Rate limit check skipped (Redis unreachable) for key %s", key)
+        return True, 0, window_seconds
 
 
 def check_login_rate_limit(request: Request) -> Tuple[bool, int]:
@@ -345,24 +360,30 @@ def check_invite_rate_limit(org_id: int, user_id: int, count: int = 1) -> Tuple[
     whichever bucket denied the request.
     """
     r = get_redis_connection()
-    for key, ceiling in (
-        (f"invite_send:org:{org_id}", INVITE_ORG_MAX_PER_DAY),
-        (f"invite_send:user:{user_id}", INVITE_USER_MAX_PER_DAY),
-    ):
-        rate_key = f"rate_limit:{key}"
-        current = r.get(rate_key)
-        current = int(current) if current is not None else 0
-        if current + count > ceiling:
+    if r is None:
+        return True, INVITE_RATE_LIMIT_WINDOW_SECONDS
+    try:
+        for key, ceiling in (
+            (f"invite_send:org:{org_id}", INVITE_ORG_MAX_PER_DAY),
+            (f"invite_send:user:{user_id}", INVITE_USER_MAX_PER_DAY),
+        ):
+            rate_key = f"rate_limit:{key}"
+            current = r.get(rate_key)
+            current = int(current) if current is not None else 0
+            if current + count > ceiling:
+                ttl = r.ttl(rate_key)
+                return False, ttl if ttl and ttl > 0 else INVITE_RATE_LIMIT_WINDOW_SECONDS
+        # Reserve capacity in both buckets, asserting the window TTL on creation.
+        for key in (f"invite_send:org:{org_id}", f"invite_send:user:{user_id}"):
+            rate_key = f"rate_limit:{key}"
+            new_val = r.incrby(rate_key, count)
             ttl = r.ttl(rate_key)
-            return False, ttl if ttl and ttl > 0 else INVITE_RATE_LIMIT_WINDOW_SECONDS
-    # Reserve capacity in both buckets, asserting the window TTL on creation.
-    for key in (f"invite_send:org:{org_id}", f"invite_send:user:{user_id}"):
-        rate_key = f"rate_limit:{key}"
-        new_val = r.incrby(rate_key, count)
-        ttl = r.ttl(rate_key)
-        if new_val == count or ttl is None or ttl < 0:
-            r.expire(rate_key, INVITE_RATE_LIMIT_WINDOW_SECONDS)
-    return True, INVITE_RATE_LIMIT_WINDOW_SECONDS
+            if new_val == count or ttl is None or ttl < 0:
+                r.expire(rate_key, INVITE_RATE_LIMIT_WINDOW_SECONDS)
+        return True, INVITE_RATE_LIMIT_WINDOW_SECONDS
+    except RedisError:
+        logger.warning("Invite rate limit check skipped (Redis unreachable) for org %s", org_id)
+        return True, INVITE_RATE_LIMIT_WINDOW_SECONDS
 
 
 def enforce_invite_rate_limit(org_id: int, user_id: int, count: int = 1) -> None:
@@ -520,9 +541,14 @@ def increment_rate_limit(key: str, window_seconds: int) -> None:
     Used when we want to count an action without checking.
     """
     r = get_redis_connection()
+    if r is None:
+        return
     rate_limit_key = f"rate_limit:{key}"
 
-    if r.exists(rate_limit_key):
-        r.incr(rate_limit_key)
-    else:
-        r.setex(rate_limit_key, window_seconds, 1)
+    try:
+        if r.exists(rate_limit_key):
+            r.incr(rate_limit_key)
+        else:
+            r.setex(rate_limit_key, window_seconds, 1)
+    except RedisError:
+        logger.warning("Rate limit increment skipped (Redis unreachable) for key %s", key)

@@ -37,6 +37,29 @@ def _request(client_host=None, headers=None):
     return Request(scope)
 
 
+def test_check_rate_limit_fails_open_when_redis_client_is_none():
+    with patch(
+        "src.services.security.rate_limiting._get_redis_pool_client",
+        return_value=None,
+    ):
+        is_allowed, count, retry_after = check_rate_limit("k", max_attempts=5, window_seconds=60)
+    assert is_allowed is True
+    assert retry_after == 60
+
+
+def test_check_rate_limit_fails_open_on_redis_error():
+    from redis.exceptions import ConnectionError as RedisConnectionError
+
+    broken_redis = Mock()
+    broken_redis.get.side_effect = RedisConnectionError("connection refused")
+
+    is_allowed, count, retry_after = check_rate_limit(
+        "k", max_attempts=5, window_seconds=60, r=broken_redis
+    )
+    assert is_allowed is True
+    assert retry_after == 60
+
+
 def test_rate_limit_exceeded_keeps_message_and_retry_after():
     exc = RateLimitExceeded("Too many requests", 17)
 
@@ -54,15 +77,16 @@ def test_get_redis_connection_success_and_missing_config():
     ):
         assert get_redis_connection() is redis_client
 
+    # Redis is optional everywhere else in this codebase (pack reconciliation,
+    # the captions consumer, etc. all treat its absence as non-fatal) — rate
+    # limiting follows the same contract and returns None rather than raising,
+    # so callers can fail open instead of a login/signup endpoint 500ing
+    # outright whenever Redis isn't configured or is briefly unreachable.
     with patch(
         "src.services.security.rate_limiting._get_redis_pool_client",
         return_value=None,
     ):
-        with pytest.raises(HTTPException) as exc_info:
-            get_redis_connection()
-
-    assert exc_info.value.status_code == 500
-    assert exc_info.value.detail == "Redis connection string not found"
+        assert get_redis_connection() is None
 
 
 @pytest.mark.parametrize(
