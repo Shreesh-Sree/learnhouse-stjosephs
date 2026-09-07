@@ -677,9 +677,40 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
 
 ## Small cleanup items
 
-- [ ] `seb-integration-discussion.md` at the repo root is a leftover draft
+- [x] ~~`seb-integration-discussion.md` at the repo root is a leftover draft
       from an earlier (now abandoned) plan to post this work as an upstream
-      Discussion — irrelevant to the self-host deployment now, safe to delete.
-- [ ] No `pytest` test file exists for the SCORM manifest parser/service yet
+      Discussion — irrelevant to the self-host deployment now, safe to delete.~~
+      Done — deleted. Confirmed stale: it proposed `require_safe_exam_browser`/
+      `seb_config_key`/`seb_quit_password` fields as a future plan, but the real
+      SEB integration (those same fields on `Assignment`, header-hash
+      verification, downloadable `.seb` config) was already built and merged
+      earlier in this project, with its own `test_seb_service.py` coverage.
+- [x] ~~No `pytest` test file exists for the SCORM manifest parser/service yet
       (SEB got `test_seb_service.py`; SCORM only has the throwaway sanity
-      scripts used during development, never committed as real tests).
+      scripts used during development, never committed as real tests).~~
+      Done — added `apps/api/src/tests/services/test_oss_scorm_service.py`
+      (28 tests). Worth noting why this wasn't already covered: every existing
+      `test_scorm_*.py` file in the suite (`test_scorm_parsing.py`,
+      `test_scorm_content_path.py`, `test_scorm_extract.py`, etc.) targets
+      `ee/services/scorm/scorm.py` via `pytest.importorskip` — the Enterprise
+      Edition SCORM module, which this OSS repo doesn't ship, so all 8 of
+      those files skip cleanly and exercise nothing here. The actual OSS
+      SCORM implementation (`src/services/courses/activities/scorm.py`,
+      SCORM 1.2 only) had no test file importing it directly. The new file
+      imports that module with no `importorskip`, reusing the existing
+      `src/tests/fixtures/scorm_packages.py` manifest builders (they're
+      generic SCORM-spec XML, not EE-specific), and covers: `validate_scorm_zip`,
+      `sanitize_path`, `detect_scorm_version` (1.2 vs 2004, single/multi-SCO),
+      `extract_scos_from_manifest` (nested items, xml:base, mastery score,
+      Rise/Windows-path normalization, missing-href-uses-first-file), 
+      `get_package_title`, and `_safe_extract_zip`'s security guards (path
+      traversal, symlink entries, per-file/aggregate size caps, entry-count
+      cap) plus an XXE check on `defusedxml`. Not covered: the FastAPI-route
+      functions (`upload_scorm_package`, `serve_scorm_file`,
+      `get_scorm_tracking`, etc.) since those need a running app + DB to
+      exercise meaningfully — only the pure/file-system-local functions are
+      tested here, matching the existing test files' own scope. Actually
+      installed the full pinned dependency set (`fastapi`, `sqlmodel`,
+      `defusedxml`, `pytest`, etc. via pip) and ran the file for real with
+      `python3 -m pytest` — all 28 tests pass against the live module; this
+      is executed coverage, not just design-verified.
