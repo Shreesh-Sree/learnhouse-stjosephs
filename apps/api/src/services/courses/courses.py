@@ -913,6 +913,65 @@ async def update_course(
     return course
 
 
+async def set_course_prerequisite(
+    request: Request,
+    course_uuid: str,
+    prerequisite_course_id: int | None,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> CourseRead:
+    """Set or clear this course's learning-path prerequisite.
+
+    A dedicated endpoint rather than a field on the generic ``update_course``
+    body — that update loop only ever SETS a non-None field, never clears
+    one to null (true for every field there, not something introduced
+    here), and a prerequisite genuinely needs to be clearable.
+    """
+    statement = select(Course).where(Course.course_uuid == course_uuid)
+    course = (await db_session.execute(statement)).scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.UPDATE)
+
+    if prerequisite_course_id is not None:
+        if prerequisite_course_id == course.id:
+            raise HTTPException(status_code=400, detail="A course cannot be its own prerequisite")
+
+        prereq_statement = select(Course).where(Course.id == prerequisite_course_id)
+        prerequisite = (await db_session.execute(prereq_statement)).scalars().first()
+        if not prerequisite:
+            raise HTTPException(status_code=404, detail="Prerequisite course not found")
+        if prerequisite.org_id != course.org_id:
+            raise HTTPException(status_code=400, detail="Prerequisite course must be in the same organization")
+
+    course.prerequisite_course_id = prerequisite_course_id
+    course.update_date = str(datetime.now())
+    db_session.add(course)
+    await db_session.commit()
+    await db_session.refresh(course)
+
+    authors_statement = (
+        select(ResourceAuthor, User)
+        .join(User, ResourceAuthor.user_id == User.id)  # type: ignore
+        .where(ResourceAuthor.resource_uuid == course.course_uuid)
+        .order_by(ResourceAuthor.id.asc())  # type: ignore
+    )
+    author_results = (await db_session.execute(authors_statement)).all()
+    authors = [
+        AuthorWithRole(
+            user=UserRead.model_validate(user),
+            authorship=resource_author.authorship,
+            authorship_status=resource_author.authorship_status,
+            creation_date=resource_author.creation_date,
+            update_date=resource_author.update_date,
+        )
+        for resource_author, user in author_results
+    ]
+
+    return CourseRead(**course.model_dump(), authors=authors)
+
+
 async def delete_course(
     request: Request,
     course_uuid: str,

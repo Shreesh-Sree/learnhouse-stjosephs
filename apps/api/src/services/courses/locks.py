@@ -13,9 +13,13 @@ to be checked at once without N+1 queries.
 
 from typing import Iterable
 
+from sqlalchemy import func
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from src.db.courses.activities import Activity
+from src.db.courses.chapter_activities import ChapterActivity
+from src.db.trail_steps import TrailStep
 from src.db.user_organizations import UserOrganization
 from src.db.usergroup_resources import UserGroupResource
 from src.db.usergroup_user import UserGroupUser
@@ -110,3 +114,43 @@ async def is_locked_for_user(
         acting_user_id, [resource_uuid], db_session
     )
     return resource_uuid not in accessible
+
+
+async def is_chapter_fully_completed(
+    user_id: int, chapter_id: int, db_session: AsyncSession
+) -> bool:
+    """Pure completion check for one chapter: True iff every PUBLISHED
+    activity in it has a completed TrailStep for this user. Mirrors
+    services.courses.certifications.is_course_fully_completed exactly, just
+    scoped to a chapter instead of a whole course — kept as a separate
+    function rather than a parameter on that one so neither caller has to
+    reason about the other's scope.
+
+    An empty chapter (no published activities) is treated as NOT completed —
+    same reasoning as the course-level check: a prerequisite that can never
+    be satisfied should read as "still blocked", not silently pass everyone.
+    """
+    total_activities = (await db_session.execute(
+        select(func.count(ChapterActivity.id))
+        .join(Activity, Activity.id == ChapterActivity.activity_id)
+        .where(ChapterActivity.chapter_id == chapter_id, Activity.published == True)  # noqa: E712
+    )).scalar_one()
+    if not total_activities:
+        return False
+
+    completed_activities = (await db_session.execute(
+        select(func.count(func.distinct(TrailStep.activity_id)))
+        .join(
+            ChapterActivity,
+            (ChapterActivity.activity_id == TrailStep.activity_id)
+            & (ChapterActivity.chapter_id == chapter_id),
+        )
+        .join(Activity, Activity.id == ChapterActivity.activity_id)
+        .where(
+            TrailStep.user_id == user_id,
+            TrailStep.complete == True,  # noqa: E712
+            Activity.published == True,  # noqa: E712
+        )
+    )).scalar_one()
+
+    return completed_activities >= total_activities

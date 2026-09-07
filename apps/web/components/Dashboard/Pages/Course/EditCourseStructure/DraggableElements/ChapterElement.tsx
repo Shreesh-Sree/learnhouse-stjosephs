@@ -22,6 +22,7 @@ import {
   getChapterUserGroups,
   removeUserGroupFromChapter,
   updateChapter,
+  setChapterPrerequisite,
 } from '@services/courses/chapters'
 import { deleteActivity, updateActivity } from '@services/courses/activities'
 import LockPopover, { LockType } from './LockPopover'
@@ -207,6 +208,28 @@ function ChapterElement(props: ChapterElementProps) {
     }
   }
 
+  async function changeChapterPrerequisite(rawValue: string) {
+    const nextId = rawValue ? parseInt(rawValue, 10) : null
+    try {
+      await setChapterPrerequisite(props.chapter.id, nextId, access_token)
+      const updatedStructure = {
+        ...course.courseStructure,
+        chapters: course.courseStructure.chapters.map((ch: any) =>
+          ch.chapter_uuid === props.chapter.chapter_uuid
+            ? { ...ch, prerequisite_chapter_id: nextId }
+            : ch
+        ),
+      }
+      dispatchCourse({ type: 'setCourseStructure', payload: updatedStructure })
+      dispatchCourse({ type: 'setIsSaved' })
+      toast.success(t('dashboard.courses.structure.activity.toasts.update_success'))
+      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+      revalidateTags(['courses'], props.orgslug)
+    } catch {
+      toast.error(t('dashboard.courses.structure.activity.toasts.update_error'))
+    }
+  }
+
   async function fetchChapterUserGroups() {
     const groups = await getChapterUserGroups(props.chapter.chapter_uuid, access_token)
     return Array.isArray(groups) ? groups : []
@@ -290,6 +313,24 @@ function ChapterElement(props: ChapterElementProps) {
               </div>
             </div>
             <div className="flex items-center space-x-2">
+              <ToolTip content={t('dashboard.courses.structure.actions.prerequisite_chapter', { defaultValue: 'Locked until this chapter is completed' })} side="top">
+                <select
+                  value={props.chapter.prerequisite_chapter_id || ''}
+                  onChange={(e) => changeChapterPrerequisite(e.target.value)}
+                  className="text-[11px] text-neutral-600 border border-neutral-200 rounded-md px-1.5 py-1 outline-none max-w-[9rem]"
+                >
+                  <option value="">
+                    {t('dashboard.courses.structure.actions.no_prerequisite', { defaultValue: 'No prerequisite' })}
+                  </option>
+                  {course.courseStructure.chapters
+                    .filter((ch: any) => ch.chapter_uuid !== props.chapter.chapter_uuid)
+                    .map((ch: any) => (
+                      <option key={ch.chapter_uuid} value={ch.id}>
+                        {ch.name}
+                      </option>
+                    ))}
+                </select>
+              </ToolTip>
               <LockPopover
                 lockType={(props.chapter.lock_type as LockType) || 'public'}
                 onChangeLockType={changeChapterLockType}

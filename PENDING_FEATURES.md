@@ -558,9 +558,50 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
 - Live video conferencing / virtual classroom (embedded Zoom/Meet, or a
   native WebRTC session) — Boards and Podcasts exist for collaboration and
   async audio; nothing covers a live class session.
-- Learning path / prerequisite enforcement (a course or activity stays
-  locked until a prior one is completed) — sequencing beyond the existing
-  chapter order.
+- ~~Learning path / prerequisite enforcement~~ — **done, at both the
+  course and the chapter level.** A course can require another course in
+  the SAME org to be fully completed before a learner may self-enroll
+  (`Course.prerequisite_course_id`, enforced at `add_course_to_trail` —
+  the self-enrollment endpoint); a chapter can require another chapter in
+  the SAME course to be fully completed before it unlocks
+  (`Chapter.prerequisite_chapter_id`, enforced in the existing
+  per-request lock computation both the course-TOC read and the
+  single-activity read already run). "Fully completed" reuses the exact
+  definition every other completion-gated feature in this app already
+  relies on (`is_course_fully_completed` for courses;
+  a new `is_chapter_fully_completed` — same COUNT-aggregate shape, just
+  scoped to a chapter instead of a whole course — for chapters), so a
+  learner's certificate-eligibility, at-risk "low progress" signal, and
+  prerequisite status can never quietly disagree about what "completed"
+  means. The prerequisite gate is deliberately INDEPENDENT of the existing
+  usergroup-restriction lock: a usergroup grant unlocks RESTRICTED content
+  for someone who's allowed to see it, but never bypasses the prerequisite
+  sequencing — verified with a standalone script covering every
+  restriction/prerequisite/usergroup-grant combination, including the
+  cases that must NOT unlock (restricted-and-unmet, granted-but-unmet).
+  `ChapterRead`/`ActivityRead` gained a `lock_reason` field
+  ("restricted" | "prerequisite" | null) alongside the pre-existing
+  `is_locked` boolean, so the frontend can render "join a group" vs
+  "finish chapter X first" instead of one generic locked state. Both
+  levels get dedicated set/clear endpoints
+  (`PUT /courses/{uuid}/prerequisite`, `PUT /chapters/{id}/prerequisite`)
+  rather than folding into the generic course/chapter update endpoints,
+  since those update loops only ever SET a non-None field and can never
+  clear one — a prerequisite genuinely needs to be un-settable. Bulk
+  roster import (instructor-driven enrollment) deliberately bypasses the
+  course-level prerequisite — that's an explicit override, not a
+  loophole. KNOWN LIMITATIONS: (1) no cycle detection across a chain of
+  prerequisites (course A requires B requires A) — the self-reference
+  case (a course/chapter requiring itself) IS rejected, but a longer
+  cycle through several courses/chapters is not caught, and would simply
+  make every course in the cycle permanently unenrollable; (2) no
+  UI badge on the course card itself showing "locked, complete X first"
+  before a learner tries to enroll — the requirement is only surfaced (a)
+  informationally in the instructor's own prerequisite-setting dropdown
+  and (b) as a clear 403 message at the moment of the enroll attempt,
+  to avoid adding per-viewer completion computation to the course-metadata
+  endpoint's existing anonymous-response cache path. Needs
+  real-environment verification like everything else this session.
 - Native mobile app wrapper (iOS/Android) — large, long-term scope; only
   worth it once the web app's mobile experience is confirmed insufficient
   on its own.

@@ -21,6 +21,7 @@ from fastapi import HTTPException, status, Request
 from src.security.rbac import check_resource_access, AccessAction
 from src.services.courses.locks import (
     batch_accessible_restricted_uuids,
+    is_chapter_fully_completed,
     is_locked_for_user,
     is_org_admin,
 )
@@ -185,6 +186,48 @@ async def update_chapter(
         )
 
     return chapter
+
+
+async def set_chapter_prerequisite(
+    request: Request,
+    chapter_id: int,
+    prerequisite_chapter_id: int | None,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> ChapterRead:
+    """Set or clear this chapter's learning-path prerequisite. A dedicated
+    endpoint for the same reason services.courses.courses.set_course_prerequisite
+    is one: the generic update loop only ever sets a non-None field."""
+    statement = select(Chapter).where(Chapter.id == chapter_id)
+    chapter = (await db_session.execute(statement)).scalars().first()
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter does not exist")
+
+    course_statement = select(Course).where(Course.id == chapter.course_id)
+    course = (await db_session.execute(course_statement)).scalars().first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course does not exist")
+
+    await check_resource_access(request, db_session, current_user, course.course_uuid, AccessAction.UPDATE)
+
+    if prerequisite_chapter_id is not None:
+        if prerequisite_chapter_id == chapter.id:
+            raise HTTPException(status_code=400, detail="A chapter cannot be its own prerequisite")
+
+        prereq_statement = select(Chapter).where(Chapter.id == prerequisite_chapter_id)
+        prerequisite = (await db_session.execute(prereq_statement)).scalars().first()
+        if not prerequisite:
+            raise HTTPException(status_code=404, detail="Prerequisite chapter not found")
+        if prerequisite.course_id != chapter.course_id:
+            raise HTTPException(status_code=400, detail="Prerequisite chapter must be in the same course")
+
+    chapter.prerequisite_chapter_id = prerequisite_chapter_id
+    chapter.update_date = str(datetime.now())
+    db_session.add(chapter)
+    await db_session.commit()
+    await db_session.refresh(chapter)
+
+    return await get_chapter(request, chapter.id, current_user, db_session)  # type: ignore
 
 
 async def delete_chapter(
@@ -430,7 +473,24 @@ async def _apply_locks_to_chapters(
             accessible_restricted_uuids=accessible,
             is_admin=admin,
         )
+        chapter_lock_reason = "restricted" if chapter_locked else None
+
+        # Learning-path prerequisite — a SEQUENCING gate, independent of the
+        # usergroup-permission gate above: even a user a usergroup grants
+        # access to must still complete the prerequisite chapter first. Only
+        # evaluated when the restriction check above didn't already lock it,
+        # since a chapter is never shown as locked for two reasons at once
+        # (see ChapterRead.lock_reason's docstring).
+        if not chapter_locked and chapter.prerequisite_chapter_id:
+            prerequisite_met = await is_chapter_fully_completed(
+                acting_user_id, chapter.prerequisite_chapter_id, db_session
+            )
+            if not prerequisite_met:
+                chapter_locked = True
+                chapter_lock_reason = "prerequisite"
+
         chapter.is_locked = chapter_locked
+        chapter.lock_reason = chapter_lock_reason
         if chapter_locked:
             chapter.description = ""
             chapter.thumbnail_image = ""
@@ -438,8 +498,10 @@ async def _apply_locks_to_chapters(
         for activity in chapter.activities:
             if chapter_locked:
                 activity_locked = True
+                activity_lock_reason = chapter_lock_reason
             elif course_grants_access:
                 activity_locked = False
+                activity_lock_reason = None
             else:
                 activity_locked = await is_locked_for_user(
                     activity.lock_type,
@@ -450,7 +512,9 @@ async def _apply_locks_to_chapters(
                     accessible_restricted_uuids=accessible,
                     is_admin=admin,
                 )
+                activity_lock_reason = "restricted" if activity_locked else None
             activity.is_locked = activity_locked
+            activity.lock_reason = activity_lock_reason
             if activity_locked:
                 activity.content = {}
                 activity.details = None

@@ -57,6 +57,12 @@ class CourseBase(SQLModel):
     public: bool
     published: bool = Field(default=False)
     open_to_contributors: bool
+    # Learning-path prerequisite: another course in the same org that must be
+    # fully completed (services.courses.certifications.is_course_fully_completed)
+    # before a learner may access this one. None = no prerequisite. Plain int
+    # here (no FK) — only the `Course` table class below needs the real
+    # ForeignKey; every other subclass just needs the id round-tripped.
+    prerequisite_course_id: Optional[int] = None
 
 
 class Course(CourseBase, table=True):
@@ -77,6 +83,12 @@ class Course(CourseBase, table=True):
     update_date: str = ""
     seo: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
     extra_metadata: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    # ON DELETE SET NULL rather than CASCADE: deleting the prerequisite course
+    # should un-gate this one, never delete it as a side effect.
+    prerequisite_course_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("course.id", ondelete="SET NULL"), nullable=True),
+    )
 
 
 class CourseCreate(CourseBase):
@@ -102,6 +114,18 @@ class CourseUpdate(SQLModel):
     open_to_contributors: Optional[bool] = None
     seo: Optional[dict] = None
     extra_metadata: Optional[dict] = None
+    # NOT here: update_course's generic update loop only ever SETS a non-None
+    # field, never clears one to null (true for every field on this model,
+    # not something introduced here) — a prerequisite genuinely needs to be
+    # clearable, so it gets its own dedicated endpoint/service function
+    # instead (services.courses.courses.set_course_prerequisite).
+
+
+class CoursePrerequisiteUpdate(SQLModel):
+    """This endpoint only ever touches one field, so there is no partial-update
+    ambiguity to resolve: an id sets the prerequisite, null (or an omitted
+    body field) clears it."""
+    prerequisite_course_id: Optional[int] = None
 
 
 class CourseRead(CourseBase):

@@ -1,5 +1,6 @@
 import { useCourseFieldSync, useCourse } from '@components/Contexts/CourseContext'
 import LinkToUserGroup from '@components/Objects/Modals/Dash/EditCourseAccess/LinkToUserGroup'
+import CoursePrerequisiteSettings from './CoursePrerequisiteSettings'
 import ConfirmationModal from '@components/Objects/StyledElements/ConfirmationModal/ConfirmationModal'
 import Modal from '@components/Objects/StyledElements/Modal/Modal'
 import { getAPIUrl } from '@services/config/config'
@@ -228,6 +229,13 @@ function EditCourseAccess(_props: EditCourseAccessProps) {
 
                 {/* User groups (Users-table styled) */}
                 {isClientPublic === false && <UserGroupsSection usergroups={usergroups} />}
+
+                {/* Learning-path prerequisite */}
+                <CoursePrerequisiteSettings
+                    course_uuid={courseStructure.course_uuid}
+                    orgslug={org?.slug}
+                    prerequisite_course_id={courseStructure.prerequisite_course_id ?? null}
+                />
             </div>
         </div>
     );

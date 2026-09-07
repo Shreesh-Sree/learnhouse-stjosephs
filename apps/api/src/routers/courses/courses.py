@@ -17,6 +17,7 @@ from src.db.users import PublicUser
 from src.db.courses.courses import (
     Course,
     CourseCreate,
+    CoursePrerequisiteUpdate,
     CourseRead,
     CourseUpdate,
     FullCourseRead,
@@ -38,6 +39,7 @@ from src.services.courses.courses import (
     search_courses,
     get_course_user_rights,
     clone_course,
+    set_course_prerequisite,
 )
 from src.services.courses.updates import (
     create_update,
@@ -592,6 +594,36 @@ async def api_update_course(
     """
     return await update_course(
         request, course_object, course_uuid, current_user, db_session
+    )
+
+
+@router.put(
+    "/{course_uuid}/prerequisite",
+    response_model=CourseRead,
+    summary="Set or clear a course's learning-path prerequisite",
+    description=(
+        "Requires another course in the same organization to be fully "
+        "completed before a learner may self-enroll in this one. Pass "
+        "null (or omit the field) to clear an existing prerequisite. "
+        "Does not affect instructor-driven enrollment (bulk roster import) "
+        "— that remains an explicit override."
+    ),
+    responses={
+        200: {"description": "Prerequisite updated.", "model": CourseRead},
+        400: {"description": "Invalid prerequisite (self-reference or a different organization)"},
+        403: {"description": "User lacks permission to update the course"},
+        404: {"description": "Course or prerequisite course not found"},
+    },
+)
+async def api_set_course_prerequisite(
+    request: Request,
+    course_uuid: str,
+    body: CoursePrerequisiteUpdate,
+    db_session: AsyncSession = Depends(get_db_session),
+    current_user: PublicUser = Depends(get_current_user),
+) -> CourseRead:
+    return await set_course_prerequisite(
+        request, course_uuid, body.prerequisite_course_id, current_user, db_session
     )
 
 

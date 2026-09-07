@@ -107,3 +107,8 @@ class ActivityRead(ActivityBase):
     last_modified_by_username: Optional[str] = None
     # Computed per-request: true if current user cannot access this activity.
     is_locked: bool = False
+    # Computed per-request, only meaningful when is_locked is True — see
+    # ChapterRead.lock_reason's docstring for the possible values. An
+    # activity's own lock_type can independently set "restricted"; a
+    # "prerequisite" reason always comes from its parent chapter cascading.
+    lock_reason: Optional[str] = None

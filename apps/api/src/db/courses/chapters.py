@@ -24,6 +24,12 @@ class ChapterBase(SQLModel):
     course_id: int = Field(
         sa_column=Column("course_id", Integer, ForeignKey("course.id", ondelete="CASCADE"), index=True)
     )
+    # Learning-path prerequisite: another chapter IN THE SAME COURSE that must
+    # be fully completed before a learner may access this one — see
+    # services.courses.locks' prerequisite check. None = no prerequisite.
+    # Plain int here (no FK) — only the `Chapter` table class below needs the
+    # real ForeignKey.
+    prerequisite_chapter_id: Optional[int] = None
 
 
 class Chapter(ChapterBase, table=True):
@@ -32,6 +38,12 @@ class Chapter(ChapterBase, table=True):
     creation_date: str = ""
     update_date: str = ""
     extra_metadata: Optional[dict] = Field(default=None, sa_column=Column(JSONB))
+    # ON DELETE SET NULL rather than CASCADE: deleting the prerequisite
+    # chapter should un-gate this one, never delete it as a side effect.
+    prerequisite_chapter_id: Optional[int] = Field(
+        default=None,
+        sa_column=Column(Integer, ForeignKey("chapter.id", ondelete="SET NULL"), nullable=True),
+    )
 
 
 class ChapterCreate(ChapterBase):
@@ -49,6 +61,12 @@ class ChapterUpdate(SQLModel):
     extra_metadata: Optional[dict] = None
 
 
+class ChapterPrerequisiteUpdate(SQLModel):
+    """An id sets the prerequisite chapter; null (or an omitted field) clears
+    it. See services.courses.chapters.set_chapter_prerequisite."""
+    prerequisite_chapter_id: Optional[int] = None
+
+
 class ChapterRead(ChapterBase):
     id: int
     activities: List[ActivityRead]
@@ -60,6 +78,13 @@ class ChapterRead(ChapterBase):
     # content (and, by cascade, its activities). Metadata (name, thumbnail) is still
     # returned so TOC navigation still renders a lock placeholder.
     is_locked: bool = False
+    # Computed per-request, only meaningful when is_locked is True: which of
+    # the two independent gates caused it. "restricted" = usergroup lock
+    # (lock_type/UserGroupResource, pre-existing); "prerequisite" = this
+    # chapter's own prerequisite_chapter_id isn't fully completed yet by this
+    # user (new). A chapter can be locked by either, but never shows both —
+    # the restricted check runs first since it is the stricter of the two.
+    lock_reason: Optional[str] = None
     pass
 
 

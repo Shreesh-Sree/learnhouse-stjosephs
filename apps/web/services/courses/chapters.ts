@@ -50,6 +50,19 @@ export async function updateChapter(
   return res
 }
 
+export async function setChapterPrerequisite(
+  chapter_id: any,
+  prerequisite_chapter_id: number | null,
+  access_token: any
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}chapters/${chapter_id}/prerequisite`,
+    RequestBodyWithAuthHeader('PUT', { prerequisite_chapter_id }, null, access_token)
+  )
+  const res = await errorHandling(result)
+  return res
+}
+
 export async function updateCourseOrderStructure(
   course_uuid: any,
   data: OrderPayload,

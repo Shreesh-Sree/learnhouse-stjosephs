@@ -474,6 +474,25 @@ async def add_course_to_trail(
         request, db_session, user, course.course_uuid, AccessAction.READ
     )
 
+    # Learning-path prerequisite: block SELF-enrollment (not admin-driven
+    # roster import, which is an instructor override) until the prerequisite
+    # course is fully completed. See services.courses.certifications.
+    # is_course_fully_completed for the completion definition.
+    if course.prerequisite_course_id:
+        from src.services.courses.certifications import is_course_fully_completed
+
+        if not await is_course_fully_completed(user.id, course.prerequisite_course_id, db_session):
+            prereq = (await db_session.execute(
+                select(Course).where(Course.id == course.prerequisite_course_id)
+            )).scalars().first()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Complete \"{prereq.name}\" before enrolling in this course."
+                    if prereq else "Complete the prerequisite course before enrolling in this one."
+                ),
+            )
+
     # check if run already exists
     statement = select(TrailRun).where(
         TrailRun.course_id == course.id, TrailRun.user_id == user.id

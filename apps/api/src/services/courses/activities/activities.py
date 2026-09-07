@@ -22,6 +22,7 @@ from src.security.rbac import check_resource_access, AccessAction
 from src.services.courses.activities.versioning import create_activity_version
 from src.services.courses.locks import (
     batch_accessible_restricted_uuids,
+    is_chapter_fully_completed,
     is_locked_for_user,
     is_org_admin,
 )
@@ -297,12 +298,15 @@ async def _apply_activity_lock(
             acting_user_id, check_uuids, db_session
         )
 
-    # Course-level usergroup membership unlocks everything below it.
-    if course.course_uuid in accessible:
-        return
+    # Course-level usergroup membership unlocks the RESTRICTED-type gate
+    # below, but never the prerequisite gate further down — that one is
+    # about sequencing, not permission, so it applies to everyone the same
+    # way the TOC read (services.courses.chapters._apply_locks_to_chapters)
+    # already treats it.
+    course_grants_access = course.course_uuid in accessible
 
     chapter_locked = False
-    if parent_chapter_row:
+    if parent_chapter_row and not course_grants_access:
         chapter_locked = await is_locked_for_user(
             parent_chapter_row.lock_type,
             parent_chapter_row.chapter_uuid,
@@ -313,14 +317,28 @@ async def _apply_activity_lock(
             is_admin=admin,
         )
 
-    activity_locked = chapter_locked or await is_locked_for_user(
-        activity.lock_type,
-        activity.activity_uuid,
-        course.org_id,
-        current_user,
-        db_session,
-        accessible_restricted_uuids=accessible,
-        is_admin=admin,
+    if (
+        not chapter_locked
+        and parent_chapter_row is not None
+        and parent_chapter_row.prerequisite_chapter_id
+    ):
+        prerequisite_met = await is_chapter_fully_completed(
+            acting_user_id, parent_chapter_row.prerequisite_chapter_id, db_session
+        )
+        if not prerequisite_met:
+            chapter_locked = True
+
+    activity_locked = chapter_locked or (
+        not course_grants_access
+        and await is_locked_for_user(
+            activity.lock_type,
+            activity.activity_uuid,
+            course.org_id,
+            current_user,
+            db_session,
+            accessible_restricted_uuids=accessible,
+            is_admin=admin,
+        )
     )
 
     if activity_locked:

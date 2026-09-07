@@ -71,6 +71,19 @@ export async function updateCourse(course_uuid: any, data: any, access_token:any
   return res
 }
 
+export async function setCoursePrerequisite(
+  course_uuid: string,
+  prerequisite_course_id: number | null,
+  access_token: any
+) {
+  const result: any = await fetch(
+    `${getAPIUrl()}courses/${course_uuid}/prerequisite`,
+    RequestBodyWithAuthHeader('PUT', { prerequisite_course_id }, null, access_token)
+  )
+  const res = await errorHandling(result)
+  return res
+}
+
 export async function getCourse(course_uuid: string, next: any, access_token:any) {
   const result: any = await fetch(
     `${getAPIUrl()}courses/${course_uuid}`,

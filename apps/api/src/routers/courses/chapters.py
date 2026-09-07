@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from src.core.events.database import get_db_session
 from src.db.courses.chapters import (
     ChapterCreate,
+    ChapterPrerequisiteUpdate,
     ChapterRead,
     ChapterUpdate,
     ChapterUpdateOrder,
@@ -14,6 +15,7 @@ from src.services.courses.chapters import (
     get_chapter,
     get_course_chapters,
     reorder_chapters_and_activities,
+    set_chapter_prerequisite,
     update_chapter,
 )
 from src.services.courses.lock_usergroups import (
@@ -186,6 +188,36 @@ async def api_update_coursechapter(
     """
     return await update_chapter(
         request, coursechapter_object, chapter_id, current_user, db_session
+    )
+
+
+@router.put(
+    "/{chapter_id}/prerequisite",
+    response_model=ChapterRead,
+    summary="Set or clear a chapter's learning-path prerequisite",
+    description=(
+        "Requires another chapter in the SAME course to be fully completed "
+        "before a learner may access this one. Pass null (or omit the "
+        "field) to clear an existing prerequisite. Independent of the "
+        "chapter's own lock_type/usergroup restriction — a usergroup grant "
+        "does not bypass this gate."
+    ),
+    responses={
+        200: {"description": "Prerequisite updated.", "model": ChapterRead},
+        400: {"description": "Invalid prerequisite (self-reference or a different course)"},
+        403: {"description": "User lacks permission to modify this chapter"},
+        404: {"description": "Chapter or prerequisite chapter not found"},
+    },
+)
+async def api_set_chapter_prerequisite(
+    request: Request,
+    chapter_id: int,
+    body: ChapterPrerequisiteUpdate,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> ChapterRead:
+    return await set_chapter_prerequisite(
+        request, chapter_id, body.prerequisite_chapter_id, current_user, db_session
     )
 
 
