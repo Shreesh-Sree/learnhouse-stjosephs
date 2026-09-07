@@ -111,6 +111,16 @@ class AssignmentBase(SQLModel):
     # through SEB's own quit UI.
     seb_quit_password: Optional[str] = None
 
+    # Per-attempt duration, independent of due_date (an absolute deadline).
+    # None means no time limit — the attempt is only bounded by due_date, same
+    # as every existing assignment. Enforcement compares against
+    # AssignmentUserSubmission.started_at, which is set once when the learner
+    # explicitly starts the attempt (see services.courses.activities.assignments
+    # start_assignment_attempt) — not inferred from their first answer, so a
+    # file-upload-only assignment (no interactive task touched until the very
+    # end) still has a real, honest start time.
+    time_limit_minutes: Optional[int] = None
+
     org_id: int
     course_id: int
     chapter_id: int
@@ -171,6 +181,7 @@ class AssignmentUpdate(SQLModel):
     solution_reveal: Optional[SolutionRevealEnum] = None
     require_safe_exam_browser: Optional[bool] = None
     seb_quit_password: Optional[str] = None
+    time_limit_minutes: Optional[int] = None
     update_date: Optional[str] = None
 
 
@@ -418,6 +429,12 @@ class AssignmentUserSubmissionBase(SQLModel):
     # AssignmentUserSubmission row tracks the student's latest attempt while
     # still bounding how many times they can resubmit.
     attempt_number: int = 1
+    # When this attempt's clock started, for assignments with time_limit_minutes
+    # set. Written exactly once per attempt by start_assignment_attempt — never
+    # client-settable (absent from Create/Update below) so a student can't push
+    # it backward to buy more time. A retry gets a fresh started_at, same as it
+    # gets a fresh attempt_number: a new attempt is a new clock.
+    started_at: Optional[str] = None
     user_id: int = Field(
         sa_column=Column("user_id", ForeignKey("user.id", ondelete="CASCADE"))
     )

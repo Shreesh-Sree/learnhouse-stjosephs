@@ -1406,12 +1406,13 @@ async def update_assignment(
     # a null is normally read as "not sent" rather than "clear this", because
     # every optional field on AssignmentUpdate defaults to None.
     #
-    # Two fields need to be genuinely clearable, so an explicit null empties
+    # Three fields need to be genuinely clearable, so an explicit null empties
     # them: pass_threshold_percentage back to NULL (the grading-type default),
     # otherwise a set threshold could never be removed and would keep
-    # over-gating certificates; and due_date, so an assignment can be moved to
+    # over-gating certificates; due_date, so an assignment can be moved to
     # a self-paced course and lose its deadline instead of keeping one the
-    # teacher can only ever push further out.
+    # teacher can only ever push further out; and time_limit_minutes, so a
+    # timed assignment can be turned back into an untimed one.
     #
     # The structural foreign keys are never reassigned here: RBAC above only
     # authorizes the assignment's *current* course, so honoring a client-supplied
@@ -1419,7 +1420,7 @@ async def update_assignment(
     # org/course. AssignmentUpdate no longer exposes them; this guard keeps the
     # invariant even if the model regains those fields later.
     IMMUTABLE_FIELDS = frozenset({"org_id", "course_id", "chapter_id", "activity_id"})
-    CLEARABLE_FIELDS = frozenset({"pass_threshold_percentage", "due_date"})
+    CLEARABLE_FIELDS = frozenset({"pass_threshold_percentage", "due_date", "time_limit_minutes"})
     provided = getattr(assignment_object, "model_fields_set", set())
     for var, value in vars(assignment_object).items():
         if var in IMMUTABLE_FIELDS:
