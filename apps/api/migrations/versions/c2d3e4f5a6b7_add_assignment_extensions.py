@@ -3,7 +3,7 @@
 Adds the ``assignment_extension`` table backing per-student assignment
 deadline overrides.
 
-Revision ID: b1c2d3e4f5a6
+Revision ID: c2d3e4f5a6b7
 Revises: a0b1c2d3e4f5
 Create Date: 2026-09-07
 
@@ -16,7 +16,7 @@ import sqlmodel  # noqa: F401
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'b1c2d3e4f5a6'
+revision: str = 'c2d3e4f5a6b7'
 down_revision: Union[str, None] = 'a0b1c2d3e4f5'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
