@@ -87,7 +87,11 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   seeding approach as everything else here. Teacher toggle in the quiz task
   editor. Needs real-environment verification like everything else in this
   session.
-- Shuffled question/answer order per student (lighter-weight than pooling).
+- ~~Shuffled question/answer order per student~~ — **done.**
+  `contents.shuffle_questions` / `shuffle_options` on a QUIZ task, same
+  deterministic seed as the pool feature. Genuinely lighter than pooling
+  turned out to be true: grading matches answers by UUID, never by
+  position, so display-order shuffling needed zero grading-side changes.
 - Webcam proctoring snapshots during a SEB-locked session.
 - Campus IP allowlisting for assignment submission, alongside the SEB check.
 

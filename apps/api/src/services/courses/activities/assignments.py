@@ -439,6 +439,67 @@ def _select_quiz_pool_questions(
     return result
 
 
+def _apply_quiz_display_shuffle(
+    contents: dict,
+    user_id: int,
+    assignment_task_id: int,
+    attempt_number: int,
+) -> dict:
+    """Deterministically shuffle a QUIZ task's DISPLAY order when
+    ``contents["shuffle_questions"]`` and/or ``contents["shuffle_options"]``
+    is set — same seed shape as _select_quiz_pool_questions, applied AFTER
+    it (pooling decides WHICH questions, this decides what ORDER they and
+    their options appear in).
+
+    Unlike pooling, this needs no grading-side counterpart at all:
+    _grade_quiz_task already matches answers by (questionUUID, optionUUID)
+    keys, never by position, so reordering what the student sees changes
+    nothing about how their answers are scored. That asymmetry is
+    deliberate — order is cosmetic, which options exist is not.
+
+    Returns ``contents`` unchanged when neither flag is set.
+    """
+    if not isinstance(contents, dict):
+        return contents
+    shuffle_questions = bool(contents.get("shuffle_questions"))
+    shuffle_options = bool(contents.get("shuffle_options"))
+    if not shuffle_questions and not shuffle_options:
+        return contents
+
+    questions = contents.get("questions")
+    if not isinstance(questions, list) or not questions:
+        return contents
+
+    base_seed = f"{user_id}:{assignment_task_id}:{attempt_number}"
+    questions = list(questions)
+
+    if shuffle_options:
+        shuffled_questions = []
+        for question in questions:
+            if not isinstance(question, dict):
+                shuffled_questions.append(question)
+                continue
+            options = question.get("options")
+            if isinstance(options, list) and len(options) > 1:
+                # Per-question sub-seed so every question's options shuffle
+                # independently — one shared seed would give every question
+                # the same relative reordering.
+                q_uuid = question.get("questionUUID", "")
+                options = list(options)
+                random.Random(f"{base_seed}:{q_uuid}:options").shuffle(options)
+                question = {**question, "options": options}
+            shuffled_questions.append(question)
+        questions = shuffled_questions
+
+    if shuffle_questions:
+        questions = list(questions)
+        random.Random(f"{base_seed}:questions").shuffle(questions)
+
+    result = dict(contents)
+    result["questions"] = questions
+    return result
+
+
 async def _student_may_see_answer_key(
     current_user, assignment, db_session: AsyncSession
 ) -> bool:
@@ -1893,6 +1954,12 @@ async def read_assignment_tasks(
                 assignment_task.id,
                 attempt_number,
             )
+            read.contents = _apply_quiz_display_shuffle(
+                read.contents,
+                getattr(current_user, "id", 0) or 0,
+                assignment_task.id,
+                attempt_number,
+            )
             read.contents = _strip_answer_key(
                 read.contents, keep_answer_keys=reveal_to_student
             )
@@ -1951,6 +2018,12 @@ async def read_assignment_task(
         )
         attempt_number = await _current_attempt_number(current_user, assignment.id, db_session)
         read.contents = _select_quiz_pool_questions(
+            read.contents,
+            getattr(current_user, "id", 0) or 0,
+            assignmenttask.id,
+            attempt_number,
+        )
+        read.contents = _apply_quiz_display_shuffle(
             read.contents,
             getattr(current_user, "id", 0) or 0,
             assignmenttask.id,

@@ -1530,7 +1530,11 @@
       "pool_label": "Question pool",
       "pool_show": "Show",
       "pool_of": "of {{total}} questions, picked at random per student",
-      "pool_hint": "Off: every student sees all {{total}} questions."
+      "pool_hint": "Off: every student sees all {{total}} questions.",
+      "shuffle_label": "Order",
+      "shuffle_questions": "Shuffle questions",
+      "shuffle_options": "Shuffle answer order",
+      "shuffle_hint": "A different order per student — grading is unaffected either way."
     },
     "form": {
       "expected_answer": "Expected"

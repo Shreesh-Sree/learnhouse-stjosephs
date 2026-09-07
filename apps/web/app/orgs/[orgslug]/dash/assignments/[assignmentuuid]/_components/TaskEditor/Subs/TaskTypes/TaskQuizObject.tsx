@@ -116,6 +116,11 @@ function TaskQuizObject({ view, assignmentTaskUUID, user_id, onGraded }: TaskQui
     // receives every question regardless, since pooling only applies to
     // students (see _select_quiz_pool_questions on the API side).
     const [poolSize, setPoolSize] = useState<number | null>(null);
+    // Display-order shuffling: cosmetic only, no grading-side counterpart —
+    // _grade_quiz_task matches answers by UUID, never by position, so
+    // reordering what a student sees changes nothing about scoring.
+    const [shuffleQuestions, setShuffleQuestions] = useState(false);
+    const [shuffleOptions, setShuffleOptions] = useState(false);
 
     const handleQuestionChange = (index: number, value: string) => {
         const updatedQuestions = [...questions];
@@ -206,6 +211,8 @@ function TaskQuizObject({ view, assignmentTaskUUID, user_id, onGraded }: TaskQui
                 questions,
                 grading_mode: gradingMode,
                 pool_size: poolSize,
+                shuffle_questions: shuffleQuestions,
+                shuffle_options: shuffleOptions,
             },
         };
         const res = await updateAssignmentTask(values, assignmentTaskState.assignmentTask.assignment_task_uuid, assignment.assignment_object.assignment_uuid, access_token);
@@ -599,6 +606,8 @@ function TaskQuizObject({ view, assignmentTaskUUID, user_id, onGraded }: TaskQui
             setGradingMode(resolveQuizGradingMode(assignmentTaskState.assignmentTask.contents?.grading_mode));
             const hydratedPoolSize = assignmentTaskState.assignmentTask.contents?.pool_size;
             setPoolSize(typeof hydratedPoolSize === 'number' ? hydratedPoolSize : null);
+            setShuffleQuestions(!!assignmentTaskState.assignmentTask.contents?.shuffle_questions);
+            setShuffleOptions(!!assignmentTaskState.assignmentTask.contents?.shuffle_options);
         }
         // Student area: hydrate from already-fetched context payloads.
         else if (view == 'student') {
@@ -695,6 +704,36 @@ function TaskQuizObject({ view, assignmentTaskUUID, user_id, onGraded }: TaskQui
                                 {t('assignments.quiz.pool_hint', { defaultValue: 'Off: every student sees all {{total}} questions.', total: questions.length })}
                             </p>
                         )}
+                    </div>
+                )}
+                {view === 'teacher' && questions.length > 1 && (
+                    <div className="flex flex-wrap gap-2 items-center mb-4 py-2 px-3 bg-white rounded-md nice-shadow">
+                        <p className="text-xs font-bold text-slate-500">{t('assignments.quiz.shuffle_label', { defaultValue: 'Order' })}</p>
+                        <button
+                            type="button"
+                            aria-pressed={shuffleQuestions}
+                            onClick={() => setShuffleQuestions(!shuffleQuestions)}
+                            className={`text-xs font-bold px-2 py-0.5 rounded-md transition-all ease-linear ${shuffleQuestions
+                                ? 'bg-slate-800 text-white'
+                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                }`}
+                        >
+                            {t('assignments.quiz.shuffle_questions', { defaultValue: 'Shuffle questions' })}
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={shuffleOptions}
+                            onClick={() => setShuffleOptions(!shuffleOptions)}
+                            className={`text-xs font-bold px-2 py-0.5 rounded-md transition-all ease-linear ${shuffleOptions
+                                ? 'bg-slate-800 text-white'
+                                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                }`}
+                        >
+                            {t('assignments.quiz.shuffle_options', { defaultValue: 'Shuffle answer order' })}
+                        </button>
+                        <p className="text-[11px] text-slate-400 basis-full sm:basis-auto">
+                            {t('assignments.quiz.shuffle_hint', { defaultValue: 'A different order per student — grading is unaffected either way.' })}
+                        </p>
                     </div>
                 )}
                 <div className="flex flex-col space-y-6">
