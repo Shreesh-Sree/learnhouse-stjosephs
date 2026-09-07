@@ -46,6 +46,7 @@ import {
     Timer,
     Download,
     Camera,
+    Wifi,
 } from 'lucide-react';
 
 type GradingType = 'ALPHABET' | 'NUMERIC' | 'PERCENTAGE' | 'PASS_FAIL' | 'GPA_SCALE';
@@ -71,6 +72,8 @@ interface Assignment {
     seb_quit_password?: string | null;
     time_limit_minutes?: number | null;
     require_webcam_proctoring?: boolean;
+    require_ip_allowlist?: boolean;
+    ip_allowlist?: string | null;
     assignment_tasks?: any[];
 }
 
@@ -239,6 +242,8 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             time_limit_minutes:
                 typeof assignment.time_limit_minutes === 'number' ? assignment.time_limit_minutes : 60,
             require_webcam_proctoring: assignment.require_webcam_proctoring || false,
+            require_ip_allowlist: assignment.require_ip_allowlist || false,
+            ip_allowlist: assignment.ip_allowlist || '',
         },
         enableReinitialize: true,
         onSubmit: async (values, { setSubmitting }) => {
@@ -258,6 +263,7 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
             // Same convention for the quit password: an emptied field clears
             // it in the DB rather than storing an empty string.
             payload.seb_quit_password = values.seb_quit_password || null;
+            payload.ip_allowlist = values.ip_allowlist || null;
             // time_limit_enabled is a form-only toggle, never sent — it just
             // decides whether time_limit_minutes goes out as a number or an
             // explicit null (clearing it, same convention as due_date above).
@@ -552,6 +558,12 @@ const EditAssignmentForm: React.FC<EditAssignmentFormProps> = ({
                     })}
                     checked={formik.values.require_webcam_proctoring}
                     onChange={(v) => formik.setFieldValue('require_webcam_proctoring', v, true)}
+                />
+                <IpAllowlistRow
+                    checked={formik.values.require_ip_allowlist}
+                    onChange={(v) => formik.setFieldValue('require_ip_allowlist', v, true)}
+                    allowlist={formik.values.ip_allowlist}
+                    onAllowlistChange={(v) => formik.setFieldValue('ip_allowlist', v, true)}
                 />
             </div>
 
@@ -993,6 +1005,80 @@ function SEBRow({
                             })}
                         </p>
                     )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+// Restrict submission to a campus network. The toggle + text field here only
+// write the DB fields — real enforcement happens server-side on every
+// submission-mutating request (see _enforce_ip_allowlist_if_required in the
+// assignments service, which fails CLOSED if the toggle is on but the list
+// is empty or unparseable, so a misconfiguration blocks everyone rather than
+// silently letting them through).
+function IpAllowlistRow({
+    checked,
+    onChange,
+    allowlist,
+    onAllowlistChange,
+}: {
+    checked: boolean;
+    onChange: (_next: boolean) => void;
+    allowlist: string;
+    onAllowlistChange: (_v: string) => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <div className="rounded-xl border nice-shadow bg-white border-gray-100 overflow-hidden">
+            <div className="flex items-start justify-between gap-3 p-3">
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <div className="mt-0.5 flex-none">
+                        <Wifi size={16} className="text-teal-500" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                        <p className="text-xs font-bold text-gray-900">
+                            {t('dashboard.assignments.modals.edit.form.ip_allowlist_label', { defaultValue: 'Restrict to campus network' })}
+                        </p>
+                        <p className="text-[10px] text-gray-500 leading-snug mt-0.5">
+                            {t('dashboard.assignments.modals.edit.form.ip_allowlist_description', {
+                                defaultValue: 'Learners can only submit from an IP address in the list below, e.g. a campus lab or Wi-Fi range.',
+                            })}
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onChange(!checked)}
+                    aria-pressed={checked}
+                    className={`relative flex-none inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                        checked ? 'bg-gray-900' : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                >
+                    <span
+                        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            checked ? 'translate-x-5 rtl:-translate-x-5' : 'translate-x-1 rtl:-translate-x-1'
+                        }`}
+                    />
+                </button>
+            </div>
+            {checked && (
+                <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/50 space-y-1.5">
+                    <label className="text-[11px] font-semibold text-gray-700">
+                        {t('dashboard.assignments.modals.edit.form.ip_allowlist_input_label', { defaultValue: 'Allowed IPs / ranges (one per line)' })}
+                    </label>
+                    <textarea
+                        value={allowlist}
+                        onChange={(e) => onAllowlistChange(e.target.value)}
+                        placeholder={'203.0.113.0/24\n198.51.100.7'}
+                        rows={3}
+                        className={`${textareaClass} font-mono text-xs`}
+                    />
+                    <p className="text-[10px] text-gray-400 leading-snug">
+                        {t('dashboard.assignments.modals.edit.form.ip_allowlist_hint', {
+                            defaultValue: 'One IP or CIDR range per line (commas also work). Ask your IT department for the campus range. An empty list blocks every learner while this is on.',
+                        })}
+                    </p>
                 </div>
             )}
         </div>

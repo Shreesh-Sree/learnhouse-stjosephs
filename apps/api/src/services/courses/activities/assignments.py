@@ -89,6 +89,11 @@ from src.services.courses.activities.seb import (
     generate_seb_config_key,
     is_seb_user_agent,
 )
+from src.services.courses.activities.ip_allowlist import (
+    _enforce_ip_allowlist_if_required,
+    is_ip_allowed,
+)
+from src.services.security.rate_limiting import get_client_ip
 from src.services.email.utils import get_base_url_from_request
 
 # Hard caps for regex answer-matching (defense-in-depth alongside the timeout).
@@ -1549,6 +1554,48 @@ async def check_assignment_seb_status(
     return is_seb_user_agent(request)
 
 
+async def check_assignment_ip_allowlist_status(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
+) -> tuple[bool, str]:
+    """(allowed, client_ip) for this assignment's IP allowlist gate.
+
+    ``allowed`` is always True when the assignment doesn't require an
+    allowlist. ``client_ip`` is returned even when allowed, so the
+    student-facing gate can show it to a blocked student to relay to campus
+    IT — the same read-only, self-facing use as the SEB status endpoint this
+    mirrors.
+
+    Read access only: a student is checking their own gate status, not
+    changing anything.
+    """
+    statement = (
+        select(Assignment, Course.course_uuid)
+        .join(Course, Course.id == Assignment.course_id)  # type: ignore
+        .where(Assignment.assignment_uuid == assignment_uuid)
+    )
+    row = (await db_session.execute(statement)).first()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Assignment not found",
+        )
+
+    assignment, course_uuid = row
+
+    await authorize_assignment_access(request, db_session, current_user, course_uuid, AccessAction.READ)
+
+    client_ip = get_client_ip(request)
+
+    if not assignment.require_ip_allowlist:
+        return True, client_ip
+
+    return is_ip_allowed(client_ip, assignment.ip_allowlist), client_ip
+
+
 async def update_assignment(
     request: Request,
     assignment_uuid: str,
@@ -2179,6 +2226,7 @@ async def put_assignment_task_submission_file(
             detail="Assignment deadline has passed",
         )
     _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit=False)
+    _enforce_ip_allowlist_if_required(assignment, request, is_instructor, is_token_submit=False)
     await _enforce_time_limit_if_set(
         assignment, current_user.id, is_instructor, is_token_submit=False, db_session=db_session
     )
@@ -2553,6 +2601,7 @@ async def handle_assignment_task_submission(
                     detail="Assignment deadline has passed",
                 )
             _enforce_seb_if_required(assignment, request, is_instructor=False, is_token_submit=False)
+            _enforce_ip_allowlist_if_required(assignment, request, is_instructor=False, is_token_submit=False)
             await _enforce_time_limit_if_set(
                 assignment, current_user.id, is_instructor=False, is_token_submit=False, db_session=db_session
             )
@@ -3212,6 +3261,7 @@ async def start_assignment_attempt(
     if _is_assignment_past_due(assignment):
         raise HTTPException(status_code=403, detail="Assignment deadline has passed")
     _enforce_seb_if_required(assignment, request, is_instructor=False, is_token_submit=False)
+    _enforce_ip_allowlist_if_required(assignment, request, is_instructor=False, is_token_submit=False)
 
     statement = select(AssignmentUserSubmission).where(
         AssignmentUserSubmission.assignment_id == assignment.id,
@@ -3321,6 +3371,7 @@ async def create_assignment_submission(
             detail="Assignment deadline has passed",
         )
     _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit)
+    _enforce_ip_allowlist_if_required(assignment, request, is_instructor, is_token_submit)
     await _enforce_time_limit_if_set(
         assignment, submitter.id, is_instructor, is_token_submit, db_session=db_session
     )
@@ -4105,6 +4156,7 @@ async def retry_assignment_submission(
             detail="Assignment deadline has passed",
         )
     _enforce_seb_if_required(assignment, request, is_instructor, is_token_submit=False)
+    _enforce_ip_allowlist_if_required(assignment, request, is_instructor, is_token_submit=False)
 
     # Enforce the attempt cap. max_retries=0 means unlimited; otherwise the
     # current attempt_number must be strictly less than max_retries so the

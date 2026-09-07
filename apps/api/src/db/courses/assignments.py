@@ -130,6 +130,21 @@ class AssignmentBase(SQLModel):
     # nobody asked for.
     require_webcam_proctoring: Optional[bool] = False
 
+    # When True, every submission-mutating request must originate from an IP
+    # address inside `ip_allowlist` (e.g. a campus lab's public IP range).
+    # Enforced server-side (see
+    # services.courses.activities.ip_allowlist._enforce_ip_allowlist_if_required)
+    # at the same call sites as the SEB/time-limit checks; the frontend gate
+    # is a UX courtesy, not the security boundary — same relationship the SEB
+    # gate has to its own server-side enforcement.
+    require_ip_allowlist: Optional[bool] = False
+    # Newline- or comma-separated list of IPv4/IPv6 addresses and/or CIDR
+    # ranges (e.g. "203.0.113.0/24\n198.51.100.7"). A bare address is treated
+    # as a /32 (or /128 for IPv6). Left as free text rather than a JSON array
+    # so a teacher can paste a range list straight from campus IT without
+    # reformatting it.
+    ip_allowlist: Optional[str] = None
+
     org_id: int
     course_id: int
     chapter_id: int
@@ -192,6 +207,8 @@ class AssignmentUpdate(SQLModel):
     seb_quit_password: Optional[str] = None
     time_limit_minutes: Optional[int] = None
     require_webcam_proctoring: Optional[bool] = None
+    require_ip_allowlist: Optional[bool] = None
+    ip_allowlist: Optional[str] = None
     update_date: Optional[str] = None
 
 

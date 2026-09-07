@@ -108,6 +108,22 @@ export async function checkAssignmentSebStatus(
   return res.data ?? { seb_ok: true }
 }
 
+// Whether the CURRENT request's resolved client IP is allowed to submit this
+// assignment. Always allowed: true when the assignment doesn't require an
+// allowlist. client_ip is returned so a blocked student can relay it to
+// campus IT.
+export async function checkAssignmentIpAllowlistStatus(
+  assignmentUUID: string,
+  access_token: string
+): Promise<{ allowed: boolean; client_ip: string }> {
+  const result: any = await fetch(
+    `${getAPIUrl()}assignments/${assignmentUUID}/ip_allowlist_status`,
+    RequestBodyWithAuthHeader('GET', null, null, access_token)
+  )
+  const res = await getResponseMetadata(result)
+  return res.data ?? { allowed: true, client_ip: '' }
+}
+
 // Delete an assignment
 export async function deleteAssignment(
   assignmentUUID: string,

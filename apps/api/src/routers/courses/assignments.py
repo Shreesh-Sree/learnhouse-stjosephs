@@ -23,6 +23,7 @@ from src.services.courses.activities.proctoring import (
     upload_proctoring_snapshot,
 )
 from src.services.courses.activities.assignments import (
+    check_assignment_ip_allowlist_status,
     check_assignment_seb_status,
     create_assignment,
     create_assignment_submission,
@@ -172,6 +173,34 @@ async def api_check_assignment_seb_status(
         request, assignment_uuid, current_user, db_session
     )
     return {"seb_ok": seb_ok}
+
+
+@router.get(
+    "/{assignment_uuid}/ip_allowlist_status",
+    summary="Check IP allowlist status",
+    description=(
+        "Whether this request's resolved client IP is allowed to submit "
+        "this assignment. Always true when the assignment doesn't require "
+        "an allowlist. Also returns the resolved client IP so a blocked "
+        "student can relay it to campus IT."
+    ),
+    responses={
+        200: {"description": "IP allowlist status for this request."},
+        401: {"description": "Authentication required"},
+        403: {"description": "User lacks permission to view this assignment"},
+        404: {"description": "Assignment not found"},
+    },
+)
+async def api_check_assignment_ip_allowlist_status(
+    request: Request,
+    assignment_uuid: str,
+    current_user: PublicUser = Depends(get_current_user),
+    db_session=Depends(get_db_session),
+) -> dict:
+    allowed, client_ip = await check_assignment_ip_allowlist_status(
+        request, assignment_uuid, current_user, db_session
+    )
+    return {"allowed": allowed, "client_ip": client_ip}
 
 
 @router.get(

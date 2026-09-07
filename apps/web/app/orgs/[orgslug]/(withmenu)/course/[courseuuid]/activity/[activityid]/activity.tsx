@@ -52,6 +52,7 @@ const VideoActivity = lazy(() => import('@components/Objects/Activities/Video/Vi
 const DocumentPdfActivity = lazy(() => import('@components/Objects/Activities/DocumentPdf/DocumentPdf'))
 const AssignmentStudentActivity = lazy(() => import('@components/Objects/Activities/Assignment/AssignmentStudentActivity'))
 import AssignmentSebGate from '@components/Objects/Activities/Assignment/AssignmentSebGate'
+import AssignmentIpAllowlistGate from '@components/Objects/Activities/Assignment/AssignmentIpAllowlistGate'
 import AssignmentTimeLimitGate from '@components/Objects/Activities/Assignment/AssignmentTimeLimitGate'
 import AssignmentProctoringConsent from '@components/Objects/Activities/Assignment/AssignmentProctoringConsent'
 // Deadline rule shared with the learner activity view (and mirroring the
@@ -351,6 +352,15 @@ function ActivityClient(props: ActivityClientProps) {
       case 'TYPE_ASSIGNMENT':
         return assignment ? (
           <Suspense fallback={<LoadingFallback />}>
+            {/* IP allowlist gated outermost: a student on the wrong network
+                shouldn't even see the "open in SEB" screen underneath — the
+                network check is the more fundamental gate. Same courtesy
+                relationship to server-side enforcement as the SEB gate. */}
+            <AssignmentIpAllowlistGate
+              requireIpAllowlist={!!assignment?.require_ip_allowlist}
+              assignmentUuid={assignment?.assignment_uuid}
+              accessToken={access_token}
+            >
             {/* Gate first: an assignment requiring Safe Exam Browser shows a
                 blocking screen instead of the providers below when this
                 session doesn't look like SEB. Server-side enforcement is what
@@ -395,6 +405,7 @@ function ActivityClient(props: ActivityClientProps) {
                 </AssignmentProctoringConsent>
               </AssignmentSubmissionProvider>
             </AssignmentSebGate>
+            </AssignmentIpAllowlistGate>
           </Suspense>
         ) : null;
       case 'TYPE_SCORM':

@@ -104,7 +104,21 @@ needs its own investigation pass before implementation, same as SEB/SCORM.
   needs a Bearer token a plain `<img src>` can't carry). Needs
   real-environment verification like everything else in this session,
   camera-permission UX across browsers especially.
-- Campus IP allowlisting for assignment submission, alongside the SEB check.
+- ~~Campus IP allowlisting for assignment submission~~ — **done.** Per-assignment
+  toggle (`assignment.require_ip_allowlist`) plus a free-text
+  `ip_allowlist` field (newline/comma-separated IPs and CIDR ranges).
+  Enforced at the same 5 submission-mutating call sites as the SEB/time-limit
+  checks, with the same instructor/token exemptions; client IP resolution
+  reuses the already-vetted `get_client_ip` from the rate-limiting service
+  rather than a second implementation. Fails CLOSED on misconfiguration — an
+  empty or unparseable list blocks every non-exempt request rather than
+  silently letting everyone through. Teacher toggle + textarea in
+  `EditAssignmentModal.tsx`, student-facing blocking screen
+  (`AssignmentIpAllowlistGate.tsx`, wrapping the SEB gate) shows the
+  student's own resolved IP so they can relay it to campus IT. Needs
+  real-environment verification like everything else in this session —
+  especially the trusted-proxy IP resolution behind whatever reverse proxy
+  a real deployment sits behind.
 
 **Assessment / grading**
 - Group/team assignments (`AssignmentUserSubmission` is currently keyed to a
