@@ -55,26 +55,50 @@ test.describe('Golden path', () => {
       timeout: 15_000,
     })
 
-    const consoleErrors: string[] = []
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text())
-    })
-
-    await page.goto('/orgs/default/dash/courses')
+    // Bare path, no /orgs/{slug} prefix: proxy.ts's tenant-scoped rewrite
+    // (section 11) unconditionally prepends /orgs/{slug} to every incoming
+    // pathname with no guard against a path that already has it — navigating
+    // straight to /orgs/default/dash/... double-prefixes into
+    // /orgs/default/orgs/default/dash/... and 404s. Every dashboard link in
+    // the app itself already navigates with bare paths; only a test/manual
+    // URL would get this wrong.
+    const resp = await page.goto('/dash/courses')
+    expect(resp?.status()).toBe(200)
     // The dashboard shell (sidebar/nav) rendering at all — not a blank
     // error page — is the bar here; there's no seeded course content yet.
     await expect(page.locator('body')).not.toContainText('Application error')
     await expect(page.locator('body')).not.toContainText('500')
   })
-})
 
-// NOT added: a test for the SSO admin settings page
-// (/orgs/{slug}/dash/developers/sso). Attempting to verify it live surfaced
-// a real, pre-existing, unrelated bug — see PENDING_FEATURES.md's "Small
-// cleanup items" — every [subpage]-style dashboard settings route 404s
-// (confirmed for /dash/developers/api, /dash/org/settings/general, and
-// /dash/developers/sso alike, with a fresh dev server and no .next cache),
-// not something introduced by this session's SSO/audit/analytics work. The
-// backend and the OSS_BLOCKED_FEATURES frontend fix are independently
-// verified (real HTTP calls in PENDING_FEATURES.md); a browser-level test
-// of the settings PAGE itself has to wait until that separate bug is fixed.
+  test('SSO admin settings page reflects the real backend, not a paywall card', async ({ page }) => {
+    // Regression test for a chain of bugs found and fixed in this session:
+    // an EE-feature paywall gate (FeatureGate -> useResolvedFeature ->
+    // resolve_feature() backend + planMeetsRequirement's OSS-mode hardcoded
+    // "never meets an enterprise requirement" rule) was hiding this fully
+    // built, working OSS feature behind an "Upgrade to Enterprise" card. See
+    // PENDING_FEATURES.md for the full chain (5 independent layers, each
+    // needing its own fix).
+    await page.goto('/login')
+    await page.locator('input[type="email"]').fill(ADMIN_EMAIL)
+    await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
+    await page.locator('button[type="submit"]').click()
+    await page.waitForURL((url) => !url.pathname.includes('/login'), {
+      timeout: 15_000,
+    })
+
+    const resp = await page.goto('/dash/developers/sso')
+    expect(resp?.status()).toBe(200)
+
+    // Dismiss the first-run onboarding modal if it's covering the page.
+    await page.getByText('Get Started', { exact: false }).click({ timeout: 5_000 }).catch(() => {})
+    await page.getByText("Let's go", { exact: false }).click({ timeout: 3_000 }).catch(() => {})
+
+    // The paywall card's own text — must be absent now that sso resolves as
+    // enabled in OSS mode.
+    await expect(page.locator('body')).not.toContainText('Upgrade to')
+    // The real settings form: a live GET /auth/sso/providers round trip
+    // populated the provider dropdown, defaulted to the first real provider.
+    await expect(page.getByLabel(/sso provider/i).or(page.getByText('SSO Provider'))).toBeVisible()
+    await expect(page.getByText('Issuer URL', { exact: false }).first()).toBeVisible()
+  })
+})

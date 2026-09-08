@@ -53,16 +53,17 @@ const OrgEditSSO: React.FC = () => {
   const [providers, setProviders] = useState<SSOProviderInfo[]>([])
   const [config, setConfig] = useState<SSOConfig | null>(null)
 
-  // Form state
-  const [selectedProvider, setSelectedProvider] = useState<SSOProvider>('workos')
+  // Form state. Only OIDC providers are actually implemented server-side
+  // (keycloak/okta/auth0/custom_oidc — see src/db/sso.py's scope decision:
+  // no WorkOS, no SAML), so there's no per-provider branching here beyond
+  // that — all four share the exact same OIDC field shape.
+  const [selectedProvider, setSelectedProvider] = useState<SSOProvider | ''>('')
   const [enabled, setEnabled] = useState(false)
   const [domains, setDomains] = useState('')
   const [autoProvision, setAutoProvision] = useState(true)
 
-  // WorkOS-specific
-  const [organizationId, setOrganizationId] = useState('')
-
-  // OIDC-specific
+  // OIDC fields — field names match the backend's SSOProviderConfigIn
+  // exactly (issuer/client_id/client_secret/scope, not issuer_url/scopes).
   const [issuerUrl, setIssuerUrl] = useState('')
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
@@ -94,14 +95,17 @@ const OrgEditSSO: React.FC = () => {
         setDomains(configData.domains?.join(', ') || '')
         setAutoProvision(configData.auto_provision_users)
 
-        // WorkOS-specific
-        setOrganizationId(configData.provider_config?.organization_id || '')
-
-        // OIDC-specific
-        setIssuerUrl(configData.provider_config?.issuer_url || '')
+        // Client secret is write-only — the backend never echoes it back
+        // (see SSOConfigRead), so this always starts blank on load; a saved
+        // config keeps its existing secret unless the admin types a new one.
+        setIssuerUrl(configData.provider_config?.issuer || '')
         setClientId(configData.provider_config?.client_id || '')
-        setClientSecret(configData.provider_config?.client_secret || '')
-        setScopes(configData.provider_config?.scopes || 'openid email profile')
+        setClientSecret('')
+        setScopes(configData.provider_config?.scope || 'openid email profile')
+      } else if (providersData.length > 0) {
+        // No config yet — default the dropdown to the first real provider
+        // rather than leaving it on an empty/invalid selection.
+        setSelectedProvider(providersData[0].id)
       }
     } catch (error) {
       console.error('Failed to load SSO data:', error)
@@ -112,7 +116,7 @@ const OrgEditSSO: React.FC = () => {
   }
 
   const handleSave = async () => {
-    if (!org?.id || !access_token) return
+    if (!org?.id || !access_token || !selectedProvider) return
 
     setIsSaving(true)
     const loadingToast = toast.loading(t('dashboard.organization.sso.saving'))
@@ -123,17 +127,18 @@ const OrgEditSSO: React.FC = () => {
         .map((d) => d.trim().toLowerCase())
         .filter((d) => d.length > 0)
 
-      const providerConfig: Record<string, any> = {}
-
-      if (selectedProvider === 'workos') {
-        if (organizationId) {
-          providerConfig.organization_id = organizationId
-        }
-      } else if (selectedProvider === 'custom_oidc') {
-        providerConfig.issuer_url = issuerUrl
-        providerConfig.client_id = clientId
+      // All four supported providers (keycloak/okta/auth0/custom_oidc) share
+      // the same OIDC field shape — see src/db/sso.py.
+      const providerConfig: Record<string, any> = {
+        issuer: issuerUrl,
+        client_id: clientId,
+        scope: scopes,
+      }
+      // Omit rather than send an empty string: the backend keeps the
+      // previously-saved secret on update when client_secret is absent, but
+      // an empty string would be treated as "set it to empty".
+      if (clientSecret) {
         providerConfig.client_secret = clientSecret
-        providerConfig.scopes = scopes
       }
 
       const data = {
@@ -187,7 +192,9 @@ const OrgEditSSO: React.FC = () => {
       setConfig(null)
       setEnabled(false)
       setDomains('')
-      setOrganizationId('')
+      setIssuerUrl('')
+      setClientId('')
+      setClientSecret('')
       toast.success(t('dashboard.organization.sso.delete_success'), {
         id: loadingToast,
       })
@@ -221,7 +228,7 @@ const OrgEditSSO: React.FC = () => {
     return providers.find((p) => p.id === providerId)
   }
 
-  const selectedProviderInfo = getProviderInfo(selectedProvider)
+  const selectedProviderInfo = selectedProvider ? getProviderInfo(selectedProvider) : undefined
 
   if (isLoading && ssoEnabled) {
     return (
@@ -315,46 +322,8 @@ const OrgEditSSO: React.FC = () => {
               )}
             </div>
 
-            {/* Provider-specific configuration */}
-            {selectedProvider === 'workos' && (
-              <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Info className="w-4 h-4" />
-                  {t('dashboard.organization.sso.workos_info')}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="organizationId">
-                    {t('dashboard.organization.sso.workos_org_id')}
-                  </Label>
-                  <Input
-                    id="organizationId"
-                    value={organizationId}
-                    onChange={(e) => setOrganizationId(e.target.value)}
-                    placeholder="org_..."
-                  />
-                  <p className="text-xs text-gray-500">
-                    {t('dashboard.organization.sso.workos_org_id_help')}
-                  </p>
-                </div>
-
-                {config && selectedProviderInfo?.has_setup_portal && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleOpenSetupPortal}
-                    className="flex items-center gap-2"
-                  >
-                    <Settings2 className="w-4 h-4" />
-                    {t('dashboard.organization.sso.open_setup_portal')}
-                    <ExternalLink className="w-3 h-3" />
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* Custom OIDC configuration */}
-            {selectedProvider === 'custom_oidc' && (
+            {/* OIDC configuration — shared by all four supported providers */}
+            {selectedProvider && (
               <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Info className="w-4 h-4" />

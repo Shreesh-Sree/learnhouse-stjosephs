@@ -324,11 +324,15 @@ async def test_enterprise_only_features_follow_the_deployment_not_the_config(db,
 
     The suite pins OSS (conftest sets LEARNHOUSE_DISABLE_EE), so this documents
     where the ceiling actually is: an Enterprise-only feature stays unavailable
-    on a self-hosted OSS install however the demo is configured.
+    on a self-hosted OSS install however the demo is configured — EXCEPT the
+    three EE_ONLY_FEATURES entries that are genuinely real, complete OSS code
+    (sso/scorm/audit_logs — see _OSS_BUILT_EE_FEATURES in
+    security/features_utils/resolve.py and PENDING_FEATURES.md), which resolve
+    as available in OSS mode same as everywhere else.
     """
     from src.core.deployment_mode import EE_ONLY_FEATURES
     from src.db.organization_config import OrganizationConfig
-    from src.security.features_utils.resolve import resolve_feature
+    from src.security.features_utils.resolve import _OSS_BUILT_EE_FEATURES, resolve_feature
 
     org = (
         await db.execute(select(Organization).where(Organization.is_demo.is_(True)))
@@ -341,7 +345,8 @@ async def test_enterprise_only_features_follow_the_deployment_not_the_config(db,
 
     for feature in EE_ONLY_FEATURES:
         resolved = resolve_feature(feature, config.config, org.id)
-        assert resolved["available"] is False
+        expected_available = feature in _OSS_BUILT_EE_FEATURES
+        assert resolved["available"] is expected_available, feature
 
 
 async def test_no_usage_events_are_written(db, synced):

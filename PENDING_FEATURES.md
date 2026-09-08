@@ -121,30 +121,105 @@ Chromium) were all run for real. Results below.
       agree in practice, not just by inspection. (Not covered by the new
       E2E smoke suite — needs a seeded assignment with a time limit set.)
 
-## Known bug found this session — NOT fixed, needs its own investigation
+## Bug found and fixed this session: dashboard settings pages, and the SSO gate chain
 
-- [ ] **Every `[subpage]`-style dashboard settings route 404s**, discovered
-      while browser-verifying the SSO admin settings UI (see the SSO entry
-      below) — completely unrelated to that work, a real pre-existing bug.
-      Confirmed live, authenticated, with a freshly restarted dev server and
-      a cleared `.next` cache (ruling out stale-cache as the cause):
-      `/dash/developers/api`, `/dash/developers/sso`,
-      `/dash/org/settings/general` all return a genuine HTTP 404 — not a
-      client-side redirect, an actual 404 status the Next.js server itself
-      returns. `/dash/developers/api` is a plain, always-available tab with
-      no plan/feature gating at all, so this isn't about the EE-feature gate
-      fix elsewhere in this pass. Not root-caused in this session: checked
-      and ruled out `dynamicParams`/`generateStaticParams` exports (none),
-      an explicit `notFound()` call in the page or its layouts (none found
-      by grep), and `proxy.ts` middleware rewrite rules specific to
-      `/dash/*` (none found) — the actual mechanism is still unknown.
-      Non-`[subpage]` dashboard routes (e.g. `/dash/courses`) work fine, so
-      it's specific to the dynamic-segment pattern, not dashboard routing in
-      general. This blocks real admin usage of the SSO settings UI, org
-      settings (branding/menu/landing/AI/usage/danger tabs), and API/
-      automations/domains/SEO settings alike — worth prioritizing before
-      relying on any of those pages in production. A fresh investigation
-      pass (not a continuation of this one) is the right next step.
+**Update: root-caused and fixed.** What follows was originally written up as
+"every `[subpage]`-style dashboard settings route 404s, needs its own
+investigation" — that write-up was wrong about the cause (blamed the app;
+it was a testing artifact) and incomplete about the real bug underneath it
+(a 5-layer EE-feature gate, only 2 of which had been fixed). Both are now
+actually fixed and verified live in a real browser. Keeping the history here
+since the misdiagnosis is itself worth learning from.
+
+**What looked like the bug**: `/dash/developers/api`, `/dash/developers/sso`,
+`/dash/org/settings/general` all returned a genuine HTTP 404, for every
+`[subpage]`-style dashboard route, even a plan/feature-gate-free tab like
+`api`. Looked systemic and severe.
+
+**What it actually was**: a self-inflicted testing bug, not an app bug.
+`proxy.ts`'s tenant-scoped rewrite (section 11) unconditionally prepends
+`/orgs/{slug}` to every incoming pathname, with no guard against a path that
+already has that prefix. Every test/manual check in this session (and one
+already-committed E2E test, `authenticated session can open the org
+dashboard without erroring`) navigated directly to
+`/orgs/default/dash/...` — which the proxy then rewrites AGAIN into
+`/orgs/default/orgs/default/dash/...`, a route that doesn't exist. The
+existing E2E test's assertions (`not.toContainText('Application error'
+/'500')`) were too weak to catch this — a 404 page says "404!", not
+"Application error" or "500" — so it had been silently passing against a
+404 the whole time. Confirmed by navigating to the bare path instead
+(`/dash/developers/api`, no `/orgs/{slug}` prefix — every real link in the
+app already navigates this way): 200 OK, every time. Fixed the existing
+E2E test to use the bare path and assert on the actual response status
+(`expect(resp?.status()).toBe(200)`) instead of string-matching.
+
+**The real bug this surfaced**, once the wrong URL was out of the way:
+browser-loading the (correctly-routed) SSO settings page showed a "Single
+Sign-On (SSO) is a premium feature... Upgrade to Enterprise" paywall card
+instead of the real settings form — despite the backend and the
+`OSS_BLOCKED_FEATURES` frontend fix (this file, SSO entry below) both being
+correct. Five independent layers had to each say "available" for the page
+to actually render, and only two had been fixed:
+1. Tab visibility in the dashboard nav — `OSS_BLOCKED_FEATURES` in
+   `plans.ts` — **already fixed** (SSO entry below).
+2. The actual backend `resolve_feature()` function
+   (`src/security/features_utils/resolve.py`) — still returned
+   `{enabled: false}` for `sso`/`scorm`/`audit_logs` in OSS mode, because
+   `EE_ONLY_FEATURES` still lists them (correctly — SaaS-mode plan gating
+   needs it) and nothing had special-cased the OSS branch. **Fixed**: added
+   `_OSS_BUILT_EE_FEATURES = frozenset({"sso", "scorm", "audit_logs"})`,
+   checked in the OSS branch before the `EE_ONLY_FEATURES` block, leaving
+   `EE_ONLY_FEATURES`/`plans.py` untouched for SaaS mode. This is the
+   function that populates `org.config.config.resolved_features` — the
+   single source every frontend `FeatureGate` reads.
+3. `OrgEditSSO.tsx`, `OrgAuditLogs.tsx`, and the course page's SCORM upload
+   panel all wrap their content in `<FeatureGate feature="...">`, reading
+   that `resolved_features` value via `useResolvedFeature`. Once (2) was
+   fixed this layer resolved correctly with no further change needed.
+4. **The actual deepest bug**: `resolveGateReason()`
+   (`lib/features/gateReason.ts`) computes `meetsPlan` by comparing
+   `currentPlan` against `required_plan` via `planMeetsRequirement()` —
+   completely independently of the backend's `enabled` flag from (2).
+   `planMeetsRequirement`'s `'oss'` branch hardcodes
+   `return requiredPlan !== 'enterprise'` — i.e. an OSS deployment can
+   *never* meet an `'enterprise'`-tier requirement, no matter what the
+   backend resolved. Since `sso`/`scorm`/`audit_logs` still carry
+   `required_plan: 'enterprise'` (correctly, for SaaS), this silently
+   re-blocked the gate even after (2)'s fix. **Fixed**: `meetsPlan` now
+   trusts the backend (`resolved.enabled === true`) when `currentPlan ===
+   'oss'`, bypassing the static hierarchy check for exactly this case —
+   deliberately scoped to OSS mode only, so a SaaS-mode backend/plan
+   mismatch still gates (a deliberate defense-in-depth test,
+   `tests/feature-gate-lockout.test.mjs`, catches any regression there).
+5. `OrgEditSSO.tsx`'s own form logic had two more, separate bugs once the
+   gate itself opened: it defaulted to a hardcoded `'workos'` provider (not
+   one of the 4 this project actually implements) and sent
+   `issuer_url`/`scopes` field names that don't match the backend's real
+   `SSOProviderConfigIn` schema (`issuer`/`scope`) — every provider except
+   `custom_oidc` would have silently saved an empty config. Fixed: dropped
+   the dead WorkOS-only branch, corrected the field names, extended the
+   shared OIDC field block to all four real providers, and defaulted the
+   dropdown to the first fetched provider instead of an invalid one.
+
+**Verified live, in a real browser, after all five fixes**: the SSO
+settings page at `/dash/developers/sso` loads (200, no 404), shows no
+paywall card, and renders the real form — provider dropdown populated
+from a live `GET /auth/sso/providers` call, defaulted to Keycloak, correct
+Issuer URL/Client ID/Client Secret fields. Added as a real regression test
+in the E2E smoke suite (`SSO admin settings page reflects the real
+backend, not a paywall card`) — 5/5 smoke tests pass. Backend:
+`test_feature_resolve.py`/`test_plan_check.py`/`test_feature_dependencies.py`
+and the rest of the security/orgs test suite pass unchanged. Frontend:
+`bun test tests` 263/263 pass, including the strengthened
+`feature-gate-lockout.test.mjs` (which now specifically pins the OSS-vs-SaaS
+distinction in the fix). Also browser-verified `OrgAuditLogs.tsx`
+(`/dash/users/settings/audit-logs`): no paywall card, real table UI (search/
+filter/export/columns), "No logs found" simply because this session's admin
+hadn't generated matching events — correct empty state, not a gate. Not
+separately re-verified in a browser: the SCORM upload panel on the course
+page, which shares fix (2)/(3) but needs a seeded course to reach — the
+`resolved_features.scorm.enabled: true` API response was confirmed directly,
+but the panel itself wasn't clicked through live.
 
 ## Repo / workflow governance (blocked on GitHub web UI — can't be done from this session)
 

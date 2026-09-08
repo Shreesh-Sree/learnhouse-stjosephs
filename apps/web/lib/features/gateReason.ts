@@ -68,7 +68,21 @@ export function resolveGateReason(input: GateReasonInput): GateReasonResult {
       : null
   const requiredPlan = (resolved?.required_plan ?? (loading ? null : catalogRequired)) as PlanLevel | null
   const enabled = resolved?.enabled !== false
-  const meetsPlan = requiredPlan ? planMeetsRequirement(currentPlan, requiredPlan) : true
+  // OSS-mode exception: sso/scorm/audit_logs are real, complete OSS code
+  // despite carrying required_plan: 'enterprise' (kept for SaaS-mode gating
+  // — see resolve_feature() in the backend). planMeetsRequirement's 'oss'
+  // branch hardcodes false for any 'enterprise' requirement, which would
+  // silently re-block one of these three even after the backend explicitly
+  // resolved it as enabled. Trust the backend here — but ONLY in OSS mode;
+  // in SaaS mode a plan/current-plan mismatch must still gate regardless of
+  // what `enabled` says (defense in depth against a backend resolution bug
+  // that shouldn't be allowed to bypass the paywall).
+  const meetsPlan =
+    currentPlan === 'oss' && resolved?.enabled === true
+      ? true
+      : requiredPlan
+        ? planMeetsRequirement(currentPlan, requiredPlan)
+        : true
 
   let reason: GateReason | undefined
   if (!meetsPlan) reason = 'plan'

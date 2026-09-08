@@ -19,6 +19,12 @@ ALWAYS_ON_FEATURES = {"courses", "usergroups", "assignments"}
 # These are always enabled but their limit comes from the plan config
 ALWAYS_ON_WITH_LIMITS = {"courses"}
 
+# EE_ONLY_FEATURES entries that are nonetheless real, complete OSS code in
+# this project (see the comment at their use below). Kept as its own set
+# rather than editing EE_ONLY_FEATURES itself, so SaaS-mode plan gating for
+# these three is completely unaffected.
+_OSS_BUILT_EE_FEATURES = frozenset({"sso", "scorm", "audit_logs"})
+
 # All known features
 ALL_FEATURES = [
     "ai", "analytics", "api", "assignments", "audit_logs", "boards", "collaboration",
@@ -146,9 +152,23 @@ def resolve_feature(feature: str, config: dict, org_id: int = 0, _extras: dict |
     if mode == "ee":
         return {"enabled": not admin_disabled, "available": True, "limit": 0, "required_plan": required_plan}
 
-    # OSS mode: EE features unavailable, rest available & unlimited
+    # OSS mode: EE features unavailable, rest available & unlimited.
+    #
+    # 'sso', 'scorm' and 'audit_logs' are exceptions: they were built as real,
+    # complete OSS code in this project (independent implementations, not
+    # ports of the withheld apps/api/ee/ modules — see PENDING_FEATURES.md),
+    # so they resolve as available here too rather than through
+    # EE_ONLY_FEATURES, which stays untouched for SaaS-mode plan gating
+    # (FEATURE_PLAN_REQUIREMENTS / plans.py still requires Enterprise for
+    # them there). Without this, every FeatureGate-wrapped surface for these
+    # three (OrgEditSSO, the course-page SCORM upload panel, OrgAuditLogs)
+    # would show a paywall "Upgrade to Enterprise" card in OSS mode even
+    # though the underlying feature works end to end — exactly what browser
+    # verification of the SSO settings page in this session caught: the
+    # backend and the router-level OSS unblock were both already correct,
+    # but this function still told the frontend the feature was unavailable.
     if mode == "oss":
-        if feature in EE_ONLY_FEATURES:
+        if feature in EE_ONLY_FEATURES and feature not in _OSS_BUILT_EE_FEATURES:
             return {"enabled": False, "available": False, "limit": 0, "required_plan": required_plan}
         return {"enabled": not admin_disabled, "available": True, "limit": 0, "required_plan": required_plan}
 

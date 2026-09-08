@@ -185,7 +185,12 @@ class TestFeatureResolve:
             ee_disabled = resolve_feature("analytics", config, org_id=0)
 
         with patch("src.security.features_utils.resolve.get_deployment_mode", return_value="oss"):
-            oss_blocked = resolve_feature("sso", config, org_id=0)
+            # 'payments' stays genuinely EE/SaaS-only in OSS mode — 'sso' no
+            # longer illustrates this: it's real, complete OSS code now (see
+            # _OSS_BUILT_EE_FEATURES), so resolve_feature('sso', ...) in OSS
+            # mode returns available/enabled — see
+            # test_oss_built_ee_features_are_available_in_oss_mode below.
+            oss_blocked = resolve_feature("payments", config, org_id=0)
             oss_allowed = resolve_feature("analytics", config_allowed, org_id=0)
 
         # EE: available (everything is), but the admin toggle still turned it off.
@@ -200,7 +205,7 @@ class TestFeatureResolve:
             "enabled": False,
             "available": False,
             "limit": 0,
-            "required_plan": "enterprise",
+            "required_plan": "standard",
         }
         assert oss_allowed == {
             "enabled": True,
@@ -208,6 +213,30 @@ class TestFeatureResolve:
             "limit": 0,
             "required_plan": "standard",
         }
+
+    def test_oss_built_ee_features_are_available_in_oss_mode(self):
+        """sso/scorm/audit_logs are EE_ONLY_FEATURES entries that are
+        nonetheless real, complete OSS code (see PENDING_FEATURES.md) — they
+        must resolve as available/enabled in OSS mode, unlike the rest of
+        EE_ONLY_FEATURES (payments stays blocked, covered above)."""
+        from src.core.deployment_mode import EE_ONLY_FEATURES
+
+        config = {"config_version": "2.0", "admin_toggles": {}}
+
+        with patch("src.security.features_utils.resolve.get_deployment_mode", return_value="oss"):
+            for feature in ("sso", "scorm", "audit_logs"):
+                resolved = resolve_feature(feature, config, org_id=0)
+                assert resolved["enabled"] is True, feature
+                assert resolved["available"] is True, feature
+                # required_plan is untouched — still 'enterprise' for
+                # SaaS-mode gating, only OSS-mode availability changed.
+                assert resolved["required_plan"] == "enterprise", feature
+
+            # Confirms these three are actually the ONLY exceptions — nothing
+            # else in EE_ONLY_FEATURES got silently unblocked too.
+            for feature in EE_ONLY_FEATURES - {"sso", "scorm", "audit_logs"}:
+                resolved = resolve_feature(feature, config, org_id=0)
+                assert resolved["available"] is False, feature
 
     def test_paid_plan_feature_cannot_be_admin_disabled(self):
         # A feature INCLUDED in a paid plan must stay enabled even when an admin
