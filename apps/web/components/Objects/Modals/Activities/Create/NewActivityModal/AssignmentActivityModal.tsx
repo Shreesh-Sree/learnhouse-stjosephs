@@ -66,35 +66,60 @@ function NewAssignment({ submitActivity: _submitActivity, chapterId, course, clo
       course_id: course?.courseStructure.id,
     }
 
-    const activity_res = await createActivity(
-      activity,
-      chapterId,
-      org?.id,
-      session.data?.tokens?.access_token
-    )
-    const res = await createAssignment(
-      {
-        title: activityName,
-        description: activityDescription,
-        // Empty means no deadline; send null rather than an empty string so the
-        // column reads as unset instead of as a value nothing can parse.
-        due_date: dueDate || null,
-        grading_type: gradingType,
-        ungraded: ungraded,
-        // An ungraded assignment never auto-grades and has no answer key to
-        // reveal — send the consistent state instead of dead flags.
-        auto_grading: ungraded ? false : autoGrading,
-        anti_copy_paste: antiCopyPaste,
-        show_correct_answers: ungraded ? false : showCorrectAnswers,
-        allow_retries: allowRetries,
-        max_retries: allowRetries ? maxRetries : 0,
-        course_id: course?.courseStructure.id,
-        org_id: org?.id,
-        chapter_id: chapterId,
-        activity_id: activity_res?.id,
-      },
-      session.data?.tokens?.access_token
-    )
+    let activity_res: any
+    try {
+      activity_res = await createActivity(
+        activity,
+        chapterId,
+        org?.id,
+        session.data?.tokens?.access_token
+      )
+    } catch (e) {
+      // A network failure here (as opposed to createActivity resolving with
+      // an error payload, handled below) previously left isSubmitting stuck
+      // true forever — a permanently spinning button with no feedback and no
+      // way to retry short of closing the modal. Nothing was created yet, so
+      // just reset and let the user try again.
+      console.error('Failed to create assignment activity:', e)
+      toast.error(t('dashboard.courses.structure.activity.toasts.create_error', { defaultValue: 'Failed to create assignment. Please try again.' }))
+      setIsSubmitting(false)
+      return
+    }
+    let res: any
+    try {
+      res = await createAssignment(
+        {
+          title: activityName,
+          description: activityDescription,
+          // Empty means no deadline; send null rather than an empty string so the
+          // column reads as unset instead of as a value nothing can parse.
+          due_date: dueDate || null,
+          grading_type: gradingType,
+          ungraded: ungraded,
+          // An ungraded assignment never auto-grades and has no answer key to
+          // reveal — send the consistent state instead of dead flags.
+          auto_grading: ungraded ? false : autoGrading,
+          anti_copy_paste: antiCopyPaste,
+          show_correct_answers: ungraded ? false : showCorrectAnswers,
+          allow_retries: allowRetries,
+          max_retries: allowRetries ? maxRetries : 0,
+          course_id: course?.courseStructure.id,
+          org_id: org?.id,
+          chapter_id: chapterId,
+          activity_id: activity_res?.id,
+        },
+        session.data?.tokens?.access_token
+      )
+    } catch (e) {
+      // Same network-failure gap as createActivity above, but the activity
+      // record now exists with no assignment attached — clean it up rather
+      // than leaving an orphaned, broken activity behind.
+      console.error('Failed to create assignment:', e)
+      toast.error(t('dashboard.assignments.modals.create.toasts.error'))
+      await deleteActivity(activity_res.activity_uuid, session.data?.tokens?.access_token).catch(() => {})
+      setIsSubmitting(false)
+      return
+    }
     const toast_loading = toast.loading(
       t('dashboard.assignments.modals.create.toasts.creating')
     )
@@ -121,11 +146,22 @@ function NewAssignment({ submitActivity: _submitActivity, chapterId, course, clo
       )
     }
 
-    await refreshCourseStructureCache(queryClient, course.courseStructure.course_uuid, session.data?.tokens?.access_token)
-    queryClient.invalidateQueries({ queryKey: ['courses'] })
-    queryClient.invalidateQueries({ queryKey: ['assignments'] })
-    setIsSubmitting(false)
-    closeModal()
+    // The assignment/activity creation above already succeeded or failed and
+    // told the user so via toast — this is just a best-effort cache refresh.
+    // If it throws (a transient network hiccup, unlike the create calls above
+    // this was never awaited by the user with a loading toast), don't let
+    // that leave the modal stuck open forever with no obvious way to tell the
+    // creation actually went through.
+    try {
+      await refreshCourseStructureCache(queryClient, course.courseStructure.course_uuid, session.data?.tokens?.access_token)
+      queryClient.invalidateQueries({ queryKey: ['courses'] })
+      queryClient.invalidateQueries({ queryKey: ['assignments'] })
+    } catch (e) {
+      console.error('Failed to refresh course structure cache after assignment creation:', e)
+    } finally {
+      setIsSubmitting(false)
+      closeModal()
+    }
   }
 
   const inputClass =

@@ -339,13 +339,15 @@ class TestFeatureUsage:
             assert await usage.decrease_feature_usage("members", org.id, db) is True
         log_usage.assert_called_once_with(org.id, "members", "remove", db)
 
-        with patch("src.security.features_utils.usage._get_redis_client") as redis_client:
+        with patch("src.security.features_utils.usage.get_deployment_mode", return_value="saas"), \
+             patch("src.security.features_utils.usage._get_redis_client") as redis_client:
             redis_client.return_value.get.return_value = b"2"
             redis_client.return_value.set.return_value = True
             assert await usage.increase_feature_usage("ai", org.id, db) is True
             redis_client.return_value.set.assert_called_once_with("ai_usage:1", 3)
 
-        with patch("src.security.features_utils.usage._get_redis_client") as redis_client:
+        with patch("src.security.features_utils.usage.get_deployment_mode", return_value="saas"), \
+             patch("src.security.features_utils.usage._get_redis_client") as redis_client:
             redis_client.return_value.get.return_value = b"2"
             redis_client.return_value.set.return_value = True
             assert await usage.decrease_feature_usage("ai", org.id, db) is True
@@ -385,12 +387,14 @@ class TestFeatureUsage:
             redis_client.return_value.get.return_value = None
             assert await usage.check_limits_with_usage("ai", org.id, db) is True
 
-        with patch("src.security.features_utils.usage._get_redis_client") as redis_client:
+        with patch("src.security.features_utils.usage.get_deployment_mode", return_value="saas"), \
+             patch("src.security.features_utils.usage._get_redis_client") as redis_client:
             redis_client.return_value.get.return_value = None
             assert await usage.increase_feature_usage("ai", org.id, db) is True
             redis_client.return_value.set.assert_called_once_with("ai_usage:1", 1)
 
-        with patch("src.security.features_utils.usage._get_redis_client") as redis_client:
+        with patch("src.security.features_utils.usage.get_deployment_mode", return_value="saas"), \
+             patch("src.security.features_utils.usage._get_redis_client") as redis_client:
             redis_client.return_value.get.return_value = None
             assert await usage.decrease_feature_usage("ai", org.id, db) is True
             redis_client.return_value.set.assert_called_once_with("ai_usage:1", 0)
@@ -585,3 +589,36 @@ class TestGetOrgConfigCacheHit:
              patch("src.services.orgs.cache.set_cached_org_config"):
             result = await usage._get_org_config(org.id, db)
         assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_increase_decrease_feature_usage_skip_redis_outside_saas(self, db, org):
+        """Regression test: increase/decrease_feature_usage() for a Redis-tracked
+        feature (assignments/usergroups/podcasts/ai — anything not in
+        PLAN_BASED_FEATURES) must never touch Redis outside SaaS mode, since
+        OSS/EE has no usage limits to track and Redis is optional there.
+
+        Found via live end-to-end testing: creating an assignment in an
+        OSS deployment with no Redis running 500'd every single time —
+        increase_feature_usage("assignments", ...) called the then-unguarded
+        _get_redis_client(), which raises HTTPException(500) when Redis is
+        unreachable, and that propagated straight up through
+        create_assignment() to the client as an unhandled server error.
+        """
+        with patch("src.security.features_utils.usage.get_deployment_mode", return_value="oss"), \
+             patch("src.security.features_utils.usage._get_redis_client") as redis_client:
+            assert await usage.increase_feature_usage("assignments", org.id, db) is True
+            assert await usage.decrease_feature_usage("assignments", org.id, db) is True
+        redis_client.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_increase_decrease_feature_usage_fail_open_on_redis_outage(self, db, org):
+        """Even in SaaS mode, a Redis outage while tracking usage must not
+        crash the caller's actual create/delete request — this counter only
+        feeds soft plan-limit enforcement, not the operation itself."""
+        with patch("src.security.features_utils.usage.get_deployment_mode", return_value="saas"), \
+             patch(
+                 "src.security.features_utils.usage._get_redis_client",
+                 side_effect=HTTPException(status_code=500, detail="Redis connection string not found"),
+             ):
+            assert await usage.increase_feature_usage("assignments", org.id, db) is True
+            assert await usage.decrease_feature_usage("assignments", org.id, db) is True

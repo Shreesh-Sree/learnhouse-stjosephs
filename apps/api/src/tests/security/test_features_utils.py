@@ -225,7 +225,8 @@ class TestFeaturesUtils:
     @pytest.mark.asyncio
     async def test_increase_feature_usage_success(self, mock_db_session):
         """Test successful feature usage increase"""
-        with patch('src.security.features_utils.usage._get_redis_client') as mock_redis_client:
+        with patch('src.security.features_utils.usage.get_deployment_mode', return_value='saas'), \
+             patch('src.security.features_utils.usage._get_redis_client') as mock_redis_client:
             mock_redis = Mock()
             mock_redis.get.return_value = b"5"
             mock_redis.set.return_value = True
@@ -244,7 +245,8 @@ class TestFeaturesUtils:
     @pytest.mark.asyncio
     async def test_increase_feature_usage_no_previous_usage(self, mock_db_session):
         """Test feature usage increase when no previous usage exists"""
-        with patch('src.security.features_utils.usage._get_redis_client') as mock_redis_client:
+        with patch('src.security.features_utils.usage.get_deployment_mode', return_value='saas'), \
+             patch('src.security.features_utils.usage._get_redis_client') as mock_redis_client:
             mock_redis = Mock()
             mock_redis.get.return_value = None
             mock_redis.set.return_value = True
@@ -262,7 +264,8 @@ class TestFeaturesUtils:
     @pytest.mark.asyncio
     async def test_decrease_feature_usage_success(self, mock_db_session):
         """Test successful feature usage decrease"""
-        with patch('src.security.features_utils.usage._get_redis_client') as mock_redis_client:
+        with patch('src.security.features_utils.usage.get_deployment_mode', return_value='saas'), \
+             patch('src.security.features_utils.usage._get_redis_client') as mock_redis_client:
             mock_redis = Mock()
             mock_redis.get.return_value = b"5"
             mock_redis.set.return_value = True
@@ -281,7 +284,8 @@ class TestFeaturesUtils:
     @pytest.mark.asyncio
     async def test_decrease_feature_usage_no_previous_usage(self, mock_db_session):
         """Test feature usage decrease when no previous usage exists"""
-        with patch('src.security.features_utils.usage._get_redis_client') as mock_redis_client:
+        with patch('src.security.features_utils.usage.get_deployment_mode', return_value='saas'), \
+             patch('src.security.features_utils.usage._get_redis_client') as mock_redis_client:
             mock_redis = Mock()
             mock_redis.get.return_value = None
             mock_redis.set.return_value = True

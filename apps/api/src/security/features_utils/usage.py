@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from src.db.organization_config import OrganizationConfig
 from src.db.billing_usage import UsageEvent
@@ -410,16 +411,30 @@ async def increase_feature_usage(
         await log_usage_event(org_id, feature, "add", db_session)
         return True
 
-    # Redis-tracked features
-    r = _get_redis_client()
-    feature_usage = r.get(f"{feature}_usage:{org_id}")
-
-    if feature_usage is None:
-        feature_usage_count = 0
-    else:
-        feature_usage_count = int(feature_usage)
-
-    r.set(f"{feature}_usage:{org_id}", feature_usage_count + 1)
+    # Redis-tracked features. This counter only feeds SaaS plan-limit
+    # enforcement (check_limits_with_usage) — OSS/EE has no limits to track
+    # (resolve_feature() always returns limit=0 there, so the check is a
+    # no-op), and Redis is legitimately optional in this project's own
+    # design (get_redis_client() -> Optional[Redis]). _get_redis_client()
+    # raises HTTP 500 when Redis is unreachable, which — unguarded here —
+    # took down the ENTIRE calling request (assignment/usergroup/podcast
+    # creation and deletion) in any Redis-less deployment, confirmed live:
+    # every assignment creation 500'd. Skip the tracking entirely outside
+    # SaaS mode, and fail open (log, don't raise) even in SaaS mode, since a
+    # transient Redis outage tracking a soft usage counter is not a reason
+    # to fail the underlying create/delete the caller actually asked for.
+    if _is_non_saas():
+        return True
+    try:
+        r = _get_redis_client()
+        feature_usage = r.get(f"{feature}_usage:{org_id}")
+        feature_usage_count = 0 if feature_usage is None else int(feature_usage)
+        r.set(f"{feature}_usage:{org_id}", feature_usage_count + 1)
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "increase_feature_usage: Redis unavailable, skipping usage tracking for %s/%s",
+            feature, org_id,
+        )
     return True
 
 
@@ -434,16 +449,20 @@ async def decrease_feature_usage(
         await log_usage_event(org_id, feature, "remove", db_session)
         return True
 
-    # Redis-tracked features
-    r = _get_redis_client()
-    feature_usage = r.get(f"{feature}_usage:{org_id}")
-
-    if feature_usage is None:
-        feature_usage_count = 0
-    else:
-        feature_usage_count = int(feature_usage)
-
-    r.set(f"{feature}_usage:{org_id}", max(0, feature_usage_count - 1))
+    # See increase_feature_usage above for why this is skipped outside SaaS
+    # mode and fails open rather than raising on a Redis outage.
+    if _is_non_saas():
+        return True
+    try:
+        r = _get_redis_client()
+        feature_usage = r.get(f"{feature}_usage:{org_id}")
+        feature_usage_count = 0 if feature_usage is None else int(feature_usage)
+        r.set(f"{feature}_usage:{org_id}", max(0, feature_usage_count - 1))
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "decrease_feature_usage: Redis unavailable, skipping usage tracking for %s/%s",
+            feature, org_id,
+        )
     return True
 
 

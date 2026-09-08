@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import Modal from '@components/Objects/StyledElements/Modal/Modal'
 import NewAssignment from '@components/Objects/Modals/Activities/Create/NewActivityModal/AssignmentActivityModal'
-import { getCourse } from '@services/courses/courses'
+import { getCourseMetadata } from '@services/courses/courses'
 import { getCourseThumbnailMediaDirectory } from '@services/media/media'
 import { getUriWithOrg } from '@services/config/config'
 import { ArrowLeft, BookOpen, Layers, FolderPlus, ChevronRight, PlusCircle, Backpack } from 'lucide-react'
@@ -36,9 +36,16 @@ export default function NewAssignmentModal({
   const [selectedCourseUuid, setSelectedCourseUuid] = useState<string | null>(null)
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null)
 
+  // getCourse() (plain `GET courses/{uuid}`) returns CourseRead, which has no
+  // `chapters` field at all — every course looked like it had zero chapters,
+  // making this whole flow a dead end past step 1 for every course, always.
+  // getCourseMetadata's `/meta` endpoint is the one that actually returns
+  // chapters/activities (FullCourseRead). withUnpublishedActivities: true
+  // because this flow is for admins/authors placing a new assignment, who
+  // need to see draft chapters too, not just published ones.
   const { data: courseDetail, isLoading: courseLoading } = useQuery({
     queryKey: ['assignment-course-structure', selectedCourseUuid],
-    queryFn: () => getCourse(selectedCourseUuid as string, null, access_token),
+    queryFn: () => getCourseMetadata(selectedCourseUuid as string, null, access_token, { withUnpublishedActivities: true }),
     enabled: !!selectedCourseUuid && !!access_token && open,
     staleTime: 30_000,
   })
@@ -59,7 +66,7 @@ export default function NewAssignmentModal({
 
   const chapters: any[] = courseDetail?.chapters || []
   const courseWrapper = courseDetail
-    ? { courseStructure: courseDetail, withUnpublishedActivities: false }
+    ? { courseStructure: courseDetail, withUnpublishedActivities: true }
     : null
 
   const rowBtn =
