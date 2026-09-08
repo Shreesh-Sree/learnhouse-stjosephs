@@ -4,7 +4,7 @@ FastAPI dependencies for feature flag checks and admin authorization.
 These dependencies can be added to routers or individual endpoints
 to check if features are enabled before processing requests.
 """
-from fastapi import Depends, HTTPException, Path, Request
+from fastapi import Depends, HTTPException, Path, Query, Request
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.core.events.database import get_db_session
@@ -34,16 +34,20 @@ FeatureName = Literal[
 # Admin authorization dependency
 # ============================================================================
 
-async def require_org_admin(
-    org_id: int = Path(..., description="Organization ID"),
-    current_user: PublicUser | AnonymousUser | APITokenUser = Depends(get_current_user),
-    db_session: AsyncSession = Depends(get_db_session),
+async def _assert_org_admin(
+    org_id: int,
+    current_user: PublicUser | AnonymousUser | APITokenUser,
+    db_session: AsyncSession,
 ) -> bool:
     """
-    Dependency that verifies the current user is an admin (role_id=1)
-    for the specified organization.
+    Core check behind :func:`require_org_admin`: is the current user an admin
+    (role_id=1) for ``org_id``, or a superadmin?
 
-    Use this at the router level for endpoints that modify org configuration.
+    Pulled out as a plain function (rather than only living inside the
+    ``Path``-bound dependency below) so a route whose ``org_id`` arrives as a
+    query parameter instead of a path segment — FastAPI's ``Path(...)``
+    binding on ``require_org_admin`` only ever matches a ``{org_id}`` URL
+    segment — can still reuse the exact same authorization logic.
 
     Raises:
         HTTPException 401: If user is anonymous
@@ -88,6 +92,32 @@ async def require_org_admin(
         )
 
     return True
+
+
+async def require_org_admin(
+    org_id: int = Path(..., description="Organization ID"),
+    current_user: PublicUser | AnonymousUser | APITokenUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> bool:
+    """
+    Dependency that verifies the current user is an admin (role_id=1)
+    for the specified organization, bound from a ``{org_id}`` PATH segment.
+
+    Use this at the router level for endpoints that modify org configuration.
+    For an endpoint where ``org_id`` is a query parameter instead, use
+    :func:`require_org_admin_query`.
+    """
+    return await _assert_org_admin(org_id, current_user, db_session)
+
+
+async def require_org_admin_query(
+    org_id: int = Query(..., description="Organization ID"),
+    current_user: PublicUser | AnonymousUser | APITokenUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+) -> bool:
+    """Same check as :func:`require_org_admin`, for a route where ``org_id``
+    is a query parameter rather than a path segment."""
+    return await _assert_org_admin(org_id, current_user, db_session)
 
 
 async def _check_feature_enabled(

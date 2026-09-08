@@ -144,22 +144,86 @@ commercial deliverable, not an unfinished community feature. None of the
 below were built, and building them as literal ports of the withheld module
 was declined for that reason.
 
-- **SSO (real IdP integration — SAML/OIDC against an arbitrary school IdP)**.
-  Basic auth (password, 2FA, magic links) already exists in OSS; this would
-  be genuinely new, from-scratch OSS code, not a port.
-- **Payments** — Stripe billing is EE/SaaS only per the README. Nothing to
-  build on for a self-host that isn't selling courses.
-- **Advanced analytics** — deeper reporting/cohort breakdowns layered on top
-  of the analytics that already exist in OSS.
-- **Audit logs (advanced tier)** — the OSS foundation already exists
-  (`user_audit_event` table, a working router, a dashboard page); the EE gate
-  is almost certainly just export/retention/search on top of that.
+- ~~**SSO (real IdP integration — SAML/OIDC against an arbitrary school
+  IdP)**~~ — **done, OIDC only, not SAML/WorkOS.** See `src/db/sso.py`'s
+  module docstring for the full scope reasoning: a correct SAML 2.0
+  implementation needs XML canonicalization and XML-signature verification
+  done exactly right (XSW/wrapping-attack resistance in particular) — the
+  kind of thing you use a vetted library for, not hand-roll, and this
+  project has no SAML dependency. WorkOS (a third-party paid SSO-as-a-service
+  product) is also not implemented — it would reintroduce an external paid
+  dependency for a self-host project whose whole point is no vendor lock-in.
+  Every provider actually supported — **Keycloak, Okta, Auth0, or any other
+  IdP via a generic "custom_oidc" option** (this covers Google Workspace and
+  Microsoft Entra ID/Azure AD too, both fully OIDC-compliant) — goes through
+  one shared discovery + authorization-code-flow + PKCE path, since they all
+  expose a standard `/.well-known/openid-configuration` document.
+  DISCOVERY: this wasn't a build-from-nothing feature. The DB migration
+  (`a1b2c3d4e5f6_add_sso_connection`), the full frontend client
+  (`apps/web/services/auth/sso.ts` — config CRUD, check/authorize/callback,
+  structured error codes, the login-page button) and even the session-
+  provenance constant (`AUTH_METHOD_SSO`) already existed, clearly written
+  against a backend contract that was never implemented — this pass built
+  exactly that missing backend (`src/db/sso.py`, `src/services/auth/
+  sso_oidc.py`, `src/routers/auth_sso.py`) to the existing contract, so
+  **zero frontend changes were needed** — the login page's SSO button
+  already calls `checkSSOEnabled`/`redirectToSSOLogin` correctly.
+  Security: PKCE (S256) even though this is a confidential client (defense
+  in depth against code interception); `state` is itself a short-lived
+  signed JWT carrying the org/nonce/PKCE-verifier rather than a server-side
+  session — works correctly whether or not Redis is configured, consistent
+  with Redis being optional everywhere else in this project; ID tokens are
+  verified by fetching the IdP's JWKS and checking signature + issuer +
+  audience + nonce + expiry (not just decoded unchecked); the client secret
+  is encrypted at rest with the same Fernet helper webhook signing secrets
+  use; outbound calls to the IdP (discovery/token/JWKS) go through the same
+  SSRF guard (`services/utils/ssrf_guard.py`) webhook delivery already uses.
+  Auto-provisioning matches an existing org member by email first (no
+  duplicate account), honors a per-connection `default_role_id`, and can be
+  turned off per-org (`auto_provision_users=false`) to require accounts to
+  already exist. A per-connection email-domain allowlist is supported.
+  VERIFIED FOR REAL, not just by reading: with a live Postgres 16 database
+  and a running backend (this sandbox turned out to have both, same as the
+  rest of this session), exercised the full admin CRUD flow over real HTTP
+  (create/read/update/delete a connection, provider catalog, `check`
+  correctly flipping enabled/disabled) and the real DB-writing user
+  provisioning logic (`_resolve_or_provision_user`/`_join_org`: new-user
+  creation, idempotent re-resolution of the same email with no duplicate,
+  matching an existing org member, `auto_provision_users=false` correctly
+  blocking an unknown email) — all against the actual database, not mocks.
+  Also verified real RS256 ID-token signature/nonce/audience/issuer/expiry
+  checking against a genuine self-signed RSA keypair
+  (`src/tests/services/test_sso_oidc_service.py`, 21 tests, all passing for
+  real). **NOT verifiable in this sandbox**: the actual discovery/token-
+  exchange HTTP calls to a real external IdP — this sandbox forces all
+  outbound HTTPS through a local intercepting proxy for tooling reasons,
+  which makes `assert_connected_peer_allowed`'s post-connect peer check
+  (correctly) see the proxy's own address instead of the IdP's, and reject
+  it — a sandbox artifact, not a code bug (the same guard is already
+  proven-safe elsewhere in this codebase, e.g. webhook delivery). A real
+  deployment without a forced outbound proxy needs a real Keycloak/Okta/
+  Auth0/Google Workspace/Entra ID test to confirm the live discovery/token
+  exchange end to end — the one piece this session's environment could not
+  exercise for real.
+- **Payments** — still not built, deliberately. Stripe billing exists in EE
+  to let a SaaS operator sell course access to the public; a college
+  self-hosting its own courses for its own students has no seller/buyer
+  relationship for this to model. Revisit only if that changes.
+- ~~**Advanced analytics**~~ / ~~**Audit logs (advanced tier)**~~ — see
+  further down this file once built (same "build one feature fully, verify,
+  document" pass as everything else here).
 
-SCORM was the one EE-listed feature (`EE_ONLY_FEATURES` in
-`deployment_mode.py` includes `'scorm'`) that got built anyway, as an
-independent OSS implementation — see the main SCORM work already merged.
-The manifest-parsing edge cases it handles are properties of the public
-SCORM 1.2 / IMS CP spec, not anyone's proprietary logic.
+SCORM and SSO are the two EE-listed features (`EE_ONLY_FEATURES` in
+`deployment_mode.py` still lists `'scorm'` and `'sso'`, matching the
+constant's own SaaS-plan-gating purpose — see below) that got built anyway,
+as independent OSS implementations. Neither router calls the
+`require_org_admin`-style plan-check dependency that constant gates, so
+being listed there does not block either feature in OSS mode; it only stops
+`resolve_feature('sso'|'scorm')` from advertising them to a frontend
+feature-flag check that goes through that path, which neither feature's own
+UI does. Deliberately left the constant itself untouched rather than editing
+shared SaaS-plan-gating config for two unrelated features — the same
+precedent SCORM's own entry already set.
 
 ## Additional feature ideas — brainstormed only, none started
 

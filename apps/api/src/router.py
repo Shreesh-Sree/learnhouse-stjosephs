@@ -18,6 +18,7 @@ from src.routers import api_tokens
 from src.routers import webhooks
 from src.routers import calendar as calendar_router_module
 from src.routers import lti as lti_router_module
+from src.routers import auth_sso as auth_sso_router_module
 from src.routers.integrations import zapier as zapier_integration
 from src.routers.ai import ai, magicblocks, courseplanning, rag, images, quiz, assignment_gen, scenario, audio
 from src.routers.boards import boards_playground
@@ -116,6 +117,8 @@ v1_router.include_router(
 v1_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # Two-factor: enrollment/management plus the /auth/login/mfa challenge.
 v1_router.include_router(mfa_router_module.router, prefix="/auth", tags=["auth"])
+# SSO (OIDC): admin config CRUD + the public check/authorize/callback flow.
+v1_router.include_router(auth_sso_router_module.router, prefix="/auth", tags=["auth"])
 v1_router.include_router(
     orgs.router,
     prefix="/orgs",
