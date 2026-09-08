@@ -101,4 +101,39 @@ test.describe('Golden path', () => {
     await expect(page.getByLabel(/sso provider/i).or(page.getByText('SSO Provider'))).toBeVisible()
     await expect(page.getByText('Issuer URL', { exact: false }).first()).toBeVisible()
   })
+
+  test('SCORM import panel is usable, not gated, in OSS mode', async ({ page }) => {
+    // Regression test for the same EE-feature-gate chain as the SSO test above,
+    // plus a distinct bug found only by clicking through this specific surface:
+    // ImportTypeSelector.tsx rendered a <PlanBadge requiredPlan="enterprise" />
+    // unconditionally next to the SCORM import option. PlanBadge decides
+    // whether to show via planMeetsRequirement(), whose 'oss' branch hardcodes
+    // false for any 'enterprise' requirement — so even though the import
+    // button itself was correctly enabled (it reads resolved_features.scorm
+    // directly), the badge still told admins the feature was locked. Fixed by
+    // only rendering the badge when the resolved feature says it's actually
+    // unavailable, instead of re-deriving that from the plan tier.
+    await page.goto('/login')
+    await page.locator('input[type="email"]').fill(ADMIN_EMAIL)
+    await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
+    await page.locator('button[type="submit"]').click()
+    await page.waitForURL((url) => !url.pathname.includes('/login'), {
+      timeout: 15_000,
+    })
+
+    const resp = await page.goto('/dash/courses')
+    expect(resp?.status()).toBe(200)
+    await page.getByText('Get Started', { exact: false }).click({ timeout: 5_000 }).catch(() => {})
+    await page.getByText("Let's go", { exact: false }).click({ timeout: 3_000 }).catch(() => {})
+
+    await page.getByText('Import Course', { exact: false }).click({ timeout: 10_000 })
+
+    const scormButton = page.getByText('SCORM Package').locator('xpath=ancestor::button')
+    await expect(scormButton).toBeEnabled()
+    await expect(scormButton).not.toContainText('Enterprise')
+
+    await scormButton.click()
+    await expect(page.getByText('Import SCORM', { exact: false })).toBeVisible()
+    await expect(page.getByText('Click to upload or drag and drop', { exact: false })).toBeVisible()
+  })
 })

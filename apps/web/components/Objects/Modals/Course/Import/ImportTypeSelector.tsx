@@ -41,7 +41,16 @@ function ImportTypeSelector({ onSelectType, currentPlan }: ImportTypeSelectorPro
             <h3 className={`font-semibold ${canUseScorm ? 'text-gray-900' : 'text-gray-500'}`}>
               {t('courses.import.scorm_package')}
             </h3>
-            <PlanBadge currentPlan={currentPlan} requiredPlan={(rf?.scorm?.required_plan || 'enterprise') as PlanLevel} size="sm" />
+            {/* PlanBadge's own meetsPlan check goes through planMeetsRequirement,
+                whose 'oss' branch hardcodes false for an 'enterprise' requirement
+                — the same trap fixed in lib/features/gateReason.ts. scorm resolves
+                as genuinely enabled in OSS mode (see resolve_feature() backend),
+                so trust canUseScorm here rather than letting the badge relitigate
+                the plan check and show a misleading "Enterprise" lock on a feature
+                that isn't actually gated. */}
+            {!canUseScorm && (
+              <PlanBadge currentPlan={currentPlan} requiredPlan={(rf?.scorm?.required_plan || 'enterprise') as PlanLevel} size="sm" alwaysShow />
+            )}
           </div>
           <p className={`text-sm text-center ${canUseScorm ? 'text-gray-500' : 'text-gray-400'}`}>
             {t('courses.import.scorm_description')}

@@ -215,11 +215,26 @@ and the rest of the security/orgs test suite pass unchanged. Frontend:
 distinction in the fix). Also browser-verified `OrgAuditLogs.tsx`
 (`/dash/users/settings/audit-logs`): no paywall card, real table UI (search/
 filter/export/columns), "No logs found" simply because this session's admin
-hadn't generated matching events — correct empty state, not a gate. Not
-separately re-verified in a browser: the SCORM upload panel on the course
-page, which shares fix (2)/(3) but needs a seeded course to reach — the
-`resolved_features.scorm.enabled: true` API response was confirmed directly,
-but the panel itself wasn't clicked through live.
+hadn't generated matching events — correct empty state, not a gate.
+
+Also browser-verified the SCORM import panel (`/dash/courses` → "Import
+Course" → "SCORM Package"): clicking through live surfaced a sixth, separate
+bug beyond the five above. The import button itself was already correctly
+enabled — `ImportTypeSelector.tsx` reads `resolved_features.scorm.enabled`
+directly, not through `planMeetsRequirement()` — but it rendered a
+`<PlanBadge requiredPlan="enterprise">` unconditionally next to the option.
+`PlanBadge` decides whether to show via `planMeetsRequirement()`, whose
+`'oss'` branch hardcodes `false` for any `'enterprise'` requirement (the same
+trap as fix 4 above), so it displayed an "Enterprise" lock badge on a button
+that was actually clickable and fully working — misleading, not blocking,
+but still a real bug an admin would trust over the UI actually letting them
+in. Fixed by only rendering the badge when `!canUseScorm`, i.e. trusting the
+already-correct resolved-feature check instead of re-deriving gate state
+from the plan tier a second time. Confirmed live: the "Enterprise" badge is
+gone and the real "Import SCORM" upload step ("Click to upload or drag and
+drop", SCORM 1.2/2004) renders. Added as a permanent regression test,
+`SCORM import panel is usable, not gated, in OSS mode` — 6/6 smoke tests
+pass.
 
 ## Repo / workflow governance (blocked on GitHub web UI — can't be done from this session)
 
