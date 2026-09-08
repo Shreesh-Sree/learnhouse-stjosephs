@@ -60,6 +60,18 @@ self.addEventListener('activate', (event) => {
 })
 
 function isCacheableApiRequest(url) {
+  // with_unpublished_activities=true is sent ONLY by the dashboard course
+  // editor (see CourseContext.tsx / ActivitySwitcher.tsx) — students and
+  // public readers never pass it, so it's a precise signal that this is a
+  // live-editing request, not the read-only offline-viewing case this cache
+  // exists for. Serving a stale-while-revalidate response here meant a
+  // teacher who just created or edited a chapter/activity would not see
+  // their own change without a full page reload: this cache doesn't know
+  // about that write and only catches up on the NEXT GET, one request
+  // behind. Always go straight to the network for these so the editor sees
+  // its own writes immediately; everything else (published-content reads)
+  // keeps the offline cache.
+  if (url.searchParams.get('with_unpublished_activities') === 'true') return false
   return CACHEABLE_API_PATTERNS.some((pattern) => url.pathname.includes(pattern))
 }
 

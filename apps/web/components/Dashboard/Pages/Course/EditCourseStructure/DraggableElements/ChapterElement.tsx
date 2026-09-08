@@ -25,6 +25,7 @@ import {
   setChapterPrerequisite,
 } from '@services/courses/chapters'
 import { deleteActivity, updateActivity } from '@services/courses/activities'
+import { refreshCourseStructureCache } from '@services/courses/courses'
 import LockPopover, { LockType } from './LockPopover'
 import { deleteAssignmentUsingActivityUUID } from '@services/courses/assignments'
 import { revalidateTags } from '@services/utils/ts/requests'
@@ -130,7 +131,7 @@ function ChapterElement(props: ChapterElementProps) {
         )
       }
       clearSelection()
-      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+      await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
       revalidateTags(['courses'], props.orgslug)
     } catch {
       toast.error(
@@ -160,7 +161,7 @@ function ChapterElement(props: ChapterElementProps) {
       )
       clearSelection()
       toast.success(t('dashboard.courses.structure.bulk_actions.delete_success', { count }))
-      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+      await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
       revalidateTags(['courses'], props.orgslug)
     } catch {
       toast.error(t('dashboard.courses.structure.bulk_actions.delete_error'))
@@ -171,7 +172,7 @@ function ChapterElement(props: ChapterElementProps) {
 
   const deleteChapterUI = async () => {
     await deleteChapter(props.chapter.id, access_token)
-    await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+    await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
     await revalidateTags(['courses'], props.orgslug)
     router.refresh()
   }
@@ -182,7 +183,7 @@ function ChapterElement(props: ChapterElementProps) {
         name: modifiedChapter.chapterName,
       }
       await updateChapter(chapterId, modifiedChapterCopy, access_token)
-      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+      await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
       await revalidateTags(['courses'], props.orgslug)
       router.refresh()
     }
@@ -201,7 +202,7 @@ function ChapterElement(props: ChapterElementProps) {
       dispatchCourse({ type: 'setCourseStructure', payload: updatedStructure })
       dispatchCourse({ type: 'setIsSaved' })
       toast.success(t('dashboard.courses.structure.activity.toasts.update_success'))
-      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+      await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
       revalidateTags(['courses'], props.orgslug)
     } catch {
       toast.error(t('dashboard.courses.structure.activity.toasts.update_error'))
@@ -223,7 +224,7 @@ function ChapterElement(props: ChapterElementProps) {
       dispatchCourse({ type: 'setCourseStructure', payload: updatedStructure })
       dispatchCourse({ type: 'setIsSaved' })
       toast.success(t('dashboard.courses.structure.activity.toasts.update_success'))
-      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+      await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
       revalidateTags(['courses'], props.orgslug)
     } catch {
       toast.error(t('dashboard.courses.structure.activity.toasts.update_error'))

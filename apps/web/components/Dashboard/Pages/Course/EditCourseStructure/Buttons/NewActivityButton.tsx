@@ -9,6 +9,7 @@ import {
   createVideoActivityWithProgress,
   updateVideoCaptions,
 } from '@services/courses/activities'
+import { refreshCourseStructureCache } from '@services/courses/courses'
 import { useBackgroundTasks } from '@components/Contexts/BackgroundTasksContext'
 import { getOrganizationContextInfoWithoutCredentials } from '@services/organizations/orgs'
 import { revalidateTags } from '@services/utils/ts/requests'
@@ -62,7 +63,7 @@ function NewActivityButton(props: NewActivityButtonProps) {
     const toast_loading = toast.loading(t('dashboard.courses.structure.activity.toasts.creating'))
     await createActivity(activity, props.chapterId, org.id, access_token)
     track(AnalyticsEvent.ActivityCreated, { activity_type: activity?.type ?? activity?.activity_type })
-    queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(course.courseStructure.course_uuid)) })
+    await refreshCourseStructureCache(queryClient, course.courseStructure.course_uuid, access_token)
     toast.dismiss(toast_loading)
     toast.success(t('dashboard.courses.structure.activity.toasts.create_success'))
     setNewActivityModal(false)
@@ -71,9 +72,7 @@ function NewActivityButton(props: NewActivityButtonProps) {
   }
 
   const refreshStructure = async () => {
-    queryClient.invalidateQueries({
-      queryKey: queryKeys.courses.meta(cleanCourseUuid(course.courseStructure.course_uuid)),
-    })
+    await refreshCourseStructureCache(queryClient, course.courseStructure.course_uuid, access_token)
     await revalidateTags(['courses'], props.orgslug)
     router.refresh()
   }
@@ -155,7 +154,7 @@ function NewActivityButton(props: NewActivityButtonProps) {
       props.chapterId, access_token
     )
     track(AnalyticsEvent.ActivityFileUploaded, { file_type: 'video', upload_succeeded: true })
-    queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(course.courseStructure.course_uuid)) })
+    await refreshCourseStructureCache(queryClient, course.courseStructure.course_uuid, access_token)
     setNewActivityModal(false)
     toast.dismiss(toast_loading)
     toast.success(t('dashboard.courses.structure.activity.toasts.create_success'))

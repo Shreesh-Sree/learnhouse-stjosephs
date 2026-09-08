@@ -42,6 +42,7 @@ import { Draggable } from '@hello-pangea/dnd'
 import { useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@lib/query/keys'
 import { deleteAssignmentUsingActivityUUID, getAssignmentFromActivityUUID } from '@services/courses/assignments'
+import { refreshCourseStructureCache } from '@services/courses/courses'
 import { useOrg } from '@components/Contexts/OrgContext'
 import { useCourse, useCourseDispatch } from '@components/Contexts/CourseContext'
 import toast from 'react-hot-toast'
@@ -124,7 +125,7 @@ function ActivityElement(props: ActivitiyElementProps) {
     }
     dispatchCourse({ type: 'setCourseStructure', payload: updatedStructure })
     dispatchCourse({ type: 'setIsSaved' })
-    queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+    await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
     toast.dismiss(toast_loading)
     toast.success(t('dashboard.courses.structure.activity.toasts.delete_success'))
     revalidateTags(['courses'], props.orgslug)
@@ -149,7 +150,7 @@ function ActivityElement(props: ActivitiyElementProps) {
       dispatchCourse({ type: 'setCourseStructure', payload: updatedStructure })
       dispatchCourse({ type: 'setIsSaved' })
       toast.success(t('dashboard.courses.structure.activity.toasts.update_success'))
-      await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+      await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
       revalidateTags(['courses'], props.orgslug)
     } catch {
       toast.error(t('dashboard.courses.structure.activity.toasts.update_error'))
@@ -193,7 +194,7 @@ function ActivityElement(props: ActivitiyElementProps) {
         dispatchCourse({ type: 'setCourseStructure', payload: updatedStructure })
         dispatchCourse({ type: 'setIsSaved' })
         toast.success(t('dashboard.courses.structure.activity.toasts.update_success'))
-        await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+        await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
         revalidateTags(['courses'], props.orgslug)
       } else {
         toast.error(t('dashboard.courses.structure.activity.toasts.update_error'))
@@ -211,7 +212,7 @@ function ActivityElement(props: ActivitiyElementProps) {
       setIsUpdatingName(true)
       try {
         await updateActivity({ name: modifiedActivity.activityName }, activityUUID, access_token)
-        await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(props.course_uuid)) })
+        await refreshCourseStructureCache(queryClient, props.course_uuid, access_token)
         await revalidateTags(['courses'], props.orgslug)
         toast.success(t('dashboard.courses.structure.activity.toasts.name_update_success'))
         router.refresh()

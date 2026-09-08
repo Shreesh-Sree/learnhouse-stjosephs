@@ -5,6 +5,8 @@ import {
   errorHandling,
   getResponseMetadata,
 } from '@services/utils/ts/requests'
+import type { QueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@lib/query/keys'
 
 /*
  This file includes only POST, PUT, DELETE requests
@@ -60,6 +62,41 @@ export async function getCourseMetadata(
   )
   const res = await errorHandling(result)
   return res
+}
+
+/**
+ * After a course-structure mutation (create/delete/reorder a chapter or
+ * activity), push a genuinely fresh course-meta fetch directly into the
+ * react-query cache with setQueryData rather than calling
+ * invalidateQueries and hoping a background refetch lands.
+ *
+ * Why this exists: invalidateQueries()-triggered background refetches for
+ * the withUnpublished course-meta query were observed, in real end-to-end
+ * testing (Playwright against a live backend), to resolve with STALE data
+ * — missing the activity/chapter that had just been created — even though
+ * a plain fetch() to the exact same URL from the exact same page,
+ * issued moments later, always returned the correct fresh data. The
+ * failure was 100% reproducible: teachers would create a chapter or
+ * activity and never see it appear without a full page reload. The root
+ * cause inside react-query's invalidate → background-refetch pipeline
+ * wasn't pinned down, but setQueryData sidesteps it entirely: it writes
+ * directly into the cache (no fetch involved) and every subscribed
+ * component — including CourseContext's own useQuery — re-renders from
+ * that value synchronously.
+ */
+export async function refreshCourseStructureCache(
+  queryClient: QueryClient,
+  course_uuid: string,
+  access_token: string | null | undefined,
+  withUnpublishedActivities: boolean = true
+) {
+  const cleanUuid = course_uuid.replace(/^course_/, '')
+  const fresh = await getCourseMetadata(cleanUuid, {}, access_token, { withUnpublishedActivities })
+  const key = withUnpublishedActivities
+    ? queryKeys.courses.metaWithUnpublished(cleanUuid)
+    : queryKeys.courses.meta(cleanUuid)
+  queryClient.setQueryData(key, fresh)
+  return fresh
 }
 
 export async function updateCourse(course_uuid: any, data: any, access_token:any) {

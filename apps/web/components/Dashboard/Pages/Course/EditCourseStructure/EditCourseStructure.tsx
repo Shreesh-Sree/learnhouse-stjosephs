@@ -7,6 +7,7 @@ import { queryKeys } from '@lib/query/keys'
 import ChapterElement from './DraggableElements/ChapterElement'
 import PageLoading from '@components/Objects/Loaders/PageLoading'
 import { createChapter } from '@services/courses/chapters'
+import { refreshCourseStructureCache } from '@services/courses/courses'
 import { useRouter } from 'next/navigation'
 import {
   useCourse,
@@ -85,7 +86,7 @@ const EditCourseStructure = (props: EditCourseStructureProps) => {
     track(AnalyticsEvent.ChapterCreated, {
       chapter_count_after: (course_structure?.chapters?.length ?? 0) + 1,
     })
-    await queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(course.courseStructure.course_uuid)) })
+    await refreshCourseStructureCache(queryClient, course.courseStructure.course_uuid, access_token)
     await revalidateTags(['courses'], props.orgslug)
     router.refresh()
     setNewChapterModal(false)

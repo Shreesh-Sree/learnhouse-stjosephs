@@ -8,6 +8,7 @@ import { queryKeys } from '@/lib/query/keys'
 import { createAssignment } from '@services/courses/assignments'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import { createActivity, deleteActivity } from '@services/courses/activities'
+import { refreshCourseStructureCache } from '@services/courses/courses'
 import toast from 'react-hot-toast'
 import { useTranslation } from 'react-i18next'
 import { useLHAnalytics, AnalyticsEvent } from '@services/analytics'
@@ -120,7 +121,7 @@ function NewAssignment({ submitActivity: _submitActivity, chapterId, course, clo
       )
     }
 
-    queryClient.invalidateQueries({ queryKey: queryKeys.courses.meta(cleanCourseUuid(course.courseStructure.course_uuid)) })
+    await refreshCourseStructureCache(queryClient, course.courseStructure.course_uuid, session.data?.tokens?.access_token)
     queryClient.invalidateQueries({ queryKey: ['courses'] })
     queryClient.invalidateQueries({ queryKey: ['assignments'] })
     setIsSubmitting(false)

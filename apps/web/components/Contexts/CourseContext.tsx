@@ -115,7 +115,7 @@ export function CourseProvider({
   // so we fall back to a raw key. The canonical (non-unpublished) variant uses
   // queryKeys.courses.meta so invalidations from save actions land correctly.
   const queryKey = withUnpublishedActivities
-    ? ['course', cleanUuid, 'meta', 'withUnpublished']
+    ? queryKeys.courses.metaWithUnpublished(cleanUuid)
     : queryKeys.courses.meta(cleanUuid)
 
   const { data: courseStructureData, error } = useQuery({

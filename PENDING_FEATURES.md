@@ -289,6 +289,89 @@ Logs tab, and Advanced analytics tab carry no stray Enterprise badge` —
 security/orgs + analytics/audit router suites still 1423 passed / 4
 skipped (both unaffected — this pass was frontend-only).
 
+## End-to-end feature sweep (this session, on request: "test all the features end to end")
+
+Built a broad Playwright suite (`apps/web/e2e/full-sweep.spec.ts`) covering
+every top-level dashboard route reachable from the sidebar — courses,
+assignments, library, communities, podcasts, boards, playgrounds, analytics,
+every Users-settings subpage, every Org-settings subpage, every Developers
+subpage — asserting each returns 200 and renders with no application/server
+error, run against the real Postgres + FastAPI + Next.js stack. **29/29
+pass** with no gate/paywall regressions found beyond the ones already fixed
+earlier in this session.
+
+**The one real bug this pass found — and it's a serious one**: creating a
+chapter or activity in the course editor never appeared in the UI without a
+full page reload. 100% reproducible, on every single create. Root-caused
+through an extensive live debugging session (direct backend curls,
+browser-injected debug logging inside `CourseContext.tsx`'s query hook,
+manual `fetch()` calls from the page context, request/response tracing) that
+initially misdiagnosed this as a `react-query` cache-key mismatch (the
+editor's `useQuery` for course metadata uses a different key,
+`['course', uuid, 'meta', 'withUnpublished']`, than the canonical
+`queryKeys.courses.meta(uuid)` every mutation handler was invalidating) —
+a real, separate bug in its own right, fixed by consolidating both onto a
+shared `queryKeys.courses.metaWithUnpublished()` key and having every
+mutation handler push a directly-fetched fresh response into the cache via
+`setQueryData` (`refreshCourseStructureCache` in `services/courses/courses.ts`)
+rather than relying on `invalidateQueries` + hoping a background refetch
+lands — done in `NewActivityButton.tsx`, `EditCourseStructure.tsx`,
+`ChapterElement.tsx`, `ActivityElement.tsx`, `AssignmentActivityModal.tsx`,
+and `ActivitySwitcher.tsx`.
+
+That alone didn't fix it. The actual root cause was one layer deeper:
+`public/sw.js`, an offline-reading service worker built in an earlier
+session (deliberately caching `GET /api/v1/courses|chapters|activities/...`
+with a stale-while-revalidate strategy so a student's already-opened lesson
+keeps working when campus wifi drops), was intercepting the dashboard
+editor's OWN requests too — including ones carrying
+`with_unpublished_activities=true`, a parameter only the editor ever sends.
+Stale-while-revalidate serves the cached response immediately and updates
+the cache in the background, so every GET made immediately after a write
+returned the state from BEFORE that write, one request behind, no matter
+what triggered it (react-query's own refetch, an explicit manual
+`page.evaluate` fetch — every path was equally intercepted since Service
+Worker interception happens ahead of the browser's own HTTP cache
+semantics, so `cache: 'no-store'` on the fetch init never had a chance to
+matter). This is what actually explained the fully reproducible symptom,
+and it's why the earlier `refreshCourseStructureCache` fix alone wasn't
+sufficient — its own fresh-data fetch was itself served stale by the same
+service worker on the very first call after a mutation.
+
+Fixed at the true source: `isCacheableApiRequest()` in `sw.js` now checks
+for `with_unpublished_activities=true` in the request URL and always goes
+straight to the network for it, leaving the offline-reading cache path
+(used only by published-content readers, who never send that flag)
+completely untouched — the fix is one `if` statement, precisely scoped to
+not regress the offline-reading feature it sits next to.
+
+Verified live end to end: created a throwaway course through the real UI,
+added a chapter, watched it render immediately with zero reload, added an
+activity under it, watched that render immediately too. Ran the same
+create-activity flow 3 times in a row post-fix with zero flakiness (it had
+been 100% reproducible pre-fix, every single time, across roughly 15
+separate manual repro attempts during diagnosis). Added a permanent
+regression test, `creating a chapter and an activity updates the editor
+live`, to `full-sweep.spec.ts` — it creates its own throwaway course rather
+than depending on seeded data, so it's portable to any environment. Frontend
+unit suite still 263/263 (`bun test tests`) after the query-key
+consolidation.
+
+**Not yet covered by this pass** (started but not finished — the course
+editor investigation above consumed most of this session's remaining
+effort): a deep CRUD pass on Assignments (create/submit/grade), Library
+folders, Communities (create/post), Podcasts, Boards, and Playgrounds create
+flows, and the Users/Org/Developers settings *save* actions (the sweep only
+confirms these pages load — it does not yet fill in and submit their forms).
+Also not covered: whether the same stale-while-revalidate service worker
+causes an analogous "my own edit doesn't appear" problem on any OTHER
+editor surface that hits `/api/v1/courses|chapters|activities/...` without
+`with_unpublished_activities=true` in the URL (the SEO tab, Access/roster
+editing, contributor management, and drag-and-drop reordering all mutate
+course-adjacent data through different endpoints/params) — worth a
+follow-up sweep specifically hunting for that pattern elsewhere, now that
+its signature (an edit that requires a hard reload to see) is known.
+
 ## Repo / workflow governance (blocked on GitHub web UI — can't be done from this session)
 
 - [ ] Set `main` as the repository's default branch

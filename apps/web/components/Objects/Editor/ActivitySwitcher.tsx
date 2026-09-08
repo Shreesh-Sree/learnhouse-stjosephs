@@ -17,6 +17,7 @@ import {
 
 import { useAuth } from '@components/Contexts/AuthContext'
 import { getCourseMetadata } from '@services/courses/courses'
+import { queryKeys } from '@lib/query/keys'
 
 interface ActivitySwitcherProps {
   course: { course_uuid: string }
@@ -68,7 +69,7 @@ export default function ActivitySwitcher({
   // Share the cache entry with CourseProvider's withUnpublishedActivities
   // variant so a single fetch backs both consumers.
   const { data } = useQuery({
-    queryKey: ['course', cleanCourseUuid, 'meta', 'withUnpublished'],
+    queryKey: queryKeys.courses.metaWithUnpublished(cleanCourseUuid),
     queryFn: () =>
       getCourseMetadata(
         cleanCourseUuid,

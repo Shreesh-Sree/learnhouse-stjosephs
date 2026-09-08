@@ -14,6 +14,7 @@ export const queryKeys = {
     list: (orgSlug: string) => ['courses', orgSlug] as const,
     detail: (uuid: string) => ['course', uuid] as const,
     meta: (uuid: string) => ['course', uuid, 'meta'] as const,
+    metaWithUnpublished: (uuid: string) => ['course', uuid, 'meta', 'withUnpublished'] as const,
     contributors: (uuid: string) => ['course', uuid, 'contributors'] as const,
     updates: (uuid: string) => ['course', uuid, 'updates'] as const,
     rights: (uuid: string) => ['course', uuid, 'rights'] as const,
