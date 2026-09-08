@@ -521,11 +521,44 @@ Updated that existing test's 4 assertions from 500 to 503 to match the
 now-correct status code. 13/13 tests pass in that file; the broader
 `-k invite` sweep across `src/tests/routers` is 35/35.
 
+### Developers settings — API Access, Automations, Domains, SEO
+
+Continued the sweep into the Developers tabs, actually filling in and
+submitting each form rather than just confirming the pages load.
+
+**API Access** (token creation) works correctly — creating a new API
+token returns 200 and the token appears in the list immediately.
+
+**Automations** (webhooks) works correctly once the right button was
+identified: the page has two elements with overlapping-looking labels
+("Add Endpoint" is the page-level trigger button, "Create Endpoint" is
+the modal's actual submit button), which cost a few failed locator
+guesses before checking real button text via
+`page.locator('button').evaluateAll(...)`. Once pointed at the right
+button, webhook creation returns 200 and the new endpoint appears in the
+list.
+
+**SEO** settings save and persist correctly across a reload.
+
+**Domains** works correctly end-to-end for what can actually be tested in
+this sandbox: submitting "Add Domain" with a fresh hostname returns a
+clean 200 and opens a "Verify Domain" modal with real, distinct TXT
+(`_learnhouse-verification.<host>`) and CNAME (`<host>` →
+`default.learnhouse.io`) records to add at the domain's registrar, plus a
+"Verify DNS" action. This is correctly gated on external DNS ownership
+proof — the same bar used elsewhere in this pass for
+environment-limited features (e.g. AI Playground generation): confirming
+the creation call and verification-pending UI work cleanly, not that a
+real domain can be fully verified from this sandbox. No bug found.
+
+No permanent Playwright regression tests were added for these four —
+unlike the Roles and invite-codes bugs, nothing here needed a fix, so
+there was no specific regression to pin down; `full-sweep.spec.ts`'s
+existing dashboard-route sweep already covers all four pages loading.
+
 **Not yet covered by this pass**: submitting and grading an actual
-assignment (only creation was exercised), and the remaining Developers
-settings *save* actions (the sweep only confirms those pages load — it
-does not yet fill in and submit API Access, Automations, Domains, or SEO
-forms). Also not covered: whether the same stale-while-revalidate
+assignment (only creation was exercised). Also not covered: whether the
+same stale-while-revalidate
 service worker causes an analogous "my own edit doesn't appear" problem on
 any OTHER editor surface that hits
 `/api/v1/courses|chapters|activities/...` without
