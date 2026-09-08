@@ -568,6 +568,70 @@ course-adjacent data through different endpoints/params) — worth a
 follow-up sweep specifically hunting for that pattern elsewhere, now that
 its signature (an edit that requires a hard reload to see) is known.
 
+### Public-facing course/org pages — a severe bug: every course detail page was broken
+
+Continued the sweep to the logged-out, public-facing side of the app (org
+home, `/courses` listing, and `/course/[courseuuid]` detail pages).
+
+**Every public course-detail page (and its activity sub-pages) was
+completely broken**, for anyone, logged in or out. `getCourseMetadata()`
+in `services/courses/courses.ts` builds its request as
+`` `courses/course_${course_uuid}/meta` `` — it prepends `course_` itself
+and expects a bare uuid as input. But the `/course/[courseuuid]` route's
+own param arrives already prefixed (e.g. `course_af165c8f-...`, since
+that's how `course_uuid` is stored and linked-to throughout the app), and
+four call sites on the public viewing path passed that raw param straight
+through instead of stripping the prefix first:
+- `app/orgs/[orgslug]/(withmenu)/course/[courseuuid]/page.tsx`
+  (`generateMetadata`, for SEO tags)
+- `app/orgs/[orgslug]/(withmenu)/course/[courseuuid]/course.tsx` (the
+  client component's own data fetch)
+- `app/orgs/[orgslug]/(withmenu)/course/[courseuuid]/activity/[activityid]/page.tsx`
+  (`generateMetadata`)
+- `hooks/queries/useCourses.ts`'s `useCourseMeta()` hook, shared by the
+  activity page's client component and the embed player
+  (`EmbedActivityClient.tsx`)
+
+Each built a request like `courses/course_course_af165c8f-.../meta` —
+doubling the prefix — which 404'd every time. The client-visible symptom
+was a clean-looking but completely wrong error page: "Unable to access
+this course — This course could not be found or there was an error
+loading it," for a course that was perfectly reachable. `generateMetadata`
+silently swallowed the failure into a fallback title, so even the page
+`<title>`/SEO tags were wrong for every course on the site. This is about
+as severe as a bug gets in an LMS — it meant the core "view a course"
+flow, the entire point of the product, did not work for a single course,
+ever, for any visitor.
+
+Other call sites of `getCourseMetadata()` (in `CourseThumbnail.tsx`,
+`CourseThumbnailLanding.tsx`, `CourseContext.tsx`, `ActivitySwitcher.tsx`,
+the Trail cards, the sitemap route) already stripped the prefix correctly
+via a `.replace('course_', '')`-style normalisation — this bug was
+specifically confined to the four call sites above, all newer/less-touched
+code on the public-viewing path.
+
+Fixed by stripping the `course_` prefix before calling
+`getCourseMetadata()` at each of those four sites, and — matching the
+defensive normalisation `CourseContext.tsx` already did internally —
+moving the strip inside `useCourseMeta()` itself so its two callers can't
+regress this by passing either form. Verified live: temporarily published
+the seeded "SCORM Test Course" fixture, confirmed the network request
+correctly hit `courses/course_af165c8f-.../meta` (single prefix, 200), and
+the course page rendered its real title, description, thumbnail, author,
+and chapter list — then reverted the fixture back to unpublished. Added a
+permanent regression test,
+`Public course page — course-meta request is not double-prefixed`, to
+`full-sweep.spec.ts`; it asserts on the request URL shape itself (not on
+publish/login state), so it stays meaningful regardless of fixture data.
+Full `full-sweep.spec.ts` + `smoke.spec.ts` suite (41 tests) still passes
+after the fix — no regressions.
+
+**Also verified in this pass, no bugs found**: the org home page and the
+`/courses` listing page both load cleanly logged-out with zero console
+errors; the org's "courses require sign-in" gating (shown as a
+"Log in to see your courses" card rather than the raw list) is existing,
+correct org-config behavior, not a bug.
+
 ## Repo / workflow governance (blocked on GitHub web UI — can't be done from this session)
 
 - [ ] Set `main` as the repository's default branch

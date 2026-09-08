@@ -301,3 +301,37 @@ test.describe('Roles — Create a Role does not render twice', () => {
     await expect(page.getByText('Created new role', { exact: false })).toBeVisible({ timeout: 10_000 })
   })
 })
+
+test.describe('Public course page — course-meta request is not double-prefixed', () => {
+  // Regression test: getCourseMetadata() in services/courses/courses.ts builds
+  // its URL as `courses/course_${course_uuid}/meta`, i.e. it prepends "course_"
+  // itself and expects a bare uuid. Several callers on the public course-viewing
+  // path — the /course/[courseuuid] page's generateMetadata and its client
+  // component, the /course/[courseuuid]/activity/[activityid] page, and the
+  // shared useCourseMeta() hook — passed the raw route param straight through
+  // instead, and that param already arrives prefixed (e.g.
+  // "course_af165c8f-..."), so the request built as
+  // "courses/course_course_af165c8f-.../meta" and 404'd every time. This broke
+  // EVERY public course-detail and activity page view, logged in or out — the
+  // page rendered "Unable to access this course" for a course that genuinely
+  // existed and was reachable. Fixed by stripping the "course_" prefix before
+  // calling getCourseMetadata at each of those call sites (and defensively
+  // inside useCourseMeta itself, matching the normalisation CourseContext.tsx
+  // already did). This test asserts on the request URL shape itself — not on
+  // publish/auth state — so it stays valid regardless of whether the fixture
+  // course is published.
+  test('course detail page never requests a course_course_ prefixed meta URL', async ({ page }) => {
+    const metaUrls: string[] = []
+    page.on('request', req => {
+      if (req.url().includes('/meta')) metaUrls.push(req.url())
+    })
+
+    await page.goto('/course/course_af165c8f-bf21-4baf-907b-9db1fed1eef2')
+    await page.waitForTimeout(2000)
+
+    expect(metaUrls.length, 'expected at least one course-meta request').toBeGreaterThan(0)
+    for (const url of metaUrls) {
+      expect(url, 'course-meta URL must not double the course_ prefix').not.toContain('course_course_')
+    }
+  })
+})

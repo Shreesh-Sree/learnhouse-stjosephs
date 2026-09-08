@@ -20,11 +20,15 @@ export function useCourses(orgSlug: string) {
 export function useCourseMeta(courseUuid: string) {
   const session = useLHSession() as any
   const accessToken = session?.data?.tokens?.access_token as string | undefined
+  // getCourseMetadata prepends "course_" itself, so it needs the bare uuid.
+  // Callers pass whatever they have on hand — often the raw "course_..."
+  // route param — so normalise here rather than trusting every call site.
+  const cleanUuid = courseUuid?.replace('course_', '')
 
   return useQuery({
-    queryKey: queryKeys.courses.meta(courseUuid),
-    queryFn: () => getCourseMetadata(courseUuid, {}, accessToken, { slim: true }),
-    enabled: !!courseUuid,
+    queryKey: queryKeys.courses.meta(cleanUuid),
+    queryFn: () => getCourseMetadata(cleanUuid, {}, accessToken, { slim: true }),
+    enabled: !!cleanUuid,
     staleTime: 60_000,
   })
 }

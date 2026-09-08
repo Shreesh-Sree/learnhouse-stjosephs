@@ -27,7 +27,7 @@ export async function generateMetadata(props: MetadataProps): Promise<Metadata> 
       tags: ['organizations'],
     }),
     getCourseMetadata(
-      params.courseuuid,
+      params.courseuuid.replace('course_', ''),
       { revalidate: 120, tags: ['courses'] },
       access_token ?? undefined,
       { slim: true }

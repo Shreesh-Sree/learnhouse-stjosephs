@@ -36,6 +36,11 @@ const CourseClient = (props: any) => {
   const [expandedChapters, setExpandedChapters] = useState<{[key: string]: boolean}>({})
   const [activeThumbnailType, setActiveThumbnailType] = useState<'image' | 'video'>('image')
   const courseuuid = props.courseuuid
+  // getCourseMetadata prepends "course_" itself, so callers must pass the
+  // bare uuid — the route param arrives prefixed (e.g. "course_abc123"),
+  // and passing it straight through built "course_course_abc123", which
+  // 404'd on every course-detail page view (logged in or out).
+  const cleanCourseUuid = courseuuid.replace('course_', '')
   const orgslug = props.orgslug
   const initialCourse = props.course
   const serverError = props.serverError
@@ -47,8 +52,8 @@ const CourseClient = (props: any) => {
   const queryClient = useQueryClient()
 
   const { data: clientCourseData, error: courseError, isLoading: courseLoading } = useQuery({
-    queryKey: queryKeys.courses.meta(courseuuid),
-    queryFn: () => getCourseMetadata(courseuuid, {}, access_token, { slim: true }),
+    queryKey: queryKeys.courses.meta(cleanCourseUuid),
+    queryFn: () => getCourseMetadata(cleanCourseUuid, {}, access_token, { slim: true }),
     enabled: !!courseuuid && !serverError,
     staleTime: 60_000,
     refetchOnWindowFocus: false,

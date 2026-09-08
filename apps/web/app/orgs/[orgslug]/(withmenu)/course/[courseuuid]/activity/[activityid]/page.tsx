@@ -23,7 +23,7 @@ export async function generateMetadata(props: MetadataProps): Promise<Metadata> 
       revalidate: 120,
       tags: ['organizations'],
     }),
-    getCourseMetadata(params.courseuuid, { revalidate: 120, tags: ['courses'] }, access_token || null, { slim: true }),
+    getCourseMetadata(params.courseuuid.replace('course_', ''), { revalidate: 120, tags: ['courses'] }, access_token || null, { slim: true }),
     getActivityWithAuthHeader(
       params.activityid,
       { revalidate: 120, tags: ['activities'] },
