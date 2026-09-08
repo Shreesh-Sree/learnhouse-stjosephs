@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import MagicMock, Mock, patch, AsyncMock
 
 import pytest
 from fastapi import HTTPException
@@ -622,3 +622,48 @@ class TestGetOrgConfigCacheHit:
              ):
             assert await usage.increase_feature_usage("assignments", org.id, db) is True
             assert await usage.decrease_feature_usage("assignments", org.id, db) is True
+
+    @pytest.mark.asyncio
+    async def test_reserve_and_refund_ai_credit_fail_open_outside_saas_on_redis_outage(self, db, org):
+        """Regression test: reserve_ai_credit()'s own non-SaaS branch had the
+        exact same unguarded-Redis bug increase_feature_usage had above, just
+        never caught by that fix since it's a separate function. Found live:
+        generating an AI-authored assessment (any AI feature, really — every
+        AI router calls reserve_ai_credit/refund_ai_credit) in this Redis-less
+        OSS deployment 500'd every time, and since the response died before
+        CORS headers could be attached, the browser reported it as a CORS
+        failure rather than the real server error.
+
+        Org AI must be enabled for the request to even reach the Redis call —
+        an org with no config, or AI disabled, should still 404/403 as before;
+        this test asserts the SPECIFIC Redis-down path degrades gracefully.
+        """
+        org_config = MagicMock(config={"ai": {"enabled": True}})
+        with patch("src.security.features_utils.usage._is_non_saas", return_value=True), \
+             patch(
+                 "src.security.features_utils.usage._load_org_config_for_ai",
+                 new_callable=AsyncMock,
+                 return_value=org_config,
+             ), patch(
+                 "src.security.features_utils.resolve.resolve_feature",
+                 return_value={"enabled": True, "limit": -1},
+             ), patch(
+                 "src.security.features_utils.usage._get_redis_client",
+                 side_effect=ConnectionError("Error 111 connecting to localhost:6379"),
+             ):
+            assert await usage.reserve_ai_credit(org.id, db, amount=2) == 0
+
+        with patch(
+            "src.security.features_utils.usage._get_redis_client",
+            side_effect=ConnectionError("Error 111 connecting to localhost:6379"),
+        ):
+            assert usage.refund_ai_credit(org.id, amount=2) == 0
+
+    def test_refund_ai_credit_never_touches_redis_for_zero_or_negative_amount(self, org):
+        """A zero/negative refund is a no-op by construction — asserting this
+        stays true guards against a future edit accidentally routing it
+        through the Redis call this test's sibling above is about."""
+        with patch("src.security.features_utils.usage._get_redis_client") as redis_client:
+            assert usage.refund_ai_credit(org.id, amount=0) == 0
+            assert usage.refund_ai_credit(org.id, amount=-1) == 0
+        redis_client.assert_not_called()

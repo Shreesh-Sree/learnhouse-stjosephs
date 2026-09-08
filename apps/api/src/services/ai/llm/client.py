@@ -110,11 +110,17 @@ def _settings(
     return ModelSettings(**settings)
 
 
-def _agent(model_name: str, system_prompt: Optional[str], output_type: Any) -> Agent:
+def _agent(
+    model_name: str,
+    system_prompt: Optional[str],
+    output_type: Any,
+    tools: Optional[Sequence[Any]] = None,
+) -> Agent:
     return Agent(
         build_model(model_name),
         output_type=output_type,
         system_prompt=system_prompt or (),
+        tools=list(tools) if tools else [],
     )
 
 
@@ -128,13 +134,16 @@ async def generate(
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
     timeout: float = DEFAULT_TIMEOUT,
+    tools: Optional[Sequence[Any]] = None,
 ) -> Any:
     """Run a single (non-streaming) generation.
 
     Returns plain text when ``output_type`` is ``str``, or a validated instance of
-    ``output_type`` (a Pydantic model) for structured output.
+    ``output_type`` (a Pydantic model) for structured output. ``tools`` are plain
+    type-annotated async functions the model may call mid-run (e.g. web search) —
+    see src/services/ai/tools/. Omit for the previous, tool-free behavior.
     """
-    agent = _agent(model_name, system_prompt, output_type)
+    agent = _agent(model_name, system_prompt, output_type, tools)
     result = await agent.run(
         user_prompt,
         message_history=to_message_history(history) or None,
@@ -152,9 +161,14 @@ async def generate_stream(
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
     timeout: float = STREAM_TIMEOUT,
+    tools: Optional[Sequence[Any]] = None,
 ) -> AsyncGenerator[str, None]:
-    """Stream text deltas for a single generation, yielding chunks as they arrive."""
-    agent = _agent(model_name, system_prompt, str)
+    """Stream text deltas for a single generation, yielding chunks as they arrive.
+
+    Any ``tools`` calls happen transparently as part of the agent's run loop
+    before the final textual response starts streaming — see ``generate``.
+    """
+    agent = _agent(model_name, system_prompt, str, tools)
     async with agent.run_stream(
         user_prompt,
         message_history=to_message_history(history) or None,

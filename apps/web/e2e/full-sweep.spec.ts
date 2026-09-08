@@ -335,3 +335,59 @@ test.describe('Public course page — course-meta request is not double-prefixed
     }
   })
 })
+
+test.describe('AI assessment generator — real Redis-crash regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page)
+  })
+
+  // Regression test: reserve_ai_credit()'s non-SaaS branch called
+  // _get_redis_client().incrby(...) completely unguarded. Every AI router
+  // (quiz gen, image gen, audio gen, course planning, this new assessment
+  // generator, ...) calls reserve_ai_credit before dispatching to the model,
+  // so in this Redis-less sandbox EVERY AI feature 500'd — and since the
+  // response died before FastAPI could attach CORS headers, the browser
+  // reported it as a misleading "CORS policy" failure rather than a server
+  // error (the same signature as the assignment/usergroup Redis bugs fixed
+  // earlier this session, just in a different function). Fixed by having
+  // reserve_ai_credit/refund_ai_credit fail open (skip tracking, don't
+  // raise) on a Redis outage outside SaaS mode, same as
+  // increase_feature_usage/decrease_feature_usage already did.
+  //
+  // This test doesn't require a configured AI provider to be meaningful: the
+  // real bug was a network-level failure (net::ERR_FAILED / no response at
+  // all) reaching the backend. Getting ANY HTTP response back — even a 403
+  // "AI not configured" — proves the request didn't crash on the Redis call
+  // before ever reaching that check.
+  test('generating an assessment reaches the backend and gets a real HTTP response', async ({ page }) => {
+    await page.goto('/dash/assignments')
+    await dismissOnboarding(page)
+    await page.waitForTimeout(500)
+
+    await page.getByRole('button', { name: 'New Assignment' }).first().click({ timeout: 10_000 })
+    await page.waitForTimeout(800)
+
+    const dialog = page.locator('[role="dialog"]').last()
+    await dialog.locator('button').filter({ hasText: /./ }).first().click({ timeout: 10_000 })
+    await page.waitForTimeout(1200)
+
+    const chapterDialog = page.locator('[role="dialog"]').last()
+    await chapterDialog.locator('button').nth(1).click({ timeout: 10_000 })
+    await page.waitForTimeout(800)
+
+    await page.getByText('Generate with AI', { exact: false }).click({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+
+    await page.locator('textarea').fill('A 3-question quiz on basic arithmetic')
+
+    const [resp] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('/ai/assignments/generate'), { timeout: 15_000 }),
+      page.getByRole('button', { name: 'Generate Assessment' }).click({ timeout: 10_000 }),
+    ])
+
+    // The specific status doesn't matter here (403 without an AI key configured,
+    // 200 with one) — what matters is that a response came back at all, which
+    // is impossible if the Redis call crashed the request first.
+    expect(resp.status(), 'must get a real HTTP response, not a network-level failure').toBeLessThan(500)
+  })
+})

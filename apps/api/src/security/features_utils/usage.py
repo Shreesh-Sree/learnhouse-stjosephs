@@ -1115,10 +1115,25 @@ async def reserve_ai_credit(
             detail="AI is not enabled for this organization",
         )
 
-    # Non-SaaS deployments do not enforce limits but still track usage.
+    # Non-SaaS deployments do not enforce limits but still track usage (best
+    # effort). Same bug class as increase_feature_usage/decrease_feature_usage
+    # above: this counter only feeds SaaS plan-limit UI, Redis is legitimately
+    # optional in OSS deployments, and _get_redis_client()/.incrby() being
+    # unguarded here took down the entire AI-generation request (confirmed
+    # live: assessment generation 500'd — with no CORS headers on the
+    # response, which the browser then misreports as a CORS failure) in any
+    # Redis-less deployment. Fail open instead: a transient Redis outage
+    # tracking a display-only counter is not a reason to block AI usage.
     if _is_non_saas():
-        r = _get_redis_client()
-        return int(r.incrby(f"ai_credits_used:{org_id}", amount))
+        try:
+            r = _get_redis_client()
+            return int(r.incrby(f"ai_credits_used:{org_id}", amount))
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "reserve_ai_credit: Redis unavailable, skipping usage tracking for org %s",
+                org_id,
+            )
+            return 0
 
     org_plan = _get_org_plan(org_config)
     base_credits = get_ai_credit_limit(org_plan)
@@ -1193,12 +1208,25 @@ def refund_ai_credit(org_id: int, amount: int = 1) -> int:
     downstream failure so a transient AI outage does not consume the org's
     quota. The decrement is clamped at zero so accidental double-refunds do
     not mint free credits.
+
+    Every AI router calls this from an ``except`` block after some other
+    failure — an unguarded Redis error here would replace that original
+    error with an unrelated 500 (and, since the response never gets to send
+    CORS headers, the browser reports it as a misleading CORS failure). Fail
+    open: a refund that couldn't be recorded is a display-only counter being
+    slightly stale, never a reason to mask the real failure that triggered it.
     """
     if amount <= 0:
         return 0
-    r = _get_redis_client()
-    script = r.register_script(_REFUND_LUA)
-    return int(script(keys=[f"ai_credits_used:{org_id}"], args=[str(int(amount))]))
+    try:
+        r = _get_redis_client()
+        script = r.register_script(_REFUND_LUA)
+        return int(script(keys=[f"ai_credits_used:{org_id}"], args=[str(int(amount))]))
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "refund_ai_credit: Redis unavailable, skipping refund for org %s", org_id
+        )
+        return 0
 
 
 def add_ai_credits(org_id: int, amount: int) -> int:

@@ -106,6 +106,12 @@ ai_config:
   # resolving its key from `api_key` when provider=google, else `gemini_api_key`).
   image_model: ""       # AI image generation           (default: gemini-2.5-flash-image)
   tts_model: ""         # AI audio / podcast generation  (default: gemini-2.5-flash-preview-tts)
+  # Firecrawl (self-hosted: https://github.com/mendableai/firecrawl). When set, the
+  # course-planning and activity-content agents get a search_web tool so they ground
+  # blockEmbed/citations in real, currently-existing pages instead of guessing a URL.
+  # Leave blank to disable — the tool is simply not registered, nothing else changes.
+  firecrawl_url: ""       # e.g. "http://localhost:3002" for a local self-hosted instance
+  firecrawl_api_key: ""   # blank if your instance runs with USE_DB_AUTHENTICATION=false
 
 tinybird_config:
   # Set api_url to enable analytics automatically

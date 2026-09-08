@@ -6,10 +6,12 @@ import { useTranslation } from 'react-i18next'
 import { useLHSession } from '@components/Contexts/LHSessionContext'
 import Modal from '@components/Objects/StyledElements/Modal/Modal'
 import NewAssignment from '@components/Objects/Modals/Activities/Create/NewActivityModal/AssignmentActivityModal'
+import AIAssignmentGeneratorModal from '@components/Objects/AI/AIAssignmentGeneratorModal'
 import { getCourseMetadata } from '@services/courses/courses'
 import { getCourseThumbnailMediaDirectory } from '@services/media/media'
 import { getUriWithOrg } from '@services/config/config'
 import { ArrowLeft, BookOpen, Layers, FolderPlus, ChevronRight, PlusCircle, Backpack } from 'lucide-react'
+import { MagicWand, PencilSimple } from '@phosphor-icons/react'
 
 const cleanCourseUuid = (u: string) => u?.replace(/^course_/, '') ?? u
 
@@ -32,7 +34,7 @@ export default function NewAssignmentModal({
   const session = useLHSession() as any
   const access_token = session?.data?.tokens?.access_token
 
-  const [step, setStep] = useState<'course' | 'chapter' | 'form'>('course')
+  const [step, setStep] = useState<'course' | 'chapter' | 'method' | 'form' | 'ai'>('course')
   const [selectedCourseUuid, setSelectedCourseUuid] = useState<string | null>(null)
   const [selectedChapterId, setSelectedChapterId] = useState<number | null>(null)
 
@@ -150,7 +152,7 @@ export default function NewAssignmentModal({
                   key={ch.chapter_uuid || ch.id}
                   onClick={() => {
                     setSelectedChapterId(ch.id)
-                    setStep('form')
+                    setStep('method')
                   }}
                   className={rowBtn}
                 >
@@ -182,10 +184,54 @@ export default function NewAssignmentModal({
         </>
       )}
 
-      {/* ---- Step 3: the assignment form (reused from the course editor) ---- */}
-      {step === 'form' && courseWrapper && selectedChapterId != null && (
+      {/* ---- Step 3: build it by hand, or generate it with AI ---- */}
+      {step === 'method' && (
         <>
           <BackRow onClick={() => setStep('chapter')} label={courseDetail?.name} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <button onClick={() => setStep('ai')} className="flex flex-col items-start gap-2 p-4 rounded-xl border-2 border-neutral-900 bg-neutral-50 hover:bg-neutral-100 transition-colors text-left">
+              <span className="w-9 h-9 rounded-lg bg-neutral-900 text-white flex items-center justify-center flex-none">
+                <MagicWand size={18} weight="fill" />
+              </span>
+              <span className="font-semibold text-gray-800">
+                {t('dashboard.assignments.create_flow.generate_ai', { defaultValue: 'Generate with AI' })}
+              </span>
+              <span className="text-xs text-gray-500">
+                {t('dashboard.assignments.create_flow.generate_ai_desc', { defaultValue: 'Describe it, review the questions, create it.' })}
+              </span>
+            </button>
+            <button onClick={() => setStep('form')} className="flex flex-col items-start gap-2 p-4 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors text-left">
+              <span className="w-9 h-9 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center flex-none">
+                <PencilSimple size={18} weight="fill" />
+              </span>
+              <span className="font-semibold text-gray-800">
+                {t('dashboard.assignments.create_flow.build_manually', { defaultValue: 'Build it manually' })}
+              </span>
+              <span className="text-xs text-gray-500">
+                {t('dashboard.assignments.create_flow.build_manually_desc', { defaultValue: 'Set it up and add questions yourself.' })}
+              </span>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ---- Step 4a: generate the assessment with AI ---- */}
+      {step === 'ai' && courseWrapper && selectedChapterId != null && (
+        <>
+          <BackRow onClick={() => setStep('method')} label={courseDetail?.name} />
+          <AIAssignmentGeneratorModal
+            course={courseWrapper}
+            chapterId={selectedChapterId}
+            onClose={handleClose}
+            onCreated={handleCreated}
+          />
+        </>
+      )}
+
+      {/* ---- Step 4b: the assignment form (reused from the course editor) ---- */}
+      {step === 'form' && courseWrapper && selectedChapterId != null && (
+        <>
+          <BackRow onClick={() => setStep('method')} label={courseDetail?.name} />
           <NewAssignment
             course={courseWrapper}
             chapterId={selectedChapterId}

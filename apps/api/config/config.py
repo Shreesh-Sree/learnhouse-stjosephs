@@ -77,6 +77,15 @@ class AIConfig(BaseModel):
     # LEARNHOUSE_AI_TTS_MODEL; defaults to `gemini-2.5-flash-preview-tts`. All
     # Gemini TTS models are currently preview, so keep this configurable.
     tts_model: str | None = None
+    # Firecrawl — self-hosted web search/scrape tool the course-planning and
+    # activity-content agents call to ground generated content in real,
+    # currently-existing pages and videos (see src/services/ai/tools/firecrawl.py)
+    # instead of letting the model hallucinate a plausible-looking URL. Points at
+    # your own Firecrawl instance (https://github.com/mendableai/firecrawl); a
+    # self-hosted instance run with `-e USE_DB_AUTHENTICATION=false` needs no key.
+    # Unset by default — the tool is simply not registered on the agent, no error.
+    firecrawl_url: str | None = None
+    firecrawl_api_key: str | None = None
 
 
 class S3ApiConfig(BaseModel):
@@ -461,6 +470,8 @@ def get_learnhouse_config() -> LearnHouseConfig:
     gemini_api_key = env_gemini_api_key or yaml_ai_config.get("gemini_api_key")
     ai_image_model = os.environ.get("LEARNHOUSE_AI_IMAGE_MODEL") or yaml_ai_config.get("image_model")
     ai_tts_model = os.environ.get("LEARNHOUSE_AI_TTS_MODEL") or yaml_ai_config.get("tts_model")
+    firecrawl_url = os.environ.get("LEARNHOUSE_FIRECRAWL_URL") or yaml_ai_config.get("firecrawl_url")
+    firecrawl_api_key = os.environ.get("LEARNHOUSE_FIRECRAWL_API_KEY") or yaml_ai_config.get("firecrawl_api_key")
 
     # Provider-agnostic generation settings (env takes precedence over yaml).
     ai_provider = os.environ.get("LEARNHOUSE_AI_PROVIDER") or yaml_ai_config.get("provider")
@@ -669,6 +680,8 @@ def get_learnhouse_config() -> LearnHouseConfig:
         gemini_api_key=gemini_api_key,
         image_model=ai_image_model,
         tts_model=ai_tts_model,
+        firecrawl_url=firecrawl_url,
+        firecrawl_api_key=firecrawl_api_key,
     )
 
     # Surface missing internal-service keys at boot rather than at first

@@ -7,6 +7,7 @@ import base64
 
 from config.config import get_learnhouse_config
 from src.services.ai.llm import generate_stream, attachments_to_parts, model_for_tier
+from src.services.ai.tools.course_tools import course_authoring_tools
 from src.services.ai.schemas.courseplanning import (
     CoursePlan,
     CoursePlanningSessionData,
@@ -189,10 +190,24 @@ def get_language_name(language_code: str) -> str:
     return language_names.get(language_code, "English")
 
 
-def build_course_planning_system_prompt(language: str = "en") -> str:
+def _tool_usage_guidance(tools_available: bool) -> str:
+    if not tools_available:
+        return ""
+    return """
+
+WEB SEARCH TOOLS:
+You have search_web, find_video, and fetch_page_content tools. Use find_video when a
+chapter or activity would clearly benefit from a real video (e.g. a topic that's easier
+to show than describe) — pass it a specific topic, and if it returns a result, mention
+that video in the relevant activity's description so the content-generation step embeds
+it. If find_video returns nothing relevant, do not mention a video for that activity —
+never invent a YouTube URL or video title yourself."""
+
+
+def build_course_planning_system_prompt(language: str = "en", tools_available: bool = False) -> str:
     """Build the system prompt for course plan generation"""
     language_name = get_language_name(language)
-    return f"""You are an expert instructional designer and course creator. Your task is to help users create comprehensive, well-structured course plans.
+    return f"""You are an expert instructional designer and course creator. Your task is to help users create comprehensive, well-structured course plans.{_tool_usage_guidance(tools_available)}
 
 IMPORTANT: Generate ALL content (course name, description, chapter names, activity names, etc.) in {language_name}. The user's language is {language_name}, so the entire course plan must be in {language_name}.
 
@@ -266,13 +281,14 @@ def build_activity_content_system_prompt(
     chapter_name: str,
     activity_name: str,
     activity_description: str,
-    language: str = "en"
+    language: str = "en",
+    tools_available: bool = False,
 ) -> str:
     """Build the system prompt for activity content generation"""
     language_name = get_language_name(language)
     return f"""You are an expert content creator for online courses. Generate educational content for the following context:
 
-IMPORTANT: Generate ALL text content in {language_name}. The user's language is {language_name}, so all paragraphs, headings, quiz questions, answers, flipcard content, and callouts must be written in {language_name}.
+IMPORTANT: Generate ALL text content in {language_name}. The user's language is {language_name}, so all paragraphs, headings, quiz questions, answers, flipcard content, and callouts must be written in {language_name}.{_tool_usage_guidance(tools_available)}
 
 COURSE: <user_content>{course_name}</user_content>
 COURSE DESCRIPTION: <user_content>{course_description}</user_content>
@@ -351,6 +367,10 @@ AVAILABLE BLOCK TYPES (use EXACTLY these type names):
       "embedWidth": "100%",
       "alignment": "center"
     }}}}
+    CRITICAL: embedUrl must be a video URL you actually confirmed exists — either one
+    the user explicitly provided, or one returned by the find_video tool (when
+    available). Never invent a video ID or URL from memory; if you don't have a
+    confirmed URL, omit blockEmbed for that activity entirely rather than guessing.
 
 TEXT FORMATTING (MARKS):
 To add bold or italic formatting to text, use the "marks" array on text nodes:
@@ -401,7 +421,10 @@ async def generate_course_plan_stream(
     Yields chunks of the response (raw JSON text) as they arrive; parsed afterward.
     """
     try:
-        system_prompt = build_course_planning_system_prompt(language=session.language)
+        tools = course_authoring_tools()
+        system_prompt = build_course_planning_system_prompt(
+            language=session.language, tools_available=bool(tools)
+        )
 
         # Prior turns as text; attachments ride on the new user turn below.
         history = [{"role": m.role, "content": m.content} for m in session.message_history]
@@ -446,6 +469,7 @@ IMPORTANT: You MUST incorporate the materials provided above into the course pla
             system_prompt=system_prompt,
             history=history,
             timeout=300.0,
+            tools=tools,
         ):
             full_response += chunk
             yield chunk
@@ -490,13 +514,15 @@ async def generate_activity_content_stream(
     The system prompt instructs JSON-only output; parsed afterward.
     """
     try:
+        tools = course_authoring_tools()
         system_prompt = build_activity_content_system_prompt(
             course_name=course_name,
             course_description=course_description,
             chapter_name=chapter_name,
             activity_name=activity_name,
             activity_description=activity_description,
-            language=session.language
+            language=session.language,
+            tools_available=bool(tools),
         )
 
         # Get iteration count for this activity
@@ -526,6 +552,7 @@ Please modify the content according to the user's request. Output ONLY the compl
             system_prompt=system_prompt,
             temperature=0.7,
             timeout=300.0,
+            tools=tools,
         ):
             full_response += chunk
             yield chunk
