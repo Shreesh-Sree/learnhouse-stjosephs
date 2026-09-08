@@ -17,7 +17,7 @@ async function getUnsplashApi() {
 }
 
 const IMAGES_PER_PAGE = 20;
-const UNSPLASH_UTM = '?utm_source=LearnHouse&utm_medium=referral';
+const UNSPLASH_UTM = "?utm_source=St. Joseph's Placements and Training Cell&utm_medium=referral";
 
 const withUtm = (url?: string) => (url ? `${url}${UNSPLASH_UTM}` : UNSPLASH_UTM);
 

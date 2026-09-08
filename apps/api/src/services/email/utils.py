@@ -270,7 +270,7 @@ def get_org_logo_url(org, request: Optional[Request] = None) -> Optional[str]:
 
     Mirrors the frontend's ``getOrgLogoMediaDirectory`` path shape
     (``content/orgs/{uuid}/logos/{file}``). Returns None so callers fall back
-    to the default LearnHouse mark.
+    to the default St. Joseph's Placements and Training Cell mark.
     """
     logo_image = getattr(org, "logo_image", None)
     org_uuid = getattr(org, "org_uuid", None)
@@ -280,7 +280,7 @@ def get_org_logo_url(org, request: Optional[Request] = None) -> Optional[str]:
     if not base:
         # No absolute media host resolvable (no request, nothing configured).
         # A relative src would render broken in every mail client, so fall
-        # back to the default LearnHouse mark instead.
+        # back to the default St. Joseph's Placements and Training Cell mark instead.
         return None
     return f"{base}/content/orgs/{org_uuid}/logos/{logo_image}"
 

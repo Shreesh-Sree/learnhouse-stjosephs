@@ -102,7 +102,7 @@ export default function EditCourseLiveSessions({ orgslug }: { orgslug: string })
         <p className="text-xs text-gray-500 leading-relaxed">
           {t('dashboard.courses.live_sessions.description', {
             defaultValue:
-              'Schedule a live class with any meeting link (Zoom, Google Meet, Teams, ...). Students see the schedule on this course and in their calendar feed with a Join link — the call itself happens on the meeting platform, not inside LearnHouse.',
+              "Schedule a live class with any meeting link (Zoom, Google Meet, Teams, ...). Students see the schedule on this course and in their calendar feed with a Join link — the call itself happens on the meeting platform, not inside St. Joseph's Placements and Training Cell.",
           })}
         </p>
 

@@ -1,7 +1,7 @@
 {
-  "name": "LearnHouse",
-  "short_name": "LearnHouse",
-  "description": "Self-hosted learning platform — read your course content even when you're offline.",
+  "name": "St. Joseph's Placements and Training Cell",
+  "short_name": "SJ Placements & Training",
+  "description": "St. Joseph's Placements and Training Cell — St. Joseph's Group of Institutions. Learning platform — read your course content even when you're offline.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

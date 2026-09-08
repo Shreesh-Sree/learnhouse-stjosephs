@@ -44,11 +44,11 @@
     "help": "ความช่วยเหลือ",
     "help_menu": {
       "documentation": "เอกสาร",
-      "website": "เว็บไซต์ LearnHouse",
+      "website": "เว็บไซต์ St. Joseph's Placements and Training Cell",
       "discord": "Discord",
       "report_feedback": "รายงานปัญหาหรือความคิดเห็น",
       "feedback_title": "ส่งความคิดเห็น",
-      "feedback_description": "ช่วยเราปรับปรุง LearnHouse โดยแบ่งปันความคิด รายงานข้อบกพร่อง หรือแนะนำฟีเจอร์ใหม่",
+      "feedback_description": "ช่วยเราปรับปรุง St. Joseph's Placements and Training Cell โดยแบ่งปันความคิด รายงานข้อบกพร่อง หรือแนะนำฟีเจอร์ใหม่",
       "feedback_placeholder": "บอกเราว่าคุณคิดอย่างไร...",
       "feedback_success": "ขอบคุณสำหรับความคิดเห็นของคุณ!",
       "send_feedback": "ส่งความคิดเห็น",
@@ -215,7 +215,7 @@
     "organizations": "องค์กร",
     "billing": "การเรียกเก็บเงิน",
     "create_organization": "สร้างองค์กร",
-    "copyright": "© {{year}} LearnHouse, Inc.",
+    "copyright": "© {{year}} St. Joseph's Placements and Training Cell",
     "delete_organization_error": "ไม่สามารถลบองค์กรนี้ได้ กรุณาลองอีกครั้ง",
     "org_actions": "การจัดการองค์กร",
     "manage_upgrade": "จัดการ / อัปเกรด",
@@ -371,11 +371,11 @@
     "privacy_policy": "นโยบายความเป็นส่วนตัว",
     "image_title_forgot": "รีเซ็ตรหัสผ่านของคุณ",
     "image_subtitle_forgot": "เราจะช่วยให้คุณกลับเข้าสู่บัญชีได้ในเวลาอันรวดเร็ว",
-    "image_title_login": "ยินดีต้อนรับกลับสู่ LearnHouse",
+    "image_title_login": "ยินดีต้อนรับกลับสู่ St. Joseph's Placements and Training Cell",
     "image_subtitle_login": "ทำต่อจากที่ค้างไว้ — คอร์ส นักเรียน และเครื่องมือของคุณรอคุณอยู่",
     "image_title_reset": "ใกล้เสร็จแล้ว",
     "image_subtitle_reset": "สร้างรหัสผ่านที่รัดกุมเพื่อรักษาความปลอดภัยของบัญชี",
-    "image_title_signup": "เริ่มต้นการสอนด้วย LearnHouse",
+    "image_title_signup": "เริ่มต้นการสอนด้วย St. Joseph's Placements and Training Cell",
     "image_subtitle_signup": "สร้างบัญชีและเปิดตัวคอร์สแรกของคุณได้ในไม่กี่นาที",
     "image_title_verify": "ยืนยันอีเมลของคุณ",
     "image_subtitle_verify": "ขั้นตอนง่าย ๆ เพียงขั้นเดียวเพื่อรักษาความปลอดภัยของบัญชีและเริ่มต้นใช้งาน",
@@ -576,14 +576,14 @@
     "import": {
       "scorm_package": "แพ็คเกจ SCORM",
       "scorm_description": "นำเข้าแพ็คเกจ SCORM 1.2 หรือ SCORM 2004",
-      "learnhouse_courses": "คอร์ส LearnHouse",
-      "learnhouse_description": "นำเข้าคอร์สที่ส่งออกจาก LearnHouse",
+      "learnhouse_courses": "คอร์ส St. Joseph's Placements and Training Cell",
+      "learnhouse_description": "นำเข้าคอร์สที่ส่งออกจาก St. Joseph's Placements and Training Cell",
       "upload_package": "อัปโหลดแพ็คเกจ",
       "configure": "กำหนดค่า",
       "complete": "เสร็จสิ้น",
       "click_to_upload": "คลิกเพื่ออัปโหลดหรือลากและวาง",
-      "learnhouse_format": "ส่งออกคอร์ส LearnHouse (.zip)",
-      "learnhouse_info": "อัปโหลดแพ็คเกจส่งออกคอร์ส LearnHouse (.zip) คุณจะสามารถเลือกคอร์สที่จะนำเข้าและกำหนดค่าตัวเลือกการนำเข้าได้",
+      "learnhouse_format": "ส่งออกคอร์ส St. Joseph's Placements and Training Cell (.zip)",
+      "learnhouse_info": "อัปโหลดแพ็คเกจส่งออกคอร์ส St. Joseph's Placements and Training Cell (.zip) คุณจะสามารถเลือกคอร์สที่จะนำเข้าและกำหนดค่าตัวเลือกการนำเข้าได้",
       "analyze_package": "วิเคราะห์แพ็คเกจ",
       "ready_to_analyze": "พร้อมวิเคราะห์",
       "invalid_file_format": "กรุณาอัปโหลดไฟล์ .zip",
@@ -1456,7 +1456,7 @@
           "description": "กำหนดค่าการตั้งค่าส่วนตัว รหัสผ่าน อีเมล"
         }
       },
-      "learnhouse_university": "มหาวิทยาลัย LearnHouse",
+      "learnhouse_university": "มหาวิทยาลัย St. Joseph's Placements and Training Cell",
       "welcome_back": "ยินดีต้อนรับกลับ",
       "plan": "แผน",
       "create_course": "สร้างคอร์สเรียน",
@@ -1513,8 +1513,8 @@
       "import_course": "นำเข้าหลักสูตร",
       "import_scorm": "นำเข้าแพ็คเกจ SCORM",
       "import_scorm_description": "นำเข้าแพ็คเกจ SCORM เพื่อสร้างหลักสูตรใหม่",
-      "import_learnhouse": "นำเข้าคอร์ส LearnHouse",
-      "import_learnhouse_description": "นำเข้าคอร์สจากแพ็คเกจส่งออก LearnHouse",
+      "import_learnhouse": "นำเข้าคอร์ส St. Joseph's Placements and Training Cell",
+      "import_learnhouse_description": "นำเข้าคอร์สจากแพ็คเกจส่งออก St. Joseph's Placements and Training Cell",
       "import_select_type": "เลือกประเภทแพ็คเกจที่ต้องการนำเข้า",
       "no_courses": "ยังไม่มีคอร์สเรียน",
       "create_course_placeholder": "สร้างคอร์สเพื่อเพิ่มเนื้อหา",
@@ -2353,8 +2353,8 @@
         "label_placeholder": "เลือกป้ายกำกับองค์กร",
         "about": "เกี่ยวกับองค์กร",
         "about_placeholder": "คำอธิบายรายละเอียดเกี่ยวกับองค์กรของคุณ",
-        "showcase_explore": "แสดงใน LearnHouse Explore",
-        "showcase_description": "แบ่งปันคอร์สและเนื้อหาขององค์กรคุณกับชุมชน LearnHouse เปิดใช้งานสิ่งนี้เพื่อช่วยให้ผู้เรียนค้นพบแหล่งทรัพยากรทางการศึกษาที่มีค่า",
+        "showcase_explore": "แสดงใน St. Joseph's Placements and Training Cell Explore",
+        "showcase_description": "แบ่งปันคอร์สและเนื้อหาขององค์กรคุณกับชุมชน St. Joseph's Placements and Training Cell เปิดใช้งานสิ่งนี้เพื่อช่วยให้ผู้เรียนค้นพบแหล่งทรัพยากรทางการศึกษาที่มีค่า",
         "save_changes": "บันทึกการเปลี่ยนแปลง",
         "saving": "กำลังบันทึก...",
         "update_success": "ข้อมูลองค์กรได้รับการอัปเดตแล้ว",
@@ -2365,9 +2365,9 @@
         "footer_text_desc": "ข้อความที่กำหนดเองที่แสดงที่ด้านล่างของหน้าองค์กรของคุณ",
         "default_language": "ภาษาเริ่มต้น",
         "default_language_desc": "ภาษาที่ผู้เยี่ยมชมใหม่เห็นโดยค่าเริ่มต้นและภาษาที่ใช้สำหรับอีเมลที่ส่งในนามขององค์กรนี้ สมาชิกยังคงสามารถเปลี่ยนภาษาของอินเทอร์เฟซของตนได้",
-        "watermark_desc": "แสดงลายน้ำแบรนด์ LearnHouse บนหน้าองค์กรของคุณ",
+        "watermark_desc": "แสดงลายน้ำแบรนด์ St. Joseph's Placements and Training Cell บนหน้าองค์กรของคุณ",
         "watermark_free_plan": "ลายน้ำจะแสดงตลอดเวลาบนแผนฟรี",
-        "watermark_label": "ลายน้ำ \"Made with LearnHouse\"",
+        "watermark_label": "ลายน้ำ \"Made with St. Joseph's Placements and Training Cell\"",
         "watermark_ee": "ซ่อนโดยใบอนุญาต Enterprise Edition ของคุณ"
       },
       "images": {
@@ -4824,10 +4824,10 @@
       },
       "teach_the_world": {
         "title": "เรียนรู้และเติบโต",
-        "description": "แหล่งข้อมูลเพื่อช่วยให้คุณใช้ LearnHouse ได้อย่างเต็มที่",
+        "description": "แหล่งข้อมูลเพื่อช่วยให้คุณใช้ St. Joseph's Placements and Training Cell ได้อย่างเต็มที่",
         "classroom": "ห้องเรียน",
         "classroom_desc": "เรียนรู้วิธีเติบโตและจัดการคอร์สของคุณ",
-        "university": "มหาวิทยาลัย LearnHouse",
+        "university": "มหาวิทยาลัย St. Joseph's Placements and Training Cell",
         "university_desc": "คู่มือ เคล็ดลับ และแนวปฏิบัติที่ดี"
       },
       "add_content": {
@@ -4857,7 +4857,7 @@
       }
     },
     "welcome": {
-      "title": "ยินดีต้อนรับสู่ LearnHouse",
+      "title": "ยินดีต้อนรับสู่ St. Joseph's Placements and Training Cell",
       "subtitle": "สร้างคอร์ส เชิญผู้เรียน และแบ่งปันความรู้กับโลก",
       "get_started": "เริ่มต้น",
       "features_title": "ทุกอย่างที่คุณต้องการ",
@@ -5157,7 +5157,7 @@
   "embed": {
     "not_supported_description": "กิจกรรมประเภทนี้ต้องการการยืนยันตัวตนและไม่สามารถฝังได้",
     "not_supported_title": "กิจกรรมนี้ไม่รองรับ",
-    "powered_by": "ขับเคลื่อนโดย LearnHouse",
+    "powered_by": "ขับเคลื่อนโดย St. Joseph's Placements and Training Cell",
     "visit_activity": "ไปที่หน้ากิจกรรม"
   },
   "migration": {
@@ -5662,7 +5662,7 @@
         "title": "ต้องการทดลองใช้?",
         "body": "ไปที่",
         "link": "หน้านักพัฒนา",
-        "suffix": "เพื่อทดลองใช้ LearnHouse แทน"
+        "suffix": "เพื่อทดลองใช้ St. Joseph's Placements and Training Cell แทน"
       },
       "validation": {
         "required": "จำเป็นต้องกรอก",

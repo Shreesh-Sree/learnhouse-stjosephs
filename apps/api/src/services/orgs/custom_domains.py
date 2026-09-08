@@ -37,7 +37,7 @@ RESERVED_DOMAIN_PATTERNS = [
     r'^127\.0\.0\.1$',
 ]
 
-# Learnhouse domain for CNAME instructions
+# St. Joseph's Placements and Training Cell domain for CNAME instructions
 LEARNHOUSE_DOMAIN = os.getenv('LEARNHOUSE_DOMAIN', 'learnhouse.io')
 
 

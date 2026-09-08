@@ -129,7 +129,7 @@ export default function EditCourseLTI({ orgslug }: EditCourseLTIProps) {
         <p className="text-xs text-gray-500 leading-relaxed">
           {t('dashboard.courses.lti.description', {
             defaultValue:
-              'Let another LMS (Canvas, Moodle, Blackboard, ...) launch into this course. Create a link, then paste its launch URL, consumer key and secret into that LMS\'s LTI tool configuration. A student launched this way gets a LearnHouse account automatically if they don\'t already have one.',
+              "Let another LMS (Canvas, Moodle, Blackboard, ...) launch into this course. Create a link, then paste its launch URL, consumer key and secret into that LMS's LTI tool configuration. A student launched this way gets a St. Joseph's Placements and Training Cell account automatically if they don't already have one.",
           })}
         </p>
 

@@ -23,7 +23,7 @@ from email.utils import formataddr
 from typing import Optional
 
 # Platform fallback used when neither the org nor the deployment names a sender.
-DEFAULT_SENDER_NAME = "LearnHouse"
+DEFAULT_SENDER_NAME = "St. Joseph's Placements and Training Cell"
 
 # Long enough for a real organization name, short enough that the header stays
 # readable in every client's inbox list. Mirrored by the dashboard's character

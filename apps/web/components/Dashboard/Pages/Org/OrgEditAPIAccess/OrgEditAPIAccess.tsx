@@ -38,7 +38,6 @@ import {
   AlertTriangle,
   Check,
   BookOpen,
-  LifeBuoy,
 } from 'lucide-react'
 import {
   APIToken,
@@ -229,16 +228,6 @@ const OrgEditAPIAccess: React.FC = () => {
               {t('dashboard.organization.api_access.docs_playground')}
             </TabsTrigger>
           </TabsList>
-          <a
-            href="mailto:hello@learnhouse.app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-colors border border-gray-200"
-            title="Contact LearnHouse support"
-          >
-            <LifeBuoy size={14} />
-            {t('dashboard.organization.api_access.something_not_working')}
-          </a>
         </div>
 
         <TabsContent value="tokens">

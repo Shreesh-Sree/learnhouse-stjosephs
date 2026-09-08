@@ -35,7 +35,7 @@ export default function AuthBrandingTab() {
 
   const existingConfig = org?.config?.config?.customization?.auth_branding || org?.config?.config?.general?.auth_branding || {}
 
-  // Check if org has enterprise plan - hide LearnHouse branding for enterprise users
+  // Check if org has enterprise plan - hide St. Joseph's Placements and Training Cell branding for enterprise users
   // In OSS mode, always show branding regardless of plan
   const plan = usePlan()
   const isEnterprise = plan === 'enterprise'

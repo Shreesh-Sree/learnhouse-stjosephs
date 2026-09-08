@@ -5,7 +5,6 @@ import {
   Heading,
   Hr,
   Html,
-  Img,
   Preview,
   Section,
   Text,
@@ -46,8 +45,6 @@ export interface LearnHouseEmailProps {
   cta?: { label: string; href: string }
 }
 
-const LOGO_URL = 'https://www.learnhouse.io/learnhouse-dark.svg'
-
 export function LearnHouseEmail({
   accentColor,
   heading,
@@ -68,7 +65,9 @@ export function LearnHouseEmail({
           <div style={{ height: 6, backgroundColor: accentColor }} />
 
           <Section style={{ padding: '32px 40px 8px' }}>
-            <Img src={LOGO_URL} alt="LearnHouse" height={28} style={{ marginBottom: 24 }} />
+            <Text style={{ fontSize: 13, fontWeight: 800, letterSpacing: 0.2, color: '#171717', margin: '0 0 24px' }}>
+              ST. JOSEPH'S PLACEMENTS AND TRAINING CELL
+            </Text>
             <Heading style={{ fontSize: 24, fontWeight: 800, color: '#171717', margin: '0 0 8px', lineHeight: 1.25 }}>
               {heading}
             </Heading>
@@ -133,7 +132,7 @@ export function LearnHouseEmail({
           <Hr style={{ borderColor: '#eee', margin: '24px 40px 0' }} />
           <Section style={{ padding: '16px 40px 32px' }}>
             <Text style={{ fontSize: 12, color: '#a3a3a3', margin: 0 }}>
-              LearnHouse — the open-source learning platform.
+              St. Joseph's Placements and Training Cell — St. Joseph's Group of Institutions.
             </Text>
           </Section>
         </Container>

@@ -44,11 +44,11 @@
     "help": "Помощь",
     "help_menu": {
       "documentation": "Документация",
-      "website": "Сайт LearnHouse",
+      "website": "Сайт St. Joseph's Placements and Training Cell",
       "discord": "Discord",
       "report_feedback": "Сообщить о проблеме или оставить отзыв",
       "feedback_title": "Отправить отзыв",
-      "feedback_description": "Помогите нам улучшить LearnHouse, поделившись своими мыслями, сообщив об ошибках или предложив новые функции.",
+      "feedback_description": "Помогите нам улучшить St. Joseph's Placements and Training Cell, поделившись своими мыслями, сообщив об ошибках или предложив новые функции.",
       "feedback_placeholder": "Расскажите, что вы думаете...",
       "feedback_success": "Спасибо за ваш отзыв!",
       "send_feedback": "Отправить отзыв",
@@ -215,7 +215,7 @@
     "organizations": "Организации",
     "billing": "Оплата",
     "create_organization": "Создать организацию",
-    "copyright": "© {{year}} LearnHouse, Inc.",
+    "copyright": "© {{year}} St. Joseph's Placements and Training Cell",
     "delete_organization_error": "Не удалось удалить эту организацию. Попробуйте ещё раз.",
     "org_actions": "Действия с организацией",
     "manage_upgrade": "Управление / Улучшение тарифа",
@@ -381,11 +381,11 @@
     "privacy_policy": "Политикой конфиденциальности",
     "image_title_forgot": "Сброс пароля.",
     "image_subtitle_forgot": "Мы поможем вам быстро вернуться в аккаунт.",
-    "image_title_login": "С возвращением в LearnHouse.",
+    "image_title_login": "С возвращением в St. Joseph's Placements and Training Cell.",
     "image_subtitle_login": "Продолжайте с того места, где остановились — ваши курсы, студенты и инструменты ждут вас.",
     "image_title_reset": "Почти готово.",
     "image_subtitle_reset": "Придумайте надёжный пароль, чтобы защитить аккаунт.",
-    "image_title_signup": "Начните преподавать с LearnHouse.",
+    "image_title_signup": "Начните преподавать с St. Joseph's Placements and Training Cell.",
     "image_subtitle_signup": "Создайте аккаунт и запустите первый курс за считаные минуты.",
     "image_title_verify": "Подтвердите свою почту.",
     "image_subtitle_verify": "Один быстрый шаг, чтобы защитить аккаунт и начать работу.",
@@ -576,14 +576,14 @@
     "import": {
       "scorm_package": "Пакет SCORM",
       "scorm_description": "Импортировать пакеты SCORM 1.2 или SCORM 2004",
-      "learnhouse_courses": "Курсы LearnHouse",
-      "learnhouse_description": "Импортировать курсы, экспортированные из LearnHouse",
+      "learnhouse_courses": "Курсы St. Joseph's Placements and Training Cell",
+      "learnhouse_description": "Импортировать курсы, экспортированные из St. Joseph's Placements and Training Cell",
       "upload_package": "Загрузить пакет",
       "configure": "Настроить",
       "complete": "Завершено",
       "click_to_upload": "Нажмите для загрузки или перетащите",
-      "learnhouse_format": "Экспорт курса LearnHouse (.zip)",
-      "learnhouse_info": "Загрузите пакет экспорта курсов LearnHouse (.zip). Вы сможете выбрать, какие курсы импортировать, и настроить параметры импорта.",
+      "learnhouse_format": "Экспорт курса St. Joseph's Placements and Training Cell (.zip)",
+      "learnhouse_info": "Загрузите пакет экспорта курсов St. Joseph's Placements and Training Cell (.zip). Вы сможете выбрать, какие курсы импортировать, и настроить параметры импорта.",
       "analyze_package": "Анализировать пакет",
       "ready_to_analyze": "Готов к анализу",
       "invalid_file_format": "Пожалуйста, загрузите файл .zip",
@@ -1456,7 +1456,7 @@
           "description": "Настройка персональных параметров, паролей и электронной почты"
         }
       },
-      "learnhouse_university": "Университет LearnHouse",
+      "learnhouse_university": "Университет St. Joseph's Placements and Training Cell",
       "welcome_back": "С возвращением",
       "plan": "тариф",
       "create_course": "Создать курс",
@@ -1513,8 +1513,8 @@
       "import_course": "Импортировать курс",
       "import_scorm": "Импортировать пакет SCORM",
       "import_scorm_description": "Импортировать пакет SCORM для создания нового курса",
-      "import_learnhouse": "Импортировать курсы LearnHouse",
-      "import_learnhouse_description": "Импортировать курсы из экспортного пакета LearnHouse",
+      "import_learnhouse": "Импортировать курсы St. Joseph's Placements and Training Cell",
+      "import_learnhouse_description": "Импортировать курсы из экспортного пакета St. Joseph's Placements and Training Cell",
       "import_select_type": "Выберите тип пакета, который хотите импортировать",
       "no_courses": "Курсов пока нет",
       "create_course_placeholder": "Создайте курс, чтобы добавить контент",
@@ -2353,8 +2353,8 @@
         "label_placeholder": "Выберите ярлык организации",
         "about": "Об организации",
         "about_placeholder": "Подробное описание вашей организации",
-        "showcase_explore": "Показать в LearnHouse Explore",
-        "showcase_description": "Поделитесь курсами и контентом вашей организации с сообществом LearnHouse. Включите это, чтобы помочь учащимся найти ваши ценные образовательные ресурсы.",
+        "showcase_explore": "Показать в St. Joseph's Placements and Training Cell Explore",
+        "showcase_description": "Поделитесь курсами и контентом вашей организации с сообществом St. Joseph's Placements and Training Cell. Включите это, чтобы помочь учащимся найти ваши ценные образовательные ресурсы.",
         "save_changes": "Сохранить изменения",
         "saving": "Сохранение...",
         "update_success": "Организация обновлена",
@@ -2365,9 +2365,9 @@
         "footer_text_desc": "Пользовательский текст, отображаемый внизу страниц вашей организации",
         "default_language": "Язык по умолчанию",
         "default_language_desc": "Язык, который новые посетители видят по умолчанию и который используется в письмах, отправляемых от имени этой организации. Участники по-прежнему могут менять язык своего интерфейса.",
-        "watermark_desc": "Показывать водяной знак LearnHouse на страницах организации",
+        "watermark_desc": "Показывать водяной знак St. Joseph's Placements and Training Cell на страницах организации",
         "watermark_free_plan": "Водяной знак всегда отображается на бесплатном плане",
-        "watermark_label": "Водяной знак \"Made with LearnHouse\"",
+        "watermark_label": "Водяной знак \"Made with St. Joseph's Placements and Training Cell\"",
         "watermark_ee": "Скрыто лицензией Enterprise Edition"
       },
       "images": {
@@ -4824,10 +4824,10 @@
       },
       "teach_the_world": {
         "title": "Учитесь и развивайтесь",
-        "description": "Ресурсы, которые помогут вам максимально использовать LearnHouse.",
+        "description": "Ресурсы, которые помогут вам максимально использовать St. Joseph's Placements and Training Cell.",
         "classroom": "Классная комната",
         "classroom_desc": "Узнайте, как развивать и управлять курсами",
-        "university": "Университет LearnHouse",
+        "university": "Университет St. Joseph's Placements and Training Cell",
         "university_desc": "Руководства, советы и лучшие практики"
       },
       "add_content": {
@@ -4857,7 +4857,7 @@
       }
     },
     "welcome": {
-      "title": "Добро пожаловать в LearnHouse",
+      "title": "Добро пожаловать в St. Joseph's Placements and Training Cell",
       "subtitle": "Создавайте курсы, приглашайте учеников и делитесь знаниями со всем миром.",
       "get_started": "Начать",
       "features_title": "Всё, что вам нужно",
@@ -5157,7 +5157,7 @@
   "embed": {
     "not_supported_description": "Этот тип активности требует аутентификации и не может быть встроен.",
     "not_supported_title": "Эта активность не поддерживается",
-    "powered_by": "Работает на LearnHouse",
+    "powered_by": "Работает на St. Joseph's Placements and Training Cell",
     "visit_activity": "Перейти на страницу активности"
   },
   "migration": {
@@ -5662,7 +5662,7 @@
         "title": "Хотите попробовать?",
         "body": "Перейдите на",
         "link": "страницу для разработчиков",
-        "suffix": "чтобы протестировать LearnHouse."
+        "suffix": "чтобы протестировать St. Joseph's Placements and Training Cell."
       },
       "validation": {
         "required": "Обязательное поле",

@@ -395,7 +395,7 @@ function CoursesHome(params: CourseProps) {
         }
       )
       const timestamp = new Date().toISOString().split('T')[0]
-      downloadBlob(blob, `learnhouse-courses-export-${timestamp}.zip`)
+      downloadBlob(blob, `courses-export-${timestamp}.zip`)
       exportToast.complete(toastId, undefined, count, 'batch')
     } catch (error: any) {
       exportToast.error(toastId, error.message || t('courses.courses_exported_error'), undefined, count, 'batch')

@@ -16,7 +16,7 @@ import UnsplashImagePicker, { UnsplashPhotoMeta } from '@components/Dashboard/Pa
 import AIImageButton from '@components/Objects/AI/AIImageButton'
 
 const SUPPORTED_FILES = constructAcceptValue(['jpg', 'png', 'webp', 'gif'])
-const UNSPLASH_UTM = '?utm_source=LearnHouse&utm_medium=referral'
+const UNSPLASH_UTM = "?utm_source=St. Joseph's Placements and Training Cell&utm_medium=referral"
 const withUtm = (url?: string | null) => (url ? `${url}${UNSPLASH_UTM}` : '')
 
 function ImageBlockComponent(props: any) {

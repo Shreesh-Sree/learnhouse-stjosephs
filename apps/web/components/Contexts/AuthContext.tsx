@@ -105,7 +105,7 @@ interface SessionCache {
 // (the authenticated refetch interval is ~1 min).
 const SESSION_CACHE_TTL = 2 * 60 * 1000 // 2 minutes
 const TOKEN_REFRESH_THRESHOLD = 60 * 1000 // 1 minute before expiry
-const AUTH_BROADCAST_CHANNEL = 'learnhouse_auth_sync'
+const AUTH_BROADCAST_CHANNEL = 'sjptc_auth_sync'
 const OAUTH_STATE_COOKIE = 'LH_oauth_state'
 
 // Context

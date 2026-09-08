@@ -202,10 +202,10 @@ async def build_ics_feed(token: str, db_session: AsyncSession) -> str:
     body = "\r\n".join([
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//LearnHouse//Assignment Due Dates and Live Sessions//EN",
+        "PRODID:-//St. Joseph's Placements and Training Cell//Assignment Due Dates and Live Sessions//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
-        _fold_line("X-WR-CALNAME:LearnHouse schedule"),
+        _fold_line("X-WR-CALNAME:St. Joseph's Placements and Training Cell schedule"),
         *events,
         "END:VCALENDAR",
     ])

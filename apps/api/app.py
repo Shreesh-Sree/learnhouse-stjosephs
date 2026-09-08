@@ -4,10 +4,7 @@
 #  | |__|  __/ (_| | |  | | | |  _  | (_) | |_| \__ \  __/
 #  |_____\___|\__,_|_|  |_| |_|_| |_|\___/ \__,_|___/\___|
 #
-#  LearnHouse · open-source learning platform · FastAPI entrypoint
-#
-#  ↳ learnhouse.app · github.com/learnhouse/learnhouse
-#  ↳ Created and maintained by @swve © 2022–present
+#  St. Joseph's Placements and Training Cell · learning platform · FastAPI entrypoint
 
 import logging
 from contextlib import asynccontextmanager
@@ -166,7 +163,7 @@ app.include_router(v1_router)
 
 @app.get("/")
 async def root():
-    return {"Message": "Welcome to LearnHouse ✨"}
+    return {"Message": "Welcome to St. Joseph's Placements and Training Cell ✨"}
 
 
 if __name__ == "__main__":

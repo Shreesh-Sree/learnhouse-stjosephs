@@ -22,7 +22,7 @@ test.describe('Golden path', () => {
   test('homepage loads and offers a login link', async ({ page }) => {
     const response = await page.goto('/')
     expect(response?.ok()).toBeTruthy()
-    await expect(page).toHaveTitle(/LearnHouse|Default Organization/i)
+    await expect(page).toHaveTitle(/St\. Joseph's Placements and Training Cell|Default Organization/i)
   })
 
   test('login page renders the password form', async ({ page }) => {
