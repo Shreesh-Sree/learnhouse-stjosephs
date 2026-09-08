@@ -67,3 +67,14 @@ test.describe('Golden path', () => {
     await expect(page.locator('body')).not.toContainText('500')
   })
 })
+
+// NOT added: a test for the SSO admin settings page
+// (/orgs/{slug}/dash/developers/sso). Attempting to verify it live surfaced
+// a real, pre-existing, unrelated bug — see PENDING_FEATURES.md's "Small
+// cleanup items" — every [subpage]-style dashboard settings route 404s
+// (confirmed for /dash/developers/api, /dash/org/settings/general, and
+// /dash/developers/sso alike, with a fresh dev server and no .next cache),
+// not something introduced by this session's SSO/audit/analytics work. The
+// backend and the OSS_BLOCKED_FEATURES frontend fix are independently
+// verified (real HTTP calls in PENDING_FEATURES.md); a browser-level test
+// of the settings PAGE itself has to wait until that separate bug is fixed.

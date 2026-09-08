@@ -22,8 +22,19 @@ export type PlanLevel = 'free' | 'personal' | 'personal-family' | 'standard' | '
 // 'oss' is kept as a display-only type value (not in hierarchy) for OSS mode label rendering.
 export const PLAN_HIERARCHY: PlanLevel[] = ['free', 'personal', 'personal-family', 'standard', 'pro', 'enterprise']
 
-// Features blocked in OSS mode — require EE or SaaS/enterprise plan
-const OSS_BLOCKED_FEATURES = new Set(['sso', 'audit_logs', 'payments', 'analytics_advanced', 'scorm'])
+// Features blocked in OSS mode — require EE or SaaS/enterprise plan.
+//
+// The backend's EE_ONLY_FEATURES (src/core/deployment_mode.py) still lists
+// all five of sso/audit_logs/payments/analytics_advanced/scorm — that
+// constant is shared with SaaS-mode plan gating and was deliberately left
+// alone. But sso, scorm, and analytics_advanced turned out to already be (or
+// were built as) real, complete OSS code, unblocked in OSS/EE mode at the
+// specific router call sites that used to 403 on them (see PENDING_FEATURES.md
+// for the full history) — so hiding their UI here would contradict what the
+// backend actually does. audit_logs is an orphaned key nothing gates on,
+// either side. Only payments remains genuinely unbuilt for a self-host that
+// isn't selling course access to the public.
+const OSS_BLOCKED_FEATURES = new Set(['payments'])
 
 /**
  * Check if the current plan meets or exceeds the required plan level.

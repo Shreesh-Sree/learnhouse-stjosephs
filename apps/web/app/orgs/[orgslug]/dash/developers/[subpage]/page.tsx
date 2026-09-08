@@ -38,10 +38,12 @@ function DevelopersPage(props: { params: Promise<DevParams> }) {
   const params = use(props.params)
   const [H1Label, setH1Label] = React.useState('')
   const [H2Label, setH2Label] = React.useState('')
-  // Hide tabs whose feature is unavailable in the current deployment mode — in
-  // OSS this drops the enterprise-only SSO tab (which would otherwise render a
-  // dead "upgrade" card, since getUpgradeUrl() is null for OSS). EE/SaaS keep all
-  // tabs (isFeatureAvailable returns true; per-plan gating is handled downstream).
+  // Hide tabs whose feature is unavailable in the current deployment mode.
+  // SSO is real, working OSS code as of this pass (see services/plans/plans.ts
+  // and PENDING_FEATURES.md), so isFeatureAvailable('sso') now returns true in
+  // OSS mode too — this filter only actually drops something for 'payments'.
+  // EE/SaaS keep all tabs (isFeatureAvailable returns true; per-plan gating is
+  // handled downstream).
   const DEV_TABS = getDevTabs(t).filter((tab) => isFeatureAvailable(tab.id))
 
   function handleLabels() {

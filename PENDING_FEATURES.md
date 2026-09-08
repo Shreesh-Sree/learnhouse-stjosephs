@@ -121,6 +121,31 @@ Chromium) were all run for real. Results below.
       agree in practice, not just by inspection. (Not covered by the new
       E2E smoke suite — needs a seeded assignment with a time limit set.)
 
+## Known bug found this session — NOT fixed, needs its own investigation
+
+- [ ] **Every `[subpage]`-style dashboard settings route 404s**, discovered
+      while browser-verifying the SSO admin settings UI (see the SSO entry
+      below) — completely unrelated to that work, a real pre-existing bug.
+      Confirmed live, authenticated, with a freshly restarted dev server and
+      a cleared `.next` cache (ruling out stale-cache as the cause):
+      `/dash/developers/api`, `/dash/developers/sso`,
+      `/dash/org/settings/general` all return a genuine HTTP 404 — not a
+      client-side redirect, an actual 404 status the Next.js server itself
+      returns. `/dash/developers/api` is a plain, always-available tab with
+      no plan/feature gating at all, so this isn't about the EE-feature gate
+      fix elsewhere in this pass. Not root-caused in this session: checked
+      and ruled out `dynamicParams`/`generateStaticParams` exports (none),
+      an explicit `notFound()` call in the page or its layouts (none found
+      by grep), and `proxy.ts` middleware rewrite rules specific to
+      `/dash/*` (none found) — the actual mechanism is still unknown.
+      Non-`[subpage]` dashboard routes (e.g. `/dash/courses`) work fine, so
+      it's specific to the dynamic-segment pattern, not dashboard routing in
+      general. This blocks real admin usage of the SSO settings UI, org
+      settings (branding/menu/landing/AI/usage/danger tabs), and API/
+      automations/domains/SEO settings alike — worth prioritizing before
+      relying on any of those pages in production. A fresh investigation
+      pass (not a continuation of this one) is the right next step.
+
 ## Repo / workflow governance (blocked on GitHub web UI — can't be done from this session)
 
 - [ ] Set `main` as the repository's default branch
