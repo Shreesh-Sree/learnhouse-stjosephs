@@ -2,7 +2,7 @@ import { Callout } from 'nextra/components'
 
 # Environment Variables
 
-This page is the deployment reference for LearnHouse environment variables. The backend
+This page is the deployment reference for St. Joseph's Placements and Training Cell environment variables. The backend
 loads `apps/api/config/config.yaml` first, then overrides matching settings from the
 environment. The web app reads `NEXT_PUBLIC_*` values from runtime config or `process.env`.
 The CLI-generated `.env` file is the recommended way to configure a self-hosted instance.
@@ -16,8 +16,8 @@ optional: the feature stays disabled or uses a runtime fallback when the variabl
 
 | Variable | Description | Type | Default / required | Used by |
 | --- | --- | --- | --- | --- |
-| `LEARNHOUSE_SITE_NAME` | Instance name returned by the API. | string | `LearnHouse` | API |
-| `LEARNHOUSE_SITE_DESCRIPTION` | Short instance description returned by the API. | string | `LearnHouse is an open-source platform tailored for learning experiences.` | API |
+| `LEARNHOUSE_SITE_NAME` | Instance name returned by the API. | string | `St. Joseph's Placements and Training Cell` | API |
+| `LEARNHOUSE_SITE_DESCRIPTION` | Short instance description returned by the API. | string | `St. Joseph's Placements and Training Cell is an open-source platform tailored for learning experiences.` | API |
 | `LEARNHOUSE_CONTACT_EMAIL` | Contact email for the instance. | email | `hello@learnhouse.app` | API |
 | `LEARNHOUSE_ENV` | Environment label for backend and Sentry reporting. | string | `dev` | API, Web |
 | `LEARNHOUSE_DEVELOPMENT_MODE` | Enables development-only API behavior such as docs routes and EE dev override. | boolean | `false` | API, CLI |
@@ -35,7 +35,7 @@ optional: the feature stays disabled or uses a runtime fallback when the variabl
 | `LEARNHOUSE_COOKIE_DOMAIN_ALLOW_BROAD` | Acknowledges intentionally broad cookie domains such as `.example.com` and silences the safety warning. | boolean | `false` | API, EE CLI |
 | `LEARNHOUSE_CUSTOM_DOMAIN_DEV_MODE` | Skips DNS verification for all custom domains and marks them verified immediately. Development/testing only. | boolean | `false` | API |
 | `LEARNHOUSE_PUBLIC` | Docker build argument that produces a community build by excluding non-community code. | boolean | `false` | Dockerfiles (root, API, Web) |
-| `LEARNHOUSE_PLATFORM_URL` | Base URL for LearnHouse platform links, upgrade URLs, and email allowlist checks. | URL | unset; backend flows fall back to `https://www.learnhouse.app` and the web token-exchange to `https://learnhouse.app` | API, Web |
+| `LEARNHOUSE_PLATFORM_URL` | Base URL for St. Joseph's Placements and Training Cell platform links, upgrade URLs, and email allowlist checks. | URL | unset; backend flows fall back to `https://www.learnhouse.app` and the web token-exchange to `https://learnhouse.app` | API, Web |
 | `LEARNHOUSE_PLATFORM_API_KEY` | Shared secret for platform-only internal endpoints such as packs. When unset, those endpoints reject every request with a 403 and the API logs an error on the first rejected request. | secret string | required for SaaS/platform endpoints | API |
 | `CLOUD_INTERNAL_KEY` | Shared secret for SaaS-internal endpoints (custom-domain sync and the `cloud_internal` router). When unset, those endpoints reject every request and the API logs a startup warning. | secret string | unset; required for SaaS custom-domain provisioning | API |
 
@@ -105,7 +105,7 @@ optional: the feature stays disabled or uses a runtime fallback when the variabl
 | `LEARNHOUSE_EMAIL_PROVIDER` | Outbound email provider. | enum: `resend`, `smtp` | `resend` | API, CLI |
 | `LEARNHOUSE_RESEND_API_KEY` | Resend API key when `LEARNHOUSE_EMAIL_PROVIDER=resend`. | secret string | unset; required to send via Resend | API, CLI |
 | `LEARNHOUSE_SYSTEM_EMAIL_ADDRESS` | Sender address for system email. | email | unset; CLI setup can emit `noreply@{domain}` | API, CLI |
-| `LEARNHOUSE_SYSTEM_EMAIL_SENDER_NAME` | Display name on system email, as in `Name <address>`. The address itself is not configurable per sender. | string | `LearnHouse` | API |
+| `LEARNHOUSE_SYSTEM_EMAIL_SENDER_NAME` | Display name on system email, as in `Name <address>`. The address itself is not configurable per sender. | string | `St. Joseph's Placements and Training Cell` | API |
 | `LEARNHOUSE_SMTP_HOST` | SMTP server hostname when `LEARNHOUSE_EMAIL_PROVIDER=smtp`. | hostname | unset | API, CLI |
 | `LEARNHOUSE_SMTP_PORT` | SMTP server port. | integer | `587` | API, CLI |
 | `LEARNHOUSE_SMTP_USERNAME` | SMTP authentication username. | string | unset | API, CLI |

@@ -1,13 +1,13 @@
 # Supporting Services
 
-LearnHouse relies on several supporting services that run alongside the main applications.
+St. Joseph's Placements and Training Cell relies on several supporting services that run alongside the main applications.
 
 - In **development** (`learnhouse dev`), PostgreSQL and Redis run in Docker via `.learnhouse/docker-compose.dev.yml` while the API, web, and collab processes run locally on the host.
-- In **self-hosted production**, the LearnHouse CLI generates a `docker-compose.yml` from templates in `apps/cli/src/templates/` that runs PostgreSQL, Redis, a single `learnhouse-app` container (which bundles web + API + collab), and either nginx or Caddy as a reverse proxy.
+- In **self-hosted production**, the St. Joseph's Placements and Training Cell CLI generates a `docker-compose.yml` from templates in `apps/cli/src/templates/` that runs PostgreSQL, Redis, a single `learnhouse-app` container (which bundles web + API + collab), and either nginx or Caddy as a reverse proxy.
 
 ## PostgreSQL
 
-`pgvector/pgvector:pg16` (PostgreSQL 16 with the pgvector extension) is the primary database for LearnHouse. It stores all persistent application data including:
+`pgvector/pgvector:pg16` (PostgreSQL 16 with the pgvector extension) is the primary database for St. Joseph's Placements and Training Cell. It stores all persistent application data including:
 
 - Organizations and their configurations
 - User accounts and authentication records

@@ -2,7 +2,7 @@ import { Callout } from 'nextra/components'
 
 # Headless Assignments
 
-LearnHouse assignments can be driven entirely from your own frontend. With an API token you can author assignments and tasks, store an arbitrary custom data object on each task, read submissions and grades, submit answers on behalf of your learners, and grade them — all over the standard REST API, no LearnHouse UI required.
+St. Joseph's Placements and Training Cell assignments can be driven entirely from your own frontend. With an API token you can author assignments and tasks, store an arbitrary custom data object on each task, read submissions and grades, submit answers on behalf of your learners, and grade them — all over the standard REST API, no St. Joseph's Placements and Training Cell UI required.
 
 <Callout type="info">
 API tokens are available on the **Pro plan**. Create one under **Organization Settings → API Access** and grant it the **Assignments** permission. Tokens are prefixed with `lh_` and are scoped to a single organization.
@@ -65,7 +65,7 @@ curl -X POST http://localhost:1338/api/v1/assignments/ \
 
 ## Custom tasks — bring your own data object
 
-Each task has an `assignment_type` and a free-form `contents` JSON object. For a fully custom assignment, use the `CUSTOM` type: LearnHouse stores your `contents` (the task definition) and the learner's `task_submission` (their answer) as an arbitrary, caller-owned JSON object. The server never interprets or auto-grades it — it's yours to render and grade however you like.
+Each task has an `assignment_type` and a free-form `contents` JSON object. For a fully custom assignment, use the `CUSTOM` type: St. Joseph's Placements and Training Cell stores your `contents` (the task definition) and the learner's `task_submission` (their answer) as an arbitrary, caller-owned JSON object. The server never interprets or auto-grades it — it's yours to render and grade however you like.
 
 ```bash
 curl -X POST http://localhost:1338/api/v1/assignments/{assignment_uuid}/tasks \
@@ -87,12 +87,12 @@ curl -X POST http://localhost:1338/api/v1/assignments/{assignment_uuid}/tasks \
 The `contents` you send back out of `GET /assignments/task/{uuid}` is byte-for-byte what you stored.
 
 <Callout type="info">
-The built-in task types — `QUIZ`, `FORM`, `CODE`, `SHORT_ANSWER`, `NUMBER_ANSWER` — are auto-graded by LearnHouse against their `contents` schema. `CUSTOM` (and `FILE_SUBMISSION`) are **not** auto-graded and are graded manually.
+The built-in task types — `QUIZ`, `FORM`, `CODE`, `SHORT_ANSWER`, `NUMBER_ANSWER` — are auto-graded by St. Joseph's Placements and Training Cell against their `contents` schema. `CUSTOM` (and `FILE_SUBMISSION`) are **not** auto-graded and are graded manually.
 </Callout>
 
 ## Submissions and grading
 
-Learners are referenced by their existing LearnHouse `user_id`. These endpoints let you read submissions, write a learner's answer on their behalf, and finalize grades.
+Learners are referenced by their existing St. Joseph's Placements and Training Cell `user_id`. These endpoints let you read submissions, write a learner's answer on their behalf, and finalize grades.
 
 | Method | Endpoint | Action |
 | --- | --- | --- |
@@ -108,7 +108,7 @@ Learners are referenced by their existing LearnHouse `user_id`. These endpoints 
 
 ### Submitting on behalf of a learner
 
-To write a learner's answer, pass their LearnHouse id as `on_behalf_of_user_id`. The learner must already be a member of the token's organization.
+To write a learner's answer, pass their St. Joseph's Placements and Training Cell id as `on_behalf_of_user_id`. The learner must already be a member of the token's organization.
 
 ```bash
 # Save a learner's answer for a task

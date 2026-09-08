@@ -1,6 +1,6 @@
 ---
 title: Build It Yourself
-description: A complete, tested, step-by-step guide to building a headless learning platform with Next.js and the LearnHouse API — public catalogue first, then authentication, enrollment, and progress tracking.
+description: A complete, tested, step-by-step guide to building a headless learning platform with Next.js and the St. Joseph's Placements and Training Cell API — public catalogue first, then authentication, enrollment, and progress tracking.
 ---
 
 import { Callout, Tabs } from 'nextra/components'
@@ -8,12 +8,12 @@ import AuthFlowDiagram from '../../../components/diagrams/AuthFlowDiagram'
 
 # Build It Yourself
 
-This is the full build. By the end you'll have a Next.js app that browses your courses, plays their content, signs learners in, enrolls them, and tracks progress — all on top of the LearnHouse API.
+This is the full build. By the end you'll have a Next.js app that browses your courses, plays their content, signs learners in, enrolls them, and tracks progress — all on top of the St. Joseph's Placements and Training Cell API.
 
 It's split into two parts. **Part 1 is completely anonymous** — no login, no tokens, just public reads — and gets you a working public site. **Part 2 layers authentication on top** without rewriting anything from Part 1.
 
 <Callout type="info">
-**Prerequisites** (from the [overview](/guides/build-learning-platform)): Node 18+, a running LearnHouse instance at `http://localhost:1338`, your **org slug**, and at least one **public, published course** with content. Everything reads the API base from one env var, so adjust it if your instance is elsewhere.
+**Prerequisites** (from the [overview](/guides/build-learning-platform)): Node 18+, a running St. Joseph's Placements and Training Cell instance at `http://localhost:1338`, your **org slug**, and at least one **public, published course** with content. Everything reads the API base from one env var, so adjust it if your instance is elsewhere.
 </Callout>
 
 ---
@@ -43,14 +43,14 @@ Replace `your-org-slug` with your real slug. You can confirm it resolves by open
 
 ## Step 2 — A tiny API client
 
-Every call to LearnHouse goes through one small helper. Create `src/lib/learnhouse.ts`. This mirrors the pattern the official frontend uses in `apps/web/services/utils/ts/requests.ts` — a thin `fetch` wrapper that surfaces the API's `{ "detail": "..." }` error shape.
+Every call to St. Joseph's Placements and Training Cell goes through one small helper. Create `src/lib/learnhouse.ts`. This mirrors the pattern the official frontend uses in `apps/web/services/utils/ts/requests.ts` — a thin `fetch` wrapper that surfaces the API's `{ "detail": "..." }` error shape.
 
 ```ts filename="src/lib/learnhouse.ts"
 export const API_URL = process.env.NEXT_PUBLIC_LEARNHOUSE_API_URL!
 export const ORG_SLUG = process.env.NEXT_PUBLIC_LEARNHOUSE_ORG_SLUG!
 
 /**
- * Fetch JSON from the LearnHouse API.
+ * Fetch JSON from the St. Joseph's Placements and Training Cell API.
  * Pass an access token to authenticate (Part 2); omit it for public reads.
  */
 export async function lhFetch<T = any>(
@@ -75,7 +75,7 @@ export async function lhFetch<T = any>(
     } catch {
       /* non-JSON error body */
     }
-    throw new Error(`LearnHouse API ${res.status}: ${detail}`)
+    throw new Error(`St. Joseph's Placements and Training Cell API ${res.status}: ${detail}`)
   }
   return res.json()
 }
@@ -203,7 +203,7 @@ Start the dev server:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and you'll see your courses. (If LearnHouse is also on `:3000`, run the API on its usual port and Next will pick `:3001` — or set `PORT`.)
+Open [http://localhost:3000](http://localhost:3000) and you'll see your courses. (If St. Joseph's Placements and Training Cell is also on `:3000`, run the API on its usual port and Next will pick `:3001` — or set `PORT`.)
 
 <Callout type="info">
 The path segment after `courses/` is the **full** `course_uuid` exactly as returned by the list — it already includes the `course_` prefix (e.g. `course_3f2a…`). Pass it through verbatim; don't add or strip anything.
@@ -350,7 +350,7 @@ You now have a **fully browsable public learning site** — catalogue, course pa
 
 # Part 2 — Authentication, enrollment & progress
 
-Now we add accounts. The golden rule: **LearnHouse tokens never reach the browser.** Your Next.js app logs in on the server, stores the tokens in its *own* httpOnly cookie, and attaches them when calling the API. This is the Backend-for-Frontend (BFF) pattern.
+Now we add accounts. The golden rule: **St. Joseph's Placements and Training Cell tokens never reach the browser.** Your Next.js app logs in on the server, stores the tokens in its *own* httpOnly cookie, and attaches them when calling the API. This is the Backend-for-Frontend (BFF) pattern.
 
 <AuthFlowDiagram />
 
@@ -360,7 +360,7 @@ Now we add accounts. The golden rule: **LearnHouse tokens never reach the browse
 
 ## Step 6 — A server-side session
 
-Create `src/lib/session.ts` to read and write the session cookie. It stores the LearnHouse tokens, encrypted-at-rest concerns aside, in an httpOnly cookie that the browser can't read from JavaScript.
+Create `src/lib/session.ts` to read and write the session cookie. It stores the St. Joseph's Placements and Training Cell tokens, encrypted-at-rest concerns aside, in an httpOnly cookie that the browser can't read from JavaScript.
 
 ```ts filename="src/lib/session.ts"
 import { cookies } from 'next/headers'
@@ -613,7 +613,7 @@ export async function authedFetch<T = any>(
     }
   }
 
-  if (!res.ok) throw new Error(`LearnHouse API ${res.status}`)
+  if (!res.ok) throw new Error(`St. Joseph's Placements and Training Cell API ${res.status}`)
   return res.json()
 }
 ```

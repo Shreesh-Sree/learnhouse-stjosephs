@@ -2,9 +2,9 @@ import { Callout } from 'nextra/components'
 
 # Updates
 
-Keeping LearnHouse up to date ensures you have the latest features, bug fixes, and security patches.
+Keeping St. Joseph's Placements and Training Cell up to date ensures you have the latest features, bug fixes, and security patches.
 
-## Updating LearnHouse
+## Updating St. Joseph's Placements and Training Cell
 
 Use the built-in `update` command. It backs up your database, pulls the new image, migrates uploaded content to a persistent volume, restarts the stack, and applies database migrations.
 
@@ -60,7 +60,7 @@ npx learnhouse logs
 
 ## Database Migrations
 
-LearnHouse uses [Alembic](https://alembic.sqlalchemy.org/) to evolve the database schema between versions. After the new container starts, the CLI prompts:
+St. Joseph's Placements and Training Cell uses [Alembic](https://alembic.sqlalchemy.org/) to evolve the database schema between versions. After the new container starts, the CLI prompts:
 
 ```
 ? Run database migrations now? › Yes / No
@@ -81,7 +81,7 @@ docker compose exec learnhouse-app sh -c "cd /app/api && uv run alembic upgrade 
 
 ### Installs Created Before v1.3
 
-Early LearnHouse installs created their schema via SQLAlchemy's `create_all` without Alembic tracking. The update command detects this automatically and stamps the current schema as the baseline before running any delta migrations — so `upgrade head` applies only new changes instead of replaying everything.
+Early St. Joseph's Placements and Training Cell installs created their schema via SQLAlchemy's `create_all` without Alembic tracking. The update command detects this automatically and stamps the current schema as the baseline before running any delta migrations — so `upgrade head` applies only new changes instead of replaying everything.
 
 ## Rolling Back
 
@@ -111,7 +111,7 @@ Uploaded files stored on the filesystem (in the `learnhouse_content_*` Docker vo
 
 The CLI automatically checks for a new version each time you run a command and prints a notice if one is available.
 
-Review the [LearnHouse release notes](https://github.com/learnhouse/learnhouse/releases) before updating to understand what has changed. Some updates may include:
+Review the [St. Joseph's Placements and Training Cell release notes](https://github.com/learnhouse/learnhouse/releases) before updating to understand what has changed. Some updates may include:
 
 - New features or UI changes
 - Database migrations (applied automatically when you accept the prompt or pass `--migrate`)

@@ -1,34 +1,28 @@
 <p align="center">
-  <a href="https://docs.learnhouse.app">
-    <img alt="LearnHouse" src=".github/images/learnhouse-github.png" width="600" />
-  </a>
+  <img alt="St. Joseph's Placements and Training Cell" src="public/img/pages/learnhouse-github.png" width="600" />
 </p>
 
 <p align="center">
-  <strong>LearnHouse Documentation</strong>
+  <strong>St. Joseph's Placements and Training Cell Documentation</strong>
 </p>
 
 <p align="center">
-  Official documentation for <a href="https://learnhouse.app">LearnHouse</a>, the open-source learning management system.
-</p>
-
-<p align="center">
-  <a href="https://docs.learnhouse.app">docs.learnhouse.app</a>
+  Documentation for St. Joseph's Placements and Training Cell's learning management platform.
 </p>
 
 ---
 
 ## Local Development
 
-This site lives in the [`learnhouse/learnhouse`](https://github.com/learnhouse/learnhouse)
-monorepo under `docs/`. Run all commands from that directory.
+This site lives in the [`learnhouse-stjosephs`](https://github.com/Shreesh-Sree/learnhouse-stjosephs)
+repository under `docs/`. Run all commands from that directory.
 
 **Prerequisites:** [Bun](https://bun.sh) installed.
 
 ```bash
-# Clone the monorepo and move into the docs app
-git clone https://github.com/learnhouse/learnhouse.git
-cd learnhouse/docs
+# Clone the repository and move into the docs app
+git clone https://github.com/Shreesh-Sree/learnhouse-stjosephs.git
+cd learnhouse-stjosephs/docs
 
 # Install dependencies
 bun install

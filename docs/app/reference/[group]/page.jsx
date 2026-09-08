@@ -31,15 +31,14 @@ export default async function GroupPage({ params }) {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'APIReference',
-    name: `LearnHouse API — ${model.title}`,
+    name: `St. Joseph's Placements and Training Cell API — ${model.title}`,
     description: model.description,
-    url: `https://docs.learnhouse.app/reference/${model.slug}`,
+    url: `/reference/${model.slug}`,
     programmingModel: 'REST',
-    targetPlatform: 'LearnHouse',
+    targetPlatform: "St. Joseph's Placements and Training Cell",
     isPartOf: {
       '@type': 'WebSite',
-      name: 'LearnHouse Docs',
-      url: 'https://docs.learnhouse.app',
+      name: "St. Joseph's Placements and Training Cell Docs",
     },
   }
 

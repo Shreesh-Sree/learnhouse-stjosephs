@@ -65,9 +65,9 @@ mdxFiles.sort((a, b) => {
 
 const sections = []
 
-sections.push('# LearnHouse Documentation — Full Content')
+sections.push('# St. Joseph's Placements and Training Cell Documentation — Full Content')
 sections.push('')
-sections.push('> This file contains the complete text of all LearnHouse documentation pages.')
+sections.push('> This file contains the complete text of all St. Joseph's Placements and Training Cell documentation pages.')
 sections.push(`> Source: ${SITE_URL}`)
 sections.push('')
 
@@ -130,7 +130,7 @@ for (const [specPath, methods] of Object.entries(spec.paths || {})) {
 
 sections.push('---')
 sections.push('')
-sections.push('# LearnHouse API Reference')
+sections.push('# St. Joseph's Placements and Training Cell API Reference')
 sections.push(`URL: ${SITE_URL}/reference`)
 sections.push('')
 sections.push(`Base URL: ${API_BASE_URL} — all endpoints are prefixed with /api/v1.`)

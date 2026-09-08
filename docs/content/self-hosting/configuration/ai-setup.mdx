@@ -2,11 +2,11 @@ import { Callout, Tabs } from 'nextra/components'
 
 # AI Setup
 
-LearnHouse includes AI-powered features for learning assistance and content editing. The AI
+St. Joseph's Placements and Training Cell includes AI-powered features for learning assistance and content editing. The AI
 layer is **provider-agnostic** — point it at any major LLM provider by setting a provider name
 and an API key. These features are optional and disabled by default.
 
-Under the hood LearnHouse uses [Pydantic AI](https://ai.pydantic.dev/) for generation, and
+Under the hood St. Joseph's Placements and Training Cell uses [Pydantic AI](https://ai.pydantic.dev/) for generation, and
 **llama-index** with **pgvector** for RAG (Retrieval-Augmented Generation), enabling AI
 assistants to answer questions using your course content as context.
 
@@ -185,7 +185,7 @@ LEARNHOUSE_AI_MODEL_STANDARD=qwen2.5:3b
 
 ## Models & tiers
 
-LearnHouse maps features to three model tiers. Leave them unset to use the built-in Gemini 3
+St. Joseph's Placements and Training Cell maps features to three model tiers. Leave them unset to use the built-in Gemini 3
 defaults, or override any of them with a model name valid for your provider.
 
 | Env variable | Used for | Default (Gemini 3) |
@@ -231,7 +231,7 @@ embeddings and work on any provider.
 
 ## File & video context (course planning)
 
-Course planning can take **images, PDFs, and YouTube links** as reference material. LearnHouse
+Course planning can take **images, PDFs, and YouTube links** as reference material. St. Joseph's Placements and Training Cell
 converts each attachment into the right format for your provider; what actually works depends on
 the provider's own capabilities:
 

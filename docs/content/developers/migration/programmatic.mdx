@@ -2,7 +2,7 @@ import { Callout } from 'nextra/components'
 
 # Programmatic Migration
 
-This guide walks through the full sequence of API calls needed to build a course from scratch -- the same calls the LearnHouse web UI makes when an editor clicks through the dashboard. Use it as a reference when writing your own migration script.
+This guide walks through the full sequence of API calls needed to build a course from scratch -- the same calls the St. Joseph's Placements and Training Cell web UI makes when an editor clicks through the dashboard. Use it as a reference when writing your own migration script.
 
 The base URL in every example is `http://localhost:1338/api/v1` -- replace it with your instance domain.
 
@@ -410,7 +410,7 @@ Save the assets you want to use to a folder (the script expects `thumbnail.jpg`,
 
 ```bash
 #!/usr/bin/env bash
-# build-demo-course.sh — create a complete course end-to-end via the LearnHouse API.
+# build-demo-course.sh — create a complete course end-to-end via the St. Joseph's Placements and Training Cell API.
 set -euo pipefail
 
 # ── Config ───────────────────────────────────────────────────────────────────
@@ -438,7 +438,7 @@ COURSE=$(curl -fsS -X POST "$API/courses/?org_id=$ORG_ID" \
   -H "Authorization: Bearer $TOKEN" \
   -F 'name=The Complete Demo Course' \
   -F 'description=One of every activity type, built via the API' \
-  -F 'about=Created end-to-end by the LearnHouse migration quickstart script.' \
+  -F 'about=Created end-to-end by the St. Joseph's Placements and Training Cell migration quickstart script.' \
   -F 'public=true' \
   -F 'thumbnail_type=image' \
   -F "thumbnail=@$ASSETS/thumbnail.jpg;type=image/jpeg")
@@ -563,7 +563,7 @@ What you should see in the browser at the printed URL:
 - **Welcome page** with the heading, bold paragraph, embedded image, bullet list, and Python-highlighted code block, plus a TOC sidebar generated from the headings.
 - **Markdown remote page** rendering the GitHub README with full formatting.
 - **Embed example** showing a Wikipedia article inside an iframe.
-- **Hosted MP4 sample** in the LearnHouse video player.
+- **Hosted MP4 sample** in the St. Joseph's Placements and Training Cell video player.
 - **YouTube embed** with the YouTube iframe player.
 - **Sample PDF document** in the embedded PDF.js viewer with toolbar.
 - **Final assignment** showing the description, due date, and File Submission widget -- **but only when signed in**. The `/api/v1/assignments/*` router rejects anonymous requests, so on a public course an anonymous viewer sees a blank panel where the assignment widget would be. Sign in (or open via the dashboard) to see the description, tasks, and submission UI.

@@ -22,7 +22,9 @@ def test_real_app_lifespan_starts_and_always_stops(monkeypatch, request_fails):
                 raise RuntimeError("request failed")
     else:
         with TestClient(app_module.app) as client:
-            assert client.get("/").json() == {"Message": "Welcome to LearnHouse ✨"}
+            assert client.get("/").json() == {
+                "Message": "Welcome to St. Joseph's Placements and Training Cell ✨"
+            }
 
     startup.assert_awaited_once()
     shutdown.assert_awaited_once()

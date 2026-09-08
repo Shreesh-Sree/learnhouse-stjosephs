@@ -1,36 +1,36 @@
 ---
 title: Agent Spec
-description: A self-contained, copy-paste specification a coding agent can follow to build a headless LearnHouse learning platform with Next.js, including the exact API contract and acceptance criteria.
+description: A self-contained, copy-paste specification a coding agent can follow to build a headless St. Joseph's Placements and Training Cell learning platform with Next.js, including the exact API contract and acceptance criteria.
 ---
 
 import { Callout } from 'nextra/components'
 
 # Agent Spec
 
-Copy everything in the block below, fill in the **Configuration** values at the top, and paste it into your coding agent (see [Let an Agent Build It](/guides/build-learning-platform/with-an-agent) for the workflow). It's written *for the model* and contains the real LearnHouse API contract, so the agent builds against the API that actually exists.
+Copy everything in the block below, fill in the **Configuration** values at the top, and paste it into your coding agent (see [Let an Agent Build It](/guides/build-learning-platform/with-an-agent) for the workflow). It's written *for the model* and contains the real St. Joseph's Placements and Training Cell API contract, so the agent builds against the API that actually exists.
 
 <Callout type="info">
 This spec mirrors the [Do It Yourself](/guides/build-learning-platform/do-it-yourself) build exactly. If you want to understand what the agent is doing, read that page alongside the generated code.
 </Callout>
 
 ````markdown
-# SPEC: Build a headless learning platform on the LearnHouse API
+# SPEC: Build a headless learning platform on the St. Joseph's Placements and Training Cell API
 
 ## Configuration (fill these in before starting)
-- API_BASE = http://localhost:1338/api/v1     # your LearnHouse API base URL
+- API_BASE = http://localhost:1338/api/v1     # your St. Joseph's Placements and Training Cell API base URL
 - ORG_SLUG = your-org-slug                     # your organization slug
 - TEST_EMAIL = you@example.com                 # optional, for verifying auth
 - TEST_PASSWORD = ********                      # optional
 
 ## Goal
 Build a web learning platform with Next.js (App Router + TypeScript + Tailwind)
-that reads courses and content from the LearnHouse REST API and supports user
+that reads courses and content from the St. Joseph's Placements and Training Cell REST API and supports user
 signup, login, enrollment, and progress tracking. Build it in two stages:
 Stage 1 is fully anonymous (no tokens); Stage 2 adds authentication on top
 without rewriting Stage 1.
 
 ## Hard rules
-- LearnHouse access/refresh tokens MUST NEVER reach the browser. Do all
+- St. Joseph's Placements and Training Cell access/refresh tokens MUST NEVER reach the browser. Do all
   authenticated calls from the server (Route Handlers / Server Actions) and
   store tokens in the Next.js app's own httpOnly cookie (a "BFF" pattern).
 - Read the API base and org slug from environment variables; never hardcode.

@@ -2,7 +2,7 @@ import { Callout } from 'nextra/components'
 
 # Troubleshooting
 
-This guide covers common issues with self-hosted LearnHouse instances and how to resolve them.
+This guide covers common issues with self-hosted St. Joseph's Placements and Training Cell instances and how to resolve them.
 
 ## First Step: Run Diagnostics
 
@@ -21,7 +21,7 @@ This checks Docker availability, container health, port conflicts, DNS resolutio
 **Common causes:**
 
 - **Docker is not running.** Verify Docker is running with `docker info`. Start the Docker daemon if needed.
-- **Insufficient memory.** LearnHouse requires at least 2 GB of RAM. Check available memory with `free -m` (Linux) or Activity Monitor (macOS).
+- **Insufficient memory.** St. Joseph's Placements and Training Cell requires at least 2 GB of RAM. Check available memory with `free -m` (Linux) or Activity Monitor (macOS).
 - **Port conflicts.** Another service may be using port 80 or 443. Check with `lsof -i :80` and stop the conflicting service. `learnhouse doctor` will also detect port conflicts.
 - **Corrupted configuration.** Re-run `learnhouse setup` to regenerate configuration files.
 
@@ -60,7 +60,7 @@ lsof -i :80
 lsof -i :443
 ```
 
-Stop the conflicting service, or reconfigure LearnHouse to use a different port by re-running `learnhouse setup`.
+Stop the conflicting service, or reconfigure St. Joseph's Placements and Training Cell to use a different port by re-running `learnhouse setup`.
 
 ## Storage Permission Errors
 
@@ -134,5 +134,5 @@ learnhouse start
 If you cannot resolve an issue using this guide:
 
 1. Run `learnhouse doctor` and include the output in your report.
-2. Check the [LearnHouse GitHub issues](https://github.com/learnhouse/learnhouse/issues) for known problems and solutions.
+2. Check the [St. Joseph's Placements and Training Cell GitHub issues](https://github.com/learnhouse/learnhouse/issues) for known problems and solutions.
 3. Open a new issue with details about your problem, including relevant log output and your environment (OS, Docker version, RAM).

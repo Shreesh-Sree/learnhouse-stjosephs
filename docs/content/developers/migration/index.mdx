@@ -1,11 +1,11 @@
 import { Callout } from 'nextra/components'
 
-# Migrating Content into LearnHouse
+# Migrating Content into St. Joseph's Placements and Training Cell
 
-This section explains how to bring existing course content into LearnHouse using the public API. There are two supported approaches:
+This section explains how to bring existing course content into St. Joseph's Placements and Training Cell using the public API. There are two supported approaches:
 
 1. **Programmatic Migration** -- you script every step (create the course, then chapters, then activities, then upload files). Use this when you need full control of the resulting structure -- typical for migrating from another LMS where you already know the chapter/activity layout.
-2. **AI-Assisted Migration** -- you upload a folder of media (videos, PDFs, images, audio) and LearnHouse asks Gemini to propose a chapter/activity tree. You review and confirm, and a single endpoint creates the entire course in one transaction. Use this when you have a pile of files but no predefined structure.
+2. **AI-Assisted Migration** -- you upload a folder of media (videos, PDFs, images, audio) and St. Joseph's Placements and Training Cell asks Gemini to propose a chapter/activity tree. You review and confirm, and a single endpoint creates the entire course in one transaction. Use this when you have a pile of files but no predefined structure.
 
 Both approaches share the same underlying data model -- a Course contains Chapters, and each Chapter contains an ordered list of Activities.
 

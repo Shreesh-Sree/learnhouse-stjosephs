@@ -2,7 +2,7 @@ import { Callout } from 'nextra/components'
 
 # SSL and Domain Setup
 
-Securing your LearnHouse instance with SSL is strongly recommended for production deployments. This guide covers domain configuration and SSL setup options.
+Securing your St. Joseph's Placements and Training Cell instance with SSL is strongly recommended for production deployments. This guide covers domain configuration and SSL setup options.
 
 ## Domain Configuration
 
@@ -14,11 +14,11 @@ LEARNHOUSE_SSL=true
 LEARNHOUSE_COOKIE_DOMAIN=.example.com
 ```
 
-Make sure your DNS records point to the server running LearnHouse before enabling SSL.
+Make sure your DNS records point to the server running St. Joseph's Placements and Training Cell before enabling SSL.
 
 ## Using a Reverse Proxy
 
-The recommended approach for SSL termination is to place a reverse proxy in front of LearnHouse. This gives you flexibility in certificate management and allows you to serve other applications on the same server.
+The recommended approach for SSL termination is to place a reverse proxy in front of St. Joseph's Placements and Training Cell. This gives you flexibility in certificate management and allows you to serve other applications on the same server.
 
 ### Caddy
 
@@ -60,7 +60,7 @@ server {
 
 ### Traefik
 
-If you use Traefik as your reverse proxy, you can configure it to route traffic to LearnHouse and handle Let's Encrypt certificates automatically through its built-in ACME support.
+If you use Traefik as your reverse proxy, you can configure it to route traffic to St. Joseph's Placements and Training Cell and handle Let's Encrypt certificates automatically through its built-in ACME support.
 
 ## Let's Encrypt
 

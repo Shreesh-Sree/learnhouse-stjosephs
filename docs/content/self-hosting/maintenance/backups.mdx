@@ -2,7 +2,7 @@ import { Callout } from 'nextra/components'
 
 # Backups
 
-Regular backups are essential for protecting your LearnHouse data. The LearnHouse CLI provides built-in backup and restore commands for the PostgreSQL database.
+Regular backups are essential for protecting your St. Joseph's Placements and Training Cell data. The St. Joseph's Placements and Training Cell CLI provides built-in backup and restore commands for the PostgreSQL database.
 
 <Callout type="warning">
 The built-in backup only covers the database and your `.env` file. Uploaded content (images, videos, documents) stored on the filesystem is **not** included. See [Filesystem Content](#filesystem-content) below for recommendations.
@@ -18,7 +18,7 @@ learnhouse backup
 
 This creates a timestamped archive containing:
 
-- **`database.sql`** — a `pg_dump` of the LearnHouse PostgreSQL database
+- **`database.sql`** — a `pg_dump` of the St. Joseph's Placements and Training Cell PostgreSQL database
 - **`.env`** — a copy of your instance's environment file (if present)
 
 Backups are written to `<installDir>/backups/learnhouse-backup-<timestamp>.tar.gz`. The CLI prints the absolute path when the backup completes.

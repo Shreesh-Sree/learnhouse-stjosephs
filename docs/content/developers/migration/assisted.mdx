@@ -2,7 +2,7 @@ import { Callout } from 'nextra/components'
 
 # AI-Assisted Migration
 
-LearnHouse exposes a three-call API that uploads a folder of media files, asks Gemini to organise them into chapters and activities, and then creates the entire course in a single transaction. This is the right path when you have a directory full of legacy lecture recordings, PDFs, and images but no existing structure.
+St. Joseph's Placements and Training Cell exposes a three-call API that uploads a folder of media files, asks Gemini to organise them into chapters and activities, and then creates the entire course in a single transaction. This is the right path when you have a directory full of legacy lecture recordings, PDFs, and images but no existing structure.
 
 All three endpoints live under `/api/v1/courses/migrate/`. They require an **authenticated user session (JWT)** with permission to create courses in the target organization.
 
@@ -29,7 +29,7 @@ The token-swap endpoint requires the API token to have the `users.action_read` p
 | --- | --- |
 | You have a clean export from another LMS with a known chapter / activity layout | [Programmatic Migration](/developers/migration/programmatic) |
 | You need every detail of the resulting tree to be exact (titles, ordering, types) | Programmatic |
-| You have a pile of files and want LearnHouse to propose a structure | AI-assisted (this page) |
+| You have a pile of files and want St. Joseph's Placements and Training Cell to propose a structure | AI-assisted (this page) |
 | You want to author rich-text dynamic pages | Programmatic (AI-assisted produces media-only activities) |
 
 <Callout type="warning">

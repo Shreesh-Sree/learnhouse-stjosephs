@@ -10,52 +10,40 @@ import PostHogProvider from '../components/Analytics/PostHogProvider'
 
 export const metadata = {
   title: {
-    default: 'LearnHouse Docs',
-    template: '%s – LearnHouse Docs',
+    default: "St. Joseph's Placements and Training Cell Docs",
+    template: "%s – St. Joseph's Placements and Training Cell Docs",
   },
   description:
-    'Official documentation for LearnHouse, the open-source learning management system (LMS). Guides for self-hosting, course creation, AI features, API reference, and more.',
+    "Documentation for St. Joseph's Placements and Training Cell's learning platform. Guides for course creation, AI features, API reference, and more.",
   keywords: [
-    'LearnHouse',
-    'open source LMS',
+    "St. Joseph's Placements and Training Cell",
     'learning management system',
-    'self-hosted LMS',
     'course creation',
-    'LearnHouse documentation',
-    'LearnHouse docs',
+    "St. Joseph's Placements and Training Cell documentation",
+    "St. Joseph's Placements and Training Cell docs",
   ],
-  metadataBase: new URL('https://docs.learnhouse.app'),
   robots: {
-    index: true,
-    follow: true,
+    index: false,
+    follow: false,
     googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      index: false,
+      follow: false,
     },
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://docs.learnhouse.app',
-    siteName: 'LearnHouse Docs',
+    siteName: "St. Joseph's Placements and Training Cell Docs",
     description:
-      'Official documentation for LearnHouse, the open-source learning management system (LMS). Guides for self-hosting, course creation, AI features, API reference, and more.',
+      "Documentation for St. Joseph's Placements and Training Cell's learning platform. Guides for course creation, AI features, API reference, and more.",
     images: [
       {
-        url: 'https://docs.learnhouse.app/img/pages/learnhouse-github.png',
-        alt: 'LearnHouse Docs',
-        width: 2051,
-        height: 1016,
+        url: '/img/og.png',
+        alt: "St. Joseph's Placements and Training Cell Docs",
+        width: 1512,
+        height: 687,
       },
     ],
-  },
-  twitter: {
-    creator: '@getlearnhouse',
-    site: '@getlearnhouse',
-    card: 'summary_large_image',
   },
   icons: {
     icon: [
@@ -83,7 +71,7 @@ export default async function RootLayout({ children }) {
           <CustomNavbar />
           <Layout
             pageMap={await getPageMap()}
-            docsRepositoryBase="https://github.com/learnhouse/learnhouse/tree/dev/docs"
+            docsRepositoryBase="https://github.com/Shreesh-Sree/learnhouse-stjosephs/tree/main/docs"
             sidebar={{ defaultMenuCollapseLevel: 2 }}
             editLink="Edit this page on GitHub"
             footer={<></>}
