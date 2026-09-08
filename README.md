@@ -6,6 +6,12 @@
 
 <h3 align="center">The next-gen open-source platform for world-class educational content.</h3>
 
+> **This is a fork** of [learnhouse/learnhouse](https://github.com/learnhouse/learnhouse)
+> extended for a self-hosted school/college deployment — see
+> [Self-Host / Exam & Classroom Additions](#-self-host--exam--classroom-additions)
+> below for everything added on top of upstream, and
+> [`PENDING_FEATURES.md`](PENDING_FEATURES.md) for the full detail on each one.
+
 <p align="center">
   <a href="https://github.com/learnhouse/learnhouse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/learnhouse/learnhouse?style=flat&color=blue" alt="License" /></a>
   <a href="https://github.com/learnhouse/learnhouse/stargazers"><img src="https://img.shields.io/github/stars/learnhouse/learnhouse?style=flat" alt="Stars" /></a>
@@ -37,6 +43,58 @@
 🏢 <b>Multi-Org (Enterprise)</b> — Run multiple organizations from a single instance<br>
 </p>
 
+## 🏫 Self-Host / Exam & Classroom Additions
+
+This fork extends upstream LearnHouse with a batch of features built for
+running a real self-hosted school/college deployment — exam integrity,
+grading depth, LMS interoperability, and student retention tooling that
+don't exist in the base project. Everything below is real, merged code
+(not a roadmap) — see [`PENDING_FEATURES.md`](PENDING_FEATURES.md) for the
+full writeup of each one, including known limitations and scope decisions.
+
+**Exam integrity**
+- Safe Exam Browser (SEB) enforcement — per-assignment lockdown, header-hash
+  verification, downloadable `.seb` config, proctor quit password
+- Per-attempt time limits with a server-enforced countdown and auto-submit
+- Randomized question pools and shuffled question/answer order per student
+- Webcam proctoring snapshots (opt-in, instructor-only review)
+- Campus IP allowlisting for assignment submission (fails closed)
+
+**Assessment & grading**
+- Group/team assignments with shared submission and grading
+- Peer review workflow (double-blind, purely advisory)
+- Rubric-based grading as an optional per-task overlay
+- Per-student extensions / grace periods
+- In-house plagiarism / similarity check (no third-party API)
+- Student-flaggable quiz questions with an instructor review queue
+
+**Operations & integration**
+- Bulk roster import (CSV) and gradebook export (CSV)
+- LTI 1.1 Tool Provider support — launch a course from Canvas/Moodle/Blackboard
+- QTI 1.2 question-bank import (Canvas/Blackboard/Respondus exports)
+- SCORM 1.2 package upload and playback — independent OSS implementation
+- Calendar/ICS feed of assignment due dates and live sessions
+- Anonymous/pseudonymous posting in course discussions
+
+**Retention & engagement**
+- At-risk student dashboard (inactive / failing / missing work / low progress)
+- Verifiable digital credentials — Open Badges 2.0 on every certificate
+- Weekly digest email of what's due and what hasn't been started
+- Private gamification (points, streaks, badges — never a public leaderboard)
+
+**Access & scale**
+- Offline-capable course content via a hand-rolled service worker
+- Live session scheduling (embedded meeting link) tied into the calendar feed
+- Learning-path prerequisites at both the course and chapter level
+
+**Verified, not just written.** The full backend test suite (5,700+ tests),
+every database migration, the production frontend build, and a Playwright
+end-to-end smoke suite have all been run for real against a live Postgres +
+FastAPI + Next.js stack — not just compiled or read. A
+[`scripts/smoke-test.sh`](scripts/smoke-test.sh) post-deploy gate is wired
+into CI (`.github/workflows/smoke-test.yaml`) to catch this class of
+regression automatically going forward.
+
 ## 🚀 Get Started
 
 LearnHouse has an official CLI that handles everything — self-hosting, updates, backups, and local development.
@@ -61,7 +119,7 @@ npx learnhouse doctor      # Diagnose issues
 ### Development
 
 ```bash
-git clone https://github.com/learnhouse/learnhouse.git
+git clone https://github.com/Shreesh-Sree/learnhouse.git
 cd learnhouse
 npx learnhouse dev
 ```
@@ -110,7 +168,7 @@ This spins up PostgreSQL and Redis, installs dependencies, and starts the API, W
 ## 🤝 Contributing
 
 ```bash
-git clone https://github.com/learnhouse/learnhouse.git
+git clone https://github.com/Shreesh-Sree/learnhouse.git
 cd learnhouse
 npx learnhouse dev
 ```
@@ -129,7 +187,10 @@ See our full [Security Policy](https://learnhouse.app/security) for details on o
 
 ## ✍️ Author & Maintainer
 
-Sweave (Badr B.) — [@swve](https://github.com/swve)
+Sweave (Badr B.) — [@swve](https://github.com/swve) — original LearnHouse author.
+
+This fork's self-host / exam / classroom additions (see above) are
+maintained separately by [@Shreesh-Sree](https://github.com/Shreesh-Sree).
 
 ## 💜 A Word
 
