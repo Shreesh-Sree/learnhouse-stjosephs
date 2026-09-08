@@ -357,15 +357,88 @@ than depending on seeded data, so it's portable to any environment. Frontend
 unit suite still 263/263 (`bun test tests`) after the query-key
 consolidation.
 
-**Not yet covered by this pass** (started but not finished — the course
-editor investigation above consumed most of this session's remaining
-effort): a deep CRUD pass on Assignments (create/submit/grade), Library
-folders, Communities (create/post), Podcasts, Boards, and Playgrounds create
-flows, and the Users/Org/Developers settings *save* actions (the sweep only
-confirms these pages load — it does not yet fill in and submit their forms).
-Also not covered: whether the same stale-while-revalidate service worker
-causes an analogous "my own edit doesn't appear" problem on any OTHER
-editor surface that hits `/api/v1/courses|chapters|activities/...` without
+### Assignments: two more real bugs, one of them severe
+
+Continuing the sweep into Assignments (create/submit/grade) surfaced two
+more genuine, live-verified bugs — the second is arguably the most severe
+finding of this whole pass.
+
+1. **The global "New Assignment" flow was a dead end for every course,
+   always.** `NewAssignmentModal.tsx` (reached from `/dash/assignments` →
+   "New Assignment") called `getCourse()` — a plain `GET courses/{uuid}`
+   that returns `CourseRead`, which has no `chapters` field at all — to
+   populate the chapter-picker step. Every course showed "This course has
+   no chapters yet," even courses that visibly had several, because the
+   response object literally never carried that data. Fixed by switching
+   to `getCourseMetadata()` (the `/meta` endpoint, `FullCourseRead`, which
+   actually returns chapters/activities) with `withUnpublishedActivities:
+   true` — an admin placing a new assignment needs to see draft chapters,
+   not just published ones.
+2. **Creating an assignment, a usergroup, or a podcast 500'd on every
+   single attempt in this OSS sandbox (no Redis).** Root-caused via the
+   backend log's full traceback: `increase_feature_usage()` in
+   `security/features_utils/usage.py` calls `_get_redis_client()` with no
+   guard, and that function deliberately raises `HTTPException(500)` when
+   Redis is unreachable — the same failure mode as the login-rate-limit
+   bug fixed earlier this session, just in a different call site. The
+   browser's own console reported this as a CORS error ("No
+   'Access-Control-Allow-Origin' header"), which is a red herring: Chrome
+   reports a hard 5xx-without-CORS-headers failure that way, and a direct
+   curl confirmed the endpoint's CORS headers are correctly present on
+   every other response shape (200, 422) — only the unhandled-exception
+   500 path was missing them. `increase_feature_usage`/
+   `decrease_feature_usage` are called for `assignments`, `usergroups`,
+   and `podcasts` (not `courses`/`members`/`admin_seats`, which route
+   through a separate Postgres-backed path and were unaffected) — so this
+   blocked THREE core creation/deletion flows, not just one, in any
+   Redis-less deployment. The usage counter these functions maintain only
+   ever feeds SaaS plan-limit enforcement (`resolve_feature()` always
+   returns `limit: 0` outside SaaS mode, so the limit check itself is
+   already a no-op there) — fixed by skipping the Redis call entirely
+   outside SaaS mode, and failing open (log, don't raise) even in SaaS
+   mode so a transient Redis outage doesn't take down the caller's actual
+   create/delete request over a soft usage counter.
+
+   A related, smaller bug in `AssignmentActivityModal.tsx`'s
+   `handleSubmit`: it had no error handling at all around either create
+   call or the post-creation cache refresh. A failure at any of those
+   points (this Redis crash included) left the submit button stuck in a
+   permanently-disabled loading state with the modal never closing —
+   confirmed via screenshot mid-diagnosis: the assignment had actually
+   been created successfully (visible in the list behind the stuck modal)
+   but the user would have no way to tell short of manually closing it.
+   Wrapped each step in try/catch: a failure on the create calls now shows
+   an error toast and resets the form (with orphan cleanup if the activity
+   was created but the assignment record wasn't); a failure in the
+   best-effort cache refresh no longer blocks the already-successful
+   creation from closing the modal.
+
+   Verified live end to end for both `assignments` and `usergroups`:
+   creation now returns 200 (previously 500) and appears immediately.
+   Added `test_increase_decrease_feature_usage_skip_redis_outside_saas`
+   and `test_increase_decrease_feature_usage_fail_open_on_redis_outage` to
+   `test_feature_usage.py`, and updated the 6 existing tests that
+   specifically exercise the Redis-tracked path to mock SaaS mode (they
+   were asserting Redis calls that, correctly, no longer happen outside
+   SaaS mode). Full backend `src/tests/security` + `src/tests/services`
+   suite: **4702 passed, 29 skipped, 0 failed** — no regressions from the
+   usage.py change reaching any other feature (`courses`, `members`
+   tracking is on the separate Postgres path and was never affected).
+
+**Not yet covered by this pass**: Library folders, Communities
+(create/post), Podcasts, Boards, and Playgrounds create flows, submitting
+and grading an actual assignment (only creation was exercised), and the
+Users/Org/Developers settings *save* actions (the sweep only confirms
+these pages load — it does not yet fill in and submit their forms). Also
+worth checking given what this pass found: `podcasts` shares the exact
+same `increase_feature_usage`/`decrease_feature_usage` code path as
+assignments/usergroups and is now fixed by the same change, but wasn't
+separately live-verified the way assignments/usergroups were — reasonable
+to assume fixed given it's identical code, but not independently
+screenshotted. Also not covered: whether the same stale-while-revalidate
+service worker causes an analogous "my own edit doesn't appear" problem on
+any OTHER editor surface that hits
+`/api/v1/courses|chapters|activities/...` without
 `with_unpublished_activities=true` in the URL (the SEO tab, Access/roster
 editing, contributor management, and drag-and-drop reordering all mutate
 course-adjacent data through different endpoints/params) — worth a

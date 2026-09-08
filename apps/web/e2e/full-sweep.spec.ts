@@ -160,3 +160,78 @@ test.describe('Course editor — chapters/activities appear without a reload', (
     await expect(page.getByText(activityName, { exact: false })).toBeVisible({ timeout: 15_000 })
   })
 })
+
+test.describe('Assignment and usergroup creation — real Redis-crash regression', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page)
+  })
+
+  test('creating an assignment succeeds (was a guaranteed 500 without Redis)', async ({ page }) => {
+    // Regression test for a severe bug: increase_feature_usage() in
+    // security/features_utils/usage.py called _get_redis_client() with no
+    // guard for the "assignments"/"usergroups"/"podcasts" features — that
+    // function deliberately raises HTTP 500 when Redis is unreachable, so
+    // every assignment/usergroup/podcast create or delete 500'd outright in
+    // any Redis-less deployment (this project treats Redis as optional
+    // everywhere else). Fixed to skip Redis tracking outside SaaS mode
+    // (where the usage counter is a no-op anyway) and fail open even in
+    // SaaS mode. The chapter-picker bug this test also exercises
+    // (NewActivityModal's Assignments step needs a real chapter to place
+    // the assignment in) was a separate fix: getCourse() → getCourseMetadata().
+    await page.goto('/dash/courses')
+    await dismissOnboarding(page)
+    await page.getByText('New Course', { exact: false }).click({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    await page.getByText('Start from Scratch', { exact: false }).click({ timeout: 5_000 })
+    await page.waitForTimeout(500)
+    const createCourseDialog = page.getByRole('dialog')
+    await createCourseDialog.locator('input').first().fill('E2E_ASSIGN_COURSE_' + Date.now())
+    await createCourseDialog.locator('textarea').first().fill('Course for the assignment-creation regression test.')
+    await page.getByRole('button', { name: /create course/i }).click({ timeout: 5_000 })
+    await page.waitForURL((url) => url.pathname.includes('/dash/courses/course/'), { timeout: 15_000 })
+
+    await page.goto(page.url().replace(/\/[a-z]+$/, '/content'))
+    await dismissOnboarding(page)
+    await page.waitForTimeout(1000)
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(500)
+
+    const assignmentName = 'REGRESSION_ASSIGN_' + Date.now()
+    await page.getByText('Add Activity', { exact: false }).first().click({ timeout: 10_000 })
+    await page.waitForTimeout(500)
+    await page.getByText('Assignments', { exact: false }).last().click({ timeout: 5_000 })
+    await page.waitForTimeout(800)
+    const assignDialog = page.getByRole('dialog')
+    await assignDialog.locator('input').first().fill(assignmentName)
+    await assignDialog.locator('textarea').first().fill('Created by the assignment-creation regression test.')
+    await page.waitForTimeout(300)
+
+    const submitBtn = assignDialog.getByRole('button', { name: 'Create activity' })
+    await submitBtn.scrollIntoViewIfNeeded()
+    const [resp] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('/assignments/') && r.request().method() === 'POST', { timeout: 15000 }),
+      submitBtn.click({ timeout: 10_000 }),
+    ])
+    expect(resp.status(), 'assignment creation must not 500').toBeLessThan(400)
+    await expect(page.getByText(assignmentName, { exact: false })).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 5_000 })
+  })
+
+  test('creating a usergroup succeeds (was a guaranteed 500 without Redis)', async ({ page }) => {
+    await page.goto('/dash/users/settings/usergroups')
+    await dismissOnboarding(page)
+    const groupName = 'E2E_GROUP_' + Date.now()
+    await page.getByRole('button', { name: 'Create a UserGroup' }).click({ timeout: 10_000 })
+    await page.waitForTimeout(800)
+    const dialog = page.getByRole('dialog')
+    await dialog.locator('input').first().fill(groupName)
+
+    const submitBtn = dialog.getByRole('button', { name: /create/i })
+    const [resp] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('/usergroups') && r.request().method() === 'POST', { timeout: 15000 }),
+      submitBtn.click({ timeout: 10_000 }),
+    ])
+    expect(resp.status(), 'usergroup creation must not 500').toBeLessThan(400)
+    await expect(page.getByText(groupName, { exact: false })).toBeVisible({ timeout: 15_000 })
+  })
+})
