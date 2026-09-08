@@ -264,3 +264,40 @@ test.describe('Org general settings — save works without an unrelated required
     await expect(page.locator('input[placeholder="Enter footer text..."]')).toHaveValue(footerText, { timeout: 15_000 })
   })
 })
+
+test.describe('Roles — Create a Role does not render twice', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page)
+  })
+
+  test('opening the create-role modal from either trigger mounts exactly one form', async ({ page }) => {
+    // Regression test: OrgRoles.tsx rendered TWO separate <Modal><AddRole/></Modal>
+    // instances — one wired to the header's green "Create a Role" button, one to
+    // the black button below the roles table — both bound to the SAME
+    // createRoleModal boolean state. Opening either one flipped that shared
+    // state to true, mounting BOTH dialogs at once, stacked at the exact same
+    // screen position (identical bounding boxes, confirmed live) — filling the
+    // "first" name input and reading it back showed the value in a second,
+    // separate element. Fixed by keeping one canonical <Modal> and making the
+    // second trigger a plain button that opens the same shared instance.
+    await page.goto('/dash/users/settings/roles')
+    await dismissOnboarding(page)
+    await page.getByRole('button', { name: 'Create a Role' }).first().click({ timeout: 10_000 })
+    await page.waitForTimeout(800)
+
+    await expect(page.locator('input[placeholder="e.g., Course Manager"]')).toHaveCount(1)
+    await expect(page.locator('textarea[placeholder="Describe what this role can do..."]')).toHaveCount(1)
+
+    const roleName = 'E2E_ROLE_' + Date.now()
+    await page.locator('input[placeholder="e.g., Course Manager"]').fill(roleName)
+    await page.locator('textarea[placeholder="Describe what this role can do..."]').fill('Regression test role.')
+    await page.locator('label:has-text("Read")').first().click({ timeout: 5_000 })
+
+    const [resp] = await Promise.all([
+      page.waitForResponse(r => r.url().includes('/roles') && r.request().method() === 'POST', { timeout: 15000 }),
+      page.getByRole('button', { name: 'Create Role', exact: true }).click({ timeout: 10_000 }),
+    ])
+    expect(resp.status(), 'role creation must succeed').toBeLessThan(400)
+    await expect(page.getByText('Created new role', { exact: false })).toBeVisible({ timeout: 10_000 })
+  })
+})

@@ -36,6 +36,35 @@ def _get_redis(redis_conn_string: str) -> redis.Redis:
     return redis.Redis(connection_pool=_redis_pool)
 
 
+def _get_redis_or_503(redis_conn_string: str) -> redis.Redis:
+    """
+    Invite codes are stored entirely in Redis (short-lived keys with a TTL,
+    no Postgres table) — unlike the usage-tracking counters elsewhere in this
+    project, there is no fallback data store to degrade to, so this feature
+    genuinely requires a reachable Redis. What was missing was a clean error
+    when it isn't: `redis_conn_string` being configured (which it is by
+    default) only proves a connection STRING exists, not that the server
+    behind it is actually up — the real connection attempt happens lazily
+    inside r.eval()/r.get()/r.delete(), so a Redis that's down surfaced as an
+    unhandled redis.exceptions.ConnectionError deep in library code: a raw
+    500 with a Python traceback, which the browser's console then reports as
+    a misleading CORS failure (Chrome's generic message for any
+    request that dies without a proper response). Ping eagerly here so every
+    call site raises the same clean, actionable error instead.
+    """
+    r = _get_redis(redis_conn_string)
+    try:
+        if r is None or not r.ping():
+            raise redis.exceptions.ConnectionError("no redis client")
+    except redis.exceptions.RedisError as e:
+        logger.error("Invite codes: Redis unreachable (%s)", e)
+        raise HTTPException(
+            status_code=503,
+            detail="Invite codes require a working Redis connection, which is currently unavailable. Contact your administrator.",
+        )
+    return r
+
+
 # Lua script: atomically count existing org invite codes and add a new one if
 # the per-org limit has not been reached.  Runs as a single atomic unit on the
 # Redis server, eliminating the check-then-set race condition.
@@ -112,7 +141,7 @@ async def create_invite_code(
     )
 
     # Connect to Redis
-    r = _get_redis(redis_conn_string)
+    r = _get_redis_or_503(redis_conn_string)
 
     if not r:
         raise HTTPException(
@@ -209,7 +238,7 @@ async def get_invite_codes(
     await rbac_check(request, org.org_uuid, current_user, "update", db_session)
 
     # Connect to Redis
-    r = _get_redis(redis_conn_string)
+    r = _get_redis_or_503(redis_conn_string)
 
     if not r:
         raise HTTPException(
@@ -274,7 +303,7 @@ async def get_invite_code(
     await rbac_check(request, org.org_uuid, current_user, "read", db_session)
 
     # Connect to Redis
-    r = _get_redis(redis_conn_string)
+    r = _get_redis_or_503(redis_conn_string)
 
     if not r:
         raise HTTPException(
@@ -337,7 +366,7 @@ async def delete_invite_code(
     await rbac_check(request, org.org_uuid, current_user, "update", db_session)
 
     # Connect to Redis
-    r = _get_redis(redis_conn_string)
+    r = _get_redis_or_503(redis_conn_string)
 
     if not r:
         raise HTTPException(
@@ -386,7 +415,7 @@ async def send_invite_email(
         redis_conn_string = LH_CONFIG.redis_config.redis_connection_string
 
         if redis_conn_string:
-            r = _get_redis(redis_conn_string)
+            r = _get_redis_or_503(redis_conn_string)
             matched = list(r.scan_iter(match=f"{invite_code_uuid}:org:{org.org_uuid}:code:*", count=10))  # type: ignore
             if matched:
                 data = r.get(matched[0])

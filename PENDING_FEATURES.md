@@ -456,12 +456,76 @@ persists across a full page reload. Added a permanent regression test to
 `full-sweep.spec.ts`. Frontend build and `bun test tests` (263/263) both
 clean.
 
+### Users settings — Sign-in, Two-factor, Roles, Signups & Invite Codes
+
+Continued the sweep into the remaining Users-settings tabs.
+
+**Sign-in and Two-factor both save correctly.** Both write through a
+single shared `PUT /auth/mfa/org-policy/{orgId}` endpoint (confirmed by
+reading `useOrgSecurityPolicy` in `shared.tsx` — not a bug, a deliberately
+shared org-security-policy object covering both concerns despite the
+endpoint's MFA-flavored name). Toggling an allowed sign-in method and
+saving round-trips a real 200 and persists across a reload. Two-factor's
+own save was verified via the safe "exempt Google/SSO users" checkbox
+rather than actually flipping "Require two-factor authentication" on —
+doing that for real would have locked every subsequent test login out of
+its own admin session for the rest of this pass, since this sandbox's
+admin has no second factor enrolled.
+
+**Roles had a real, confirmed bug**: `OrgRoles.tsx` rendered **two**
+separate `<Modal><AddRole/></Modal>` instances — one wired to the header's
+green "Create a Role" button, one to the black button below the roles
+table — both bound to the exact same `createRoleModal` boolean state.
+Opening either trigger flipped that shared state to `true` and mounted
+*both* dialogs at once, stacked at the identical screen position
+(confirmed live: both reported the exact same bounding box). Filling the
+name field in what looked like the only visible form and reading the
+value back showed it in a second, separate DOM element — the actual
+symptom that surfaced this during testing. Fixed by keeping one canonical
+`<Modal>` and turning the second trigger into a plain button that opens
+the same shared instance rather than mounting its own copy. Verified live:
+exactly one name input/description textarea now exists in the DOM, and
+role creation still returns 200 and appears in the list. Added a permanent
+regression test to `full-sweep.spec.ts`.
+
+**Signups & Invite Codes had a third instance of the Redis-crash bug
+class** — this one in `src/services/orgs/invites.py`, structurally
+different from the assignments/usergroups/podcasts case fixed earlier:
+invite codes are stored *entirely* in Redis (short-lived keys with a TTL,
+no Postgres table at all), so there is no fallback data store to degrade
+to the way there was for usage-tracking counters — this feature genuinely
+requires a reachable Redis to function. The actual bug was narrower but
+still real: `redis_conn_string` being configured (which it is, by
+default) only proves a connection *string* exists, not that the Redis
+server behind it is reachable — the real connection attempt happens
+lazily inside `r.eval()`/`r.get()`/`r.delete()`, so a Redis that's down
+surfaced as an unhandled `redis.exceptions.ConnectionError` deep in
+library code: a raw 500 with a Python traceback as the response body,
+which the browser reported as a misleading CORS failure (confirmed via
+the backend log's full traceback — the same "Chrome mislabels any
+response-less failure as CORS" pattern from the assignments bug).
+Generating an invite code, listing them, fetching one, and deleting one
+were all broken this way. Fixed with a `_get_redis_or_503()` wrapper that
+pings eagerly and turns any Redis error into a clean `503 Service
+Unavailable` with an actionable message ("Invite codes require a working
+Redis connection, which is currently unavailable. Contact your
+administrator.") — the frontend's existing generic error-toast plumbing
+then surfaces that message directly to the admin instead of a blank
+crash. Verified live: same 503 + clear toast, no more raw stack trace.
+Added `test_create_invite_code_redis_down_gives_clean_503_not_raw_crash`
+to `test_org_invites_service.py` (the existing suite's own
+`_get_redis`-returns-`None` test only covered a theoretical case that
+never happens in real code — `_get_redis` always returns a client object,
+it just may not be able to reach anything — so it never caught this).
+Updated that existing test's 4 assertions from 500 to 503 to match the
+now-correct status code. 13/13 tests pass in that file; the broader
+`-k invite` sweep across `src/tests/routers` is 35/35.
+
 **Not yet covered by this pass**: submitting and grading an actual
-assignment (only creation was exercised), and the remaining
-Users/Developers settings *save* actions beyond Org general (the sweep
-only confirms those pages load — it does not yet fill in and submit
-Roles, Signups, Sign-in policy, Two-factor, API Access, Automations,
-Domains, or SEO forms). Also not covered: whether the same stale-while-revalidate
+assignment (only creation was exercised), and the remaining Developers
+settings *save* actions (the sweep only confirms those pages load — it
+does not yet fill in and submit API Access, Automations, Domains, or SEO
+forms). Also not covered: whether the same stale-while-revalidate
 service worker causes an analogous "my own edit doesn't appear" problem on
 any OTHER editor surface that hits
 `/api/v1/courses|chapters|activities/...` without

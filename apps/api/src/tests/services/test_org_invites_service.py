@@ -243,10 +243,47 @@ class TestOrgInvitesService:
                     db,
                 )
 
-        assert create_conn_exc.value.status_code == 500
-        assert get_codes_conn_exc.value.status_code == 500
-        assert get_code_conn_exc.value.status_code == 500
-        assert delete_conn_exc.value.status_code == 500
+        # 503, not 500: an unreachable Redis is a dependency outage, not an
+        # unexpected server bug — see _get_redis_or_503's docstring.
+        assert create_conn_exc.value.status_code == 503
+        assert get_codes_conn_exc.value.status_code == 503
+        assert get_code_conn_exc.value.status_code == 503
+        assert delete_conn_exc.value.status_code == 503
+
+    @pytest.mark.asyncio
+    async def test_create_invite_code_redis_down_gives_clean_503_not_raw_crash(
+        self, mock_request, db, org, admin_user
+    ):
+        """Regression test for the real production scenario, not just the
+        theoretical "_get_redis returns None" case above: _get_redis()
+        returns a real client object whose connection is simply dead (the
+        Redis server isn't running), so the actual failure surfaces the
+        first time a command is attempted — here, on .ping(). Confirmed live
+        in this session: this crashed with an unhandled
+        redis.exceptions.ConnectionError (a raw 500 with a Python traceback
+        as the body) every single time an admin tried to generate an invite
+        code in a Redis-less deployment. Must now raise a clean 503 instead.
+        """
+        import redis as redis_module
+
+        dead_client = Mock()
+        dead_client.ping = Mock(side_effect=redis_module.exceptions.ConnectionError("Connection refused"))
+
+        with patch(
+            "src.services.orgs.invites.get_learnhouse_config",
+            return_value=_fake_config(),
+        ), patch(
+            "src.services.orgs.invites.rbac_check",
+            new_callable=AsyncMock,
+        ), patch(
+            "src.services.orgs.invites._get_redis",
+            return_value=dead_client,
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                await create_invite_code(mock_request, org.id, admin_user, db)
+
+        assert exc_info.value.status_code == 503
+        assert "Redis" in exc_info.value.detail
 
         invite_payload = {
             "invite_code": "ABC12345",

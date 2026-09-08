@@ -433,26 +433,19 @@ function OrgRoles() {
 
                 <div className='flex justify-end mt-3 me-2'>
                     {canCreateRoles ? (
-                        <Modal
-                            isDialogOpen={createRoleModal}
-                            onOpenChange={() => setCreateRoleModal(!createRoleModal)}
-                            minHeight="no-min"
-                            minWidth='xl'
-                            customWidth="max-w-7xl"
-                            dialogContent={
-                                <AddRole
-                                    setCreateRoleModal={setCreateRoleModal}
-                                />
-                            }
-                            dialogTitle={t('dashboard.users.roles.modals.create.title')}
-                            dialogDescription={t('dashboard.users.roles.modals.create.description')}
-                            dialogTrigger={
-                                <button className="flex space-x-2 hover:cursor-pointer p-2 sm:p-1 sm:px-3 bg-black rounded-md font-bold items-center text-sm text-white w-full sm:w-auto justify-center hover:bg-gray-800 transition-colors shadow-sm">
-                                    <Shield className="w-4 h-4" />
-                                    <span>{t('dashboard.users.roles.actions.create')}</span>
-                                </button>
-                            }
-                        />
+                        // Shares createRoleModal state with the header's own "Create a Role"
+                        // Modal above — a second full <Modal>+<AddRole> here (as it used to be)
+                        // rendered a second, fully-functional, exactly-overlapping copy of the
+                        // form the instant either trigger was clicked, since both were bound to
+                        // the same boolean. A plain trigger button avoids mounting a duplicate
+                        // dialog for what must always be a single shared open/closed state.
+                        <button
+                            onClick={() => setCreateRoleModal(true)}
+                            className="flex space-x-2 hover:cursor-pointer p-2 sm:p-1 sm:px-3 bg-black rounded-md font-bold items-center text-sm text-white w-full sm:w-auto justify-center hover:bg-gray-800 transition-colors shadow-sm"
+                        >
+                            <Shield className="w-4 h-4" />
+                            <span>{t('dashboard.users.roles.actions.create')}</span>
+                        </button>
                     ) : (
                         <div className="flex items-center space-x-2">
                             <button
