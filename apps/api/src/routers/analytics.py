@@ -445,11 +445,16 @@ async def query_dashboard(
     if query_name not in ALL_QUERIES:
         raise HTTPException(status_code=404, detail="Unknown query")
 
-    # Plan gating for advanced queries
+    # Plan gating for advanced queries — SaaS mode only. These SQL queries are
+    # real, complete OSS code in this repo, not a withheld EE module, so a
+    # self-hosted deployment gets them unconditionally (same precedent SCORM/
+    # SSO/the audit dossier router already established — see
+    # PENDING_FEATURES.md). Deliberately NOT routed through
+    # _check_mode_bypass("analytics_advanced"), which would 403 in OSS mode
+    # regardless of these queries' own completeness.
     if query_name in ADVANCED_QUERIES:
-        from src.security.features_utils.plan_check import _check_mode_bypass
-        bypass = _check_mode_bypass("analytics_advanced")
-        if bypass is None:  # SaaS mode — check plan
+        from src.core.deployment_mode import get_deployment_mode
+        if get_deployment_mode() == "saas":
             current_plan = await get_org_plan(org_id, db_session)
             if not plan_meets_requirement(current_plan, "enterprise"):
                 raise HTTPException(
@@ -797,7 +802,7 @@ async def export_analytics(
     # individual dashboard endpoints, otherwise an admin on a free/lower
     # plan could exfiltrate course-level (Pro) and advanced (Enterprise)
     # analytics simply by exporting them.
-    from src.security.features_utils.plan_check import _check_mode_bypass
+    from src.core.deployment_mode import get_deployment_mode
 
     requested = [q for q in query_names if q in allowed]
     if safe_course_uuid and requested:
@@ -809,9 +814,9 @@ async def export_analytics(
                 detail="Course analytics requires a Pro plan or higher.",
             )
     elif any(q in ADVANCED_QUERIES for q in requested):
-        # Advanced queries require an Enterprise plan in SaaS mode.
-        bypass = _check_mode_bypass("analytics_advanced")
-        if bypass is None:
+        # Advanced queries require an Enterprise plan in SaaS mode only — real
+        # OSS code, not a withheld EE module; see the dashboard endpoint above.
+        if get_deployment_mode() == "saas":
             current_plan = await get_org_plan(org_id, db_session)
             if not plan_meets_requirement(current_plan, "enterprise"):
                 raise HTTPException(

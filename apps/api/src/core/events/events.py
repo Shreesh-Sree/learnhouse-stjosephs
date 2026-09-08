@@ -81,6 +81,12 @@ def startup_app(app: FastAPI) -> Callable:
         from src.services.digest.scheduler import start_scheduler as start_digest_scheduler
         start_digest_scheduler()
 
+        # The audit-log retention purge runs on its own daily tick, same
+        # reasoning as above — not SaaS-gated either. No-op unless
+        # LEARNHOUSE_AUDIT_RETENTION_ENABLED; never raises.
+        from src.services.audit.retention_scheduler import start_scheduler as start_audit_retention_scheduler
+        start_audit_retention_scheduler()
+
         # The shared demo organization refreshes itself on an interval, so the
         # feature needs no external scheduler. No-op unless
         # LEARNHOUSE_DEMO_ENABLED; never raises.
@@ -128,6 +134,9 @@ def shutdown_app(app: FastAPI) -> Callable:
         # Stop the weekly digest tick.
         from src.services.digest.scheduler import stop_scheduler as stop_digest_scheduler
         await stop_digest_scheduler()
+        # Stop the audit retention tick.
+        from src.services.audit.retention_scheduler import stop_scheduler as stop_audit_retention_scheduler
+        await stop_audit_retention_scheduler()
         # Stop the demo refresh tick.
         from src.services.demo.scheduler import stop_scheduler as stop_demo_scheduler
         await stop_demo_scheduler()

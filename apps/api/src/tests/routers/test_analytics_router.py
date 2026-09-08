@@ -419,8 +419,8 @@ class TestAnalyticsRouter:
         result_mock.scalars.return_value = scalars_mock
         db_session.execute.return_value = result_mock
         with _analytics_guard_patches(), patch(
-            "src.security.features_utils.plan_check._check_mode_bypass",
-            return_value=None,
+            "src.core.deployment_mode.get_deployment_mode",
+            return_value="saas",
         ), patch(
             "src.routers.analytics.get_org_plan",
             new_callable=AsyncMock,
@@ -714,8 +714,8 @@ class TestAnalyticsRouter:
         # Advanced (org-level) queries require Enterprise in SaaS mode; when no
         # bypass applies and the plan is below Enterprise the export is rejected.
         with _analytics_guard_patches(), patch(
-            "src.security.features_utils.plan_check._check_mode_bypass",
-            return_value=None,
+            "src.core.deployment_mode.get_deployment_mode",
+            return_value="saas",
         ), patch(
             "src.routers.analytics.get_org_plan",
             new_callable=AsyncMock,

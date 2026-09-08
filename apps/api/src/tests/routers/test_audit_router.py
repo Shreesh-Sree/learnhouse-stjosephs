@@ -532,14 +532,14 @@ class TestRequestContext:
 class TestPlanAndTargetGuards:
     async def test_plan_gate_blocks_low_plan(self, client, regular_user):
         """SaaS mode + insufficient plan → 403."""
-        with patch("src.security.features_utils.plan_check._check_mode_bypass", return_value=None), \
+        with patch("src.core.deployment_mode.get_deployment_mode", return_value="saas"), \
              patch("src.routers.audit.get_org_plan", new_callable=AsyncMock, return_value="free"), \
              patch("src.routers.audit.plan_meets_requirement", return_value=False):
             resp = await client.get(f"/api/v1/audit/user/{regular_user.id}?org_id=1")
         assert resp.status_code == 403
 
     async def test_plan_gate_allows_enterprise(self, client, regular_user, seed_activity):
-        with patch("src.security.features_utils.plan_check._check_mode_bypass", return_value=None), \
+        with patch("src.core.deployment_mode.get_deployment_mode", return_value="saas"), \
              patch("src.routers.audit.get_org_plan", new_callable=AsyncMock, return_value="enterprise"), \
              patch("src.routers.audit.plan_meets_requirement", return_value=True):
             resp = await client.get(f"/api/v1/audit/user/{regular_user.id}?org_id=1")

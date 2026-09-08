@@ -54,11 +54,21 @@ async def _require_admin(current_user, org_id: int, db_session: AsyncSession) ->
 
 
 async def _enforce_plan(org_id: int, db_session: AsyncSession) -> None:
-    """Gate the audit feature behind the Pro plan."""
-    from src.security.features_utils.plan_check import _check_mode_bypass
+    """Gate the audit feature behind the Pro plan in SaaS mode.
 
-    bypass = _check_mode_bypass("analytics_advanced")
-    if bypass is None:  # SaaS mode — enforce plan
+    This router (dossier / summary / export) is a complete, real OSS
+    implementation living in this repo — not a withheld ``apps/api/ee/``
+    module — so a self-hosted deployment gets it unconditionally, the same
+    precedent SCORM and SSO already established (see PENDING_FEATURES.md).
+    Only SaaS mode still enforces the Pro-plan requirement; OSS and EE modes
+    both skip straight through, deliberately NOT routed through
+    ``_check_mode_bypass("analytics_advanced")`` (which would 403 in OSS mode
+    regardless of this router's own completeness — that check exists for
+    features genuinely gated behind the withheld EE module, which this isn't).
+    """
+    from src.core.deployment_mode import get_deployment_mode
+
+    if get_deployment_mode() == "saas":
         current_plan = await get_org_plan(org_id, db_session)
         if not plan_meets_requirement(current_plan, "pro"):
             raise HTTPException(
@@ -430,3 +440,89 @@ async def export_audit(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# -------------------------------------------------------------------
+# Retention policy — GET/PUT the policy, POST to purge on demand.
+# See services/audit/retention.py for the full scope decision.
+# -------------------------------------------------------------------
+from pydantic import BaseModel
+from src.services.audit.retention import (
+    MIN_RETENTION_DAYS,
+    get_retention_days,
+    purge_expired_audit_events,
+    set_retention_days,
+)
+
+
+class RetentionPolicyUpdate(BaseModel):
+    retention_days: int | None = None  # null = keep forever
+
+
+@router.get(
+    "/retention",
+    summary="Get this org's audit-log retention policy",
+    description="Null retention_days means audit events are kept forever (the default). Org admin + Pro plan.",
+)
+async def get_retention_policy(
+    org_id: int,
+    current_user: PublicUser | AnonymousUser | APITokenUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    await _require_admin(current_user, org_id, db_session)
+    await _enforce_plan(org_id, db_session)
+
+    from src.db.organization_config import OrganizationConfig
+    config = (await db_session.execute(
+        select(OrganizationConfig).where(OrganizationConfig.org_id == org_id)
+    )).scalars().first()
+    return {"retention_days": get_retention_days(config), "minimum_retention_days": MIN_RETENTION_DAYS}
+
+
+@router.put(
+    "/retention",
+    summary="Set this org's audit-log retention policy",
+    description=(
+        "Set retention_days (minimum 30) to auto-purge org-scoped audit events "
+        "older than that window on the daily schedule, or null to keep everything "
+        "forever (the default). Does not purge anything itself — see POST /audit/retention/purge "
+        "for an immediate, previewable purge. Org admin + Pro plan."
+    ),
+)
+async def put_retention_policy(
+    org_id: int,
+    data: RetentionPolicyUpdate,
+    current_user: PublicUser | AnonymousUser | APITokenUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    await _require_admin(current_user, org_id, db_session)
+    await _enforce_plan(org_id, db_session)
+
+    try:
+        await set_retention_days(org_id, data.retention_days, db_session)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"retention_days": data.retention_days}
+
+
+@router.post(
+    "/retention/purge",
+    summary="Purge audit events past this org's retention window",
+    description=(
+        "Deletes org-scoped audit events older than the configured retention_days. "
+        "Pass dry_run=true (default) to count what would be deleted without deleting "
+        "anything — always preview before running for real. A no-op if no policy is set. "
+        "Org admin + Pro plan."
+    ),
+)
+async def post_purge_retention(
+    org_id: int,
+    dry_run: bool = True,
+    current_user: PublicUser | AnonymousUser | APITokenUser = Depends(get_current_user),
+    db_session: AsyncSession = Depends(get_db_session),
+):
+    await _require_admin(current_user, org_id, db_session)
+    await _enforce_plan(org_id, db_session)
+
+    stats = await purge_expired_audit_events(db_session, org_id=org_id, dry_run=dry_run)
+    return stats.as_dict()

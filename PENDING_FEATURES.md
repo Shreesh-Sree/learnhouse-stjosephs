@@ -209,21 +209,80 @@ was declined for that reason.
   to let a SaaS operator sell course access to the public; a college
   self-hosting its own courses for its own students has no seller/buyer
   relationship for this to model. Revisit only if that changes.
-- ~~**Advanced analytics**~~ / ~~**Audit logs (advanced tier)**~~ — see
-  further down this file once built (same "build one feature fully, verify,
-  document" pass as everything else here).
+- ~~**Advanced analytics**~~ / ~~**Audit logs (advanced tier)**~~ — **done,
+  and a genuinely different situation from SSO/SCORM.** Investigating "what's
+  actually missing" turned up that both were already FULLY BUILT, real,
+  complete OSS code sitting right in this repo — not a withheld
+  `apps/api/ee/` module at all: the per-student audit dossier
+  (`routers/audit.py` — full RBAC, per-user dossier, multi-user summary
+  rows, streaming CSV/JSON export with a formula-injection guard) and the
+  advanced Tinybird analytics queries (`services/analytics/queries.py`'s
+  `ADVANCED_QUERIES`: course dropoff, cohort retention, time-to-completion,
+  peak usage hours, content-type effectiveness, new-vs-returning). Confirmed
+  live: `curl`ing `/audit/user/{id}` in this session's OSS-mode deployment
+  returned `403 analytics_advanced is not available in OSS mode` — a
+  complete, working feature, blocked outright by a paywall check that has
+  nothing to do with whether the code exists. Root cause: both routers'
+  own plan-enforcement helpers called
+  `_check_mode_bypass("analytics_advanced")`, which unconditionally 403s in
+  OSS mode for anything in `EE_ONLY_FEATURES` — correct for a feature that
+  really is withheld, wrong here since this feature isn't. Fixed by
+  replacing that call, in exactly these two call sites
+  (`routers/audit.py::_enforce_plan`, `routers/analytics.py`'s two
+  `ADVANCED_QUERIES` gate blocks), with a direct
+  `get_deployment_mode() == "saas"` check — SaaS-mode behavior (Pro/
+  Enterprise plan required) is completely unchanged; OSS and EE modes now
+  pass straight through, same precedent SCORM and SSO already established.
+  Verified live against the real Postgres 16 DB in this session: the
+  dossier, summary, and CSV export endpoints now return real data (a
+  genuine login-history CSV came back with actual rows from this session's
+  own test logins); the advanced-analytics dashboard endpoint now reaches
+  its real 503 "Analytics not configured" (Tinybird isn't set up in this
+  sandbox — the gate itself is confirmed bypassed, since that's a different
+  failure mode than the 403 it returned before).
+  **The one genuinely NEW thing built**: retention/purge, which really
+  didn't exist anywhere before this. `user_audit_event` was, by its own
+  docstring, "never updated or deleted" — correct for legal-record purposes
+  but means unbounded growth with no privacy/storage escape hatch. Added a
+  per-org retention policy (`OrganizationConfig.config["audit"]
+  ["retention_days"]`, null = keep forever, the safe default; a 30-day
+  floor guards against a fat-fingered short window silently nuking history)
+  via `GET/PUT /audit/retention`, an on-demand `POST /audit/retention/purge`
+  with a `dry_run` preview (always run this first — it's a bulk delete),
+  a `cli.py audit-retention-run --dry-run` escape hatch, and a daily
+  in-process scheduler (`services/audit/retention_scheduler.py`, same
+  Redis-day-lock-as-optimization pattern as the weekly digest scheduler)
+  gated by `LEARNHOUSE_AUDIT_RETENTION_ENABLED` (default off — matches the
+  weekly-digest kill-switch precedent; the manual CLI/API purge always
+  works regardless of the switch). SCOPE DECISION: purge only touches
+  org-scoped rows (course/assignment/certificate events); login/logout
+  events carry no `org_id` (a user authenticates once, not per-org), so
+  which org's retention policy would apply to them is ambiguous — left out
+  of automatic purge rather than guessed at. Verified for real: inserted a
+  genuinely 40-day-old and a 20-day-old org-scoped row directly into the
+  live Postgres DB, set a 30-day policy, confirmed dry-run counted exactly
+  the 40-day-old row without deleting it, then confirmed a real purge
+  deleted exactly that one row and left the 20-day-old row and all 7
+  existing login/logout rows (`org_id IS NULL`) completely untouched.
+  19 new tests (`test_audit_retention_service.py`) cover the pure config-
+  parsing logic; the live-DB purge behavior above was hand-verified rather
+  than scripted into a test, matching this session's established pattern
+  for DB-writing paths.
 
-SCORM and SSO are the two EE-listed features (`EE_ONLY_FEATURES` in
-`deployment_mode.py` still lists `'scorm'` and `'sso'`, matching the
-constant's own SaaS-plan-gating purpose — see below) that got built anyway,
-as independent OSS implementations. Neither router calls the
-`require_org_admin`-style plan-check dependency that constant gates, so
-being listed there does not block either feature in OSS mode; it only stops
-`resolve_feature('sso'|'scorm')` from advertising them to a frontend
-feature-flag check that goes through that path, which neither feature's own
-UI does. Deliberately left the constant itself untouched rather than editing
-shared SaaS-plan-gating config for two unrelated features — the same
-precedent SCORM's own entry already set.
+SCORM, SSO, and now the audit/analytics gate fix are the EE-listed
+capabilities (`EE_ONLY_FEATURES` in `deployment_mode.py` still lists
+`'scorm'`, `'sso'`, and `'analytics_advanced'`, matching the constant's own
+SaaS-plan-gating purpose — see below) that turned out to already be, or got
+built as, real OSS code. Deliberately left `EE_ONLY_FEATURES` and
+`plans.py` themselves untouched rather than editing shared SaaS-plan-gating
+config — SaaS-mode behavior for every one of these features is completely
+unchanged; only OSS/EE mode's specific call sites were fixed to stop
+routing through a gate meant for something genuinely withheld. The
+`'audit_logs'` key in that same set (distinct from `'analytics_advanced'`)
+appears to be unused by any current router — nothing in this codebase gates
+on it — so it may be either aspirational or superseded by the
+`'analytics_advanced'` gate this pass actually found and fixed; left as-is
+rather than guessing at intent for a key nothing reads.
 
 ## Additional feature ideas — brainstormed only, none started
 

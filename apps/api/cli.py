@@ -440,6 +440,44 @@ async def _run_nudges(
 
 
 @cli.command()
+def audit_retention_run(
+    dry_run: Annotated[bool, typer.Option(help="Count what would be deleted, but delete nothing")] = False,
+    org_id: Annotated[int, typer.Option(help="Restrict to a single org id")] = 0,
+):
+    """
+    Purge student audit-log rows past their org's configured retention window.
+
+    Cron-invoked (an in-app daily scheduler also runs this — see
+    services/audit/retention_scheduler.py — this command is the manual/
+    dry-run escape hatch). Only touches orgs that have actually set a
+    retention_days policy; every other org's audit history is untouched, as
+    always. Runs regardless of LEARNHOUSE_AUDIT_RETENTION_ENABLED — that
+    switch only gates the automatic scheduler, not a deliberate manual run.
+    """
+    asyncio.run(_run_audit_retention(dry_run=dry_run, org_id=org_id or None))
+
+
+async def _run_audit_retention(*, dry_run: bool, org_id) -> None:
+    from src.services.audit.retention import purge_expired_audit_events
+
+    learnhouse_config = get_learnhouse_config()
+    sql_url = learnhouse_config.database_config.sql_connection_string  # type: ignore
+    async_engine = create_async_engine(_to_async_url(sql_url), echo=False, pool_pre_ping=True)
+
+    try:
+        async with AsyncSession(async_engine, expire_on_commit=False) as db_session:
+            stats = await purge_expired_audit_events(db_session, org_id=org_id, dry_run=dry_run)
+    finally:
+        await async_engine.dispose()
+
+    mode = "dry-run" if dry_run else "live"
+    result = stats.as_dict()
+    print(f"Audit retention purge ({mode}): orgs_with_policy={result['orgs_with_policy']} rows_deleted={result['rows_deleted']}")
+    for slug, count in result["per_org"].items():
+        print(f"  {slug}: {count} row(s)")
+
+
+@cli.command()
 def digest_run(
     dry_run: Annotated[bool, typer.Option(help="Render and log, but send nothing")] = False,
     org_id: Annotated[int, typer.Option(help="Restrict to a single org id")] = 0,
