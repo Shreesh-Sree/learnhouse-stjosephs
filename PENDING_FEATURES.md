@@ -425,17 +425,43 @@ finding of this whole pass.
    usage.py change reaching any other feature (`courses`, `members`
    tracking is on the separate Postgres path and was never affected).
 
-**Not yet covered by this pass**: Library folders, Communities
-(create/post), Podcasts, Boards, and Playgrounds create flows, submitting
-and grading an actual assignment (only creation was exercised), and the
-Users/Org/Developers settings *save* actions (the sweep only confirms
-these pages load — it does not yet fill in and submit their forms). Also
-worth checking given what this pass found: `podcasts` shares the exact
-same `increase_feature_usage`/`decrease_feature_usage` code path as
-assignments/usergroups and is now fixed by the same change, but wasn't
-separately live-verified the way assignments/usergroups were — reasonable
-to assume fixed given it's identical code, but not independently
-screenshotted. Also not covered: whether the same stale-while-revalidate
+### Library, Communities, Podcasts, Boards, Playgrounds create flows — all verified working
+
+Continued the sweep through the remaining content-creation areas, live,
+through the real UI each time: Library folder creation, Community
+creation, Podcast creation (this one specifically to confirm the Redis
+usage-tracking fix above — `podcasts` shares the exact same
+`increase_feature_usage`/`decrease_feature_usage` code path as
+assignments/usergroups; confirmed 200, not 500), Board creation, and
+Playground creation. All five worked cleanly on the first try — each new
+item appeared immediately in its list with no reload needed and no
+console errors, and no further bugs were found in any of them.
+
+### Org general settings save — a required field with nothing to do with what's being saved
+
+`OrgEditGeneral.tsx`'s Yup schema required `label` (a discovery/category
+taxonomy field — "Business," "Gaming," "Tech," etc. — `Optional[str]` on
+the backend, `OrganizationUpdate.label`) for the entire general-settings
+form, meaning **every** save through that form failed with "Organization
+label is required" unless a label had already been picked — including
+completely unrelated edits like footer text, org description, or default
+language. The seeded default org ships with no label set, so this was a
+first-save wall for every fresh self-host install: confirmed live by
+editing only the footer-text field on a totally fresh org and hitting the
+same blocking validation error. Fixed by making the frontend schema match
+the backend's own optional contract (`Yup.string().optional()`). Verified
+live: saving now round-trips through 4 real `PUT` requests (org name/desc,
+footer text, sender name, default language, all 200) and the change
+persists across a full page reload. Added a permanent regression test to
+`full-sweep.spec.ts`. Frontend build and `bun test tests` (263/263) both
+clean.
+
+**Not yet covered by this pass**: submitting and grading an actual
+assignment (only creation was exercised), and the remaining
+Users/Developers settings *save* actions beyond Org general (the sweep
+only confirms those pages load — it does not yet fill in and submit
+Roles, Signups, Sign-in policy, Two-factor, API Access, Automations,
+Domains, or SEO forms). Also not covered: whether the same stale-while-revalidate
 service worker causes an analogous "my own edit doesn't appear" problem on
 any OTHER editor surface that hits
 `/api/v1/courses|chapters|activities/...` without

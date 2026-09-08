@@ -235,3 +235,32 @@ test.describe('Assignment and usergroup creation — real Redis-crash regression
     await expect(page.getByText(groupName, { exact: false })).toBeVisible({ timeout: 15_000 })
   })
 })
+
+test.describe('Org general settings — save works without an unrelated required field', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page)
+  })
+
+  test('saving footer text does not require picking an Organization Label', async ({ page }) => {
+    // Regression test: OrgEditGeneral.tsx's Yup schema required `label` (a
+    // discovery/category taxonomy field — "Business", "Gaming", "Tech", etc.
+    // — Optional[str] on the backend) for the ENTIRE general-settings form,
+    // blocking every save, including completely unrelated fields like footer
+    // text, unless a label had been picked first. The seeded default org
+    // ships with no label set, so this was a first-save wall for literally
+    // every fresh self-host install. Fixed by making the frontend schema
+    // match the backend's own optional contract.
+    await page.goto('/dash/org/settings/general')
+    await dismissOnboarding(page)
+
+    const footerText = 'E2E_FOOTER_' + Date.now()
+    await page.locator('input[placeholder="Enter footer text..."]').fill(footerText)
+    await page.getByRole('button', { name: 'Save Changes' }).click({ timeout: 10_000 })
+    await expect(page.getByText('Organization label is required', { exact: false })).toHaveCount(0, { timeout: 5_000 })
+
+    await page.waitForTimeout(1500)
+    await page.reload()
+    await dismissOnboarding(page)
+    await expect(page.locator('input[placeholder="Enter footer text..."]')).toHaveValue(footerText, { timeout: 15_000 })
+  })
+})

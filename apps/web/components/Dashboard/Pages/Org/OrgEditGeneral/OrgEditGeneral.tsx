@@ -70,7 +70,13 @@ const validationSchema = Yup.object().shape({
   about: Yup.string()
     .optional()
     .max(400, 'About text must be 400 characters or less'),
-  label: Yup.string().required('Organization label is required'),
+  // Optional on the backend (Optional[str] = None in OrganizationUpdate) — a
+  // discovery/category taxonomy field, not something every org needs to set.
+  // Required here blocked EVERY save of this form (including unrelated
+  // fields like footer text) for any org that hadn't picked one, including
+  // every freshly-installed self-host org out of the box — confirmed live:
+  // the seeded default org's very first settings save failed on this alone.
+  label: Yup.string().optional(),
 })
 
 interface OrganizationValues {
