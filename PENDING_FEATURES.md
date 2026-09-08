@@ -236,6 +236,59 @@ drop", SCORM 1.2/2004) renders. Added as a permanent regression test,
 `SCORM import panel is usable, not gated, in OSS mode` — 6/6 smoke tests
 pass.
 
+**Follow-up sweep of the other EE-only features** (`EE_ONLY_FEATURES` in
+`src/core/deployment_mode.py`: sso, audit_logs, payments, analytics_advanced,
+scorm — all five, not just the three above), done on request after the
+SCORM fix. Two more real bugs of the exact same shape turned up by grepping
+every remaining `planMeetsRequirement(...)`/`'enterprise'` call site in
+`apps/web` and clicking through each hit:
+
+7. **`app/orgs/[orgslug]/dash/analytics/page.tsx`** computed
+   `isAdvanced = planMeetsRequirement(plan, 'enterprise')` for the entire
+   "Advanced" analytics tab (14 widgets: cohort retention, dropoff map, time
+   to completion, etc.). In OSS mode `plan` is the `'oss'` pseudo-plan, and
+   `planMeetsRequirement('oss', 'enterprise')` is hardcoded `false` — so the
+   whole tab rendered every widget behind `AdvancedGate`'s "Upgrade to
+   Enterprise" lock card, even though the backend
+   (`src/routers/analytics.py`) already runs every `ADVANCED_QUERIES` query
+   unconditionally outside SaaS mode. This is the actual "Advanced
+   analytics" feature the user asked to be built in this session — it was
+   built and unblocked on the backend, but the frontend gate for it was
+   never fixed, so it was invisible the whole time. Fixed:
+   `isAdvanced = getDeploymentMode() !== 'saas' || planMeetsRequirement(plan, 'enterprise')`,
+   deferring to the plan check only where the backend's gate is real (SaaS).
+8. **Two `DashTabBar` tab configs** — the SSO tab in
+   `app/orgs/[orgslug]/dash/developers/[subpage]/page.tsx` and the Audit
+   Logs tab in `app/orgs/[orgslug]/dash/users/settings/[subpage]/page.tsx` —
+   hardcoded `requiredPlan`/`requiresPlan: 'enterprise'` unconditionally.
+   `DashTabBar` renders a `PlanBadge` for any tab carrying that field, and
+   `PlanBadge` itself decides visibility via the same broken
+   `planMeetsRequirement()` call, so both tabs showed an "Enterprise" lock
+   badge right on the tab strip even though clicking either one opens a
+   fully working page (per fixes 1-6 above) — the tab-bar badge is a
+   separate code path from `FeatureGate`/`resolveGateReason` and wasn't
+   touched by that earlier fix. Fixed both the same way as the SCORM import
+   badge: read `resolved_features.sso.enabled` / `.audit_logs.enabled` and
+   only keep the plan requirement when the feature is actually unavailable.
+
+Payments is the one EE-only feature left genuinely gated in OSS mode, and
+that's correct, not a bug — see the comment in `services/plans/plans.ts`:
+it's real Stripe/billing integration work a self-host that isn't selling
+course access publicly doesn't need, and nothing in this session built it.
+
+Verified live for both new fixes: `/dash/developers/sso`,
+`/dash/users/settings/audit-logs`, and the Analytics "Advanced" tab all
+render with no "Enterprise" text anywhere on the page (checked via full
+page-text assertions, not just the specific badge locations). The
+Advanced tab correctly still shows an unrelated "Analytics requires a
+Tinybird connection" empty state — that's this sandbox having no
+`LEARNHOUSE_TINYBIRD_*` env vars configured, a real infra prerequisite,
+not a plan gate. Added as a permanent regression test, `SSO tab, Audit
+Logs tab, and Advanced analytics tab carry no stray Enterprise badge` —
+7/7 smoke tests pass. Frontend unit suite still 263/263, backend
+security/orgs + analytics/audit router suites still 1423 passed / 4
+skipped (both unaffected — this pass was frontend-only).
+
 ## Repo / workflow governance (blocked on GitHub web UI — can't be done from this session)
 
 - [ ] Set `main` as the repository's default branch

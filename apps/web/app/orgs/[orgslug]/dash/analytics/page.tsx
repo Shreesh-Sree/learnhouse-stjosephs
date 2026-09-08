@@ -7,6 +7,7 @@ import { motion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 import { useAnalyticsStatus } from '@components/Dashboard/Analytics/useAnalyticsDashboard'
 import { planMeetsRequirement } from '@services/plans/plans'
+import { getDeploymentMode } from '@services/config/config'
 import { DashTabBar } from '@components/Dashboard/Shared/DashTabBar/DashTabBar'
 import FeatureGate from '@components/Dashboard/Shared/FeatureGate/FeatureGate'
 import { usePlan } from '@components/Hooks/usePlan'
@@ -62,10 +63,16 @@ export default function AnalyticsDashboard() {
   const [tab, setTab] = useState<Tab>('overview')
   const { data: analyticsStatus } = useAnalyticsStatus()
   const plan = usePlan()
-  // Advanced analytics is the enterprise tier; usePlan() returns the right
-  // pseudo-plan for EE ('enterprise') and OSS ('oss'), so planMeetsRequirement
-  // resolves all modes correctly.
-  const isAdvanced = planMeetsRequirement(plan, 'enterprise')
+  // Advanced analytics is gated on the enterprise plan tier in SaaS mode —
+  // but in OSS/EE mode the backend (src/routers/analytics.py) already runs
+  // every ADVANCED_QUERIES query unconditionally (see the get_deployment_mode()
+  // == "saas" check there), so those deployments must see the real tab, not a
+  // paywall. planMeetsRequirement('oss', 'enterprise') hardcodes false (the
+  // 'oss' pseudo-plan can never satisfy an 'enterprise' requirement by design
+  // — see plans.ts), which would otherwise permanently lock this whole tab in
+  // OSS mode even though every widget's data call actually succeeds. Only
+  // defer to the plan check in SaaS mode, where the backend's gate is real.
+  const isAdvanced = getDeploymentMode() !== 'saas' || planMeetsRequirement(plan, 'enterprise')
   const isConfigured = analyticsStatus?.configured === true
 
   return (

@@ -136,4 +136,38 @@ test.describe('Golden path', () => {
     await expect(page.getByText('Import SCORM', { exact: false })).toBeVisible()
     await expect(page.getByText('Click to upload or drag and drop', { exact: false })).toBeVisible()
   })
+
+  test('SSO tab, Audit Logs tab, and Advanced analytics tab carry no stray Enterprise badge', async ({ page }) => {
+    // A broader sweep after the fixes above: DashTabBar renders a PlanBadge
+    // for any tab.requiresPlan/tab.requiredPlan, and — same as the SCORM
+    // import badge — PlanBadge decides visibility via planMeetsRequirement(),
+    // whose 'oss' branch hardcodes false for 'enterprise'. Three tab configs
+    // hardcoded requiredPlan/requiresPlan: 'enterprise' unconditionally even
+    // though sso/audit_logs resolve as genuinely enabled in OSS mode, and the
+    // analytics page's own isAdvanced flag was computed the same broken way
+    // (planMeetsRequirement(plan, 'enterprise') with no deployment-mode
+    // check), which additionally paywalled all 14 Advanced analytics widgets
+    // behind an "Upgrade to Enterprise" card. All three now compute their
+    // plan requirement from resolved_features / deployment mode instead.
+    await page.goto('/login')
+    await page.locator('input[type="email"]').fill(ADMIN_EMAIL)
+    await page.locator('input[type="password"]').fill(ADMIN_PASSWORD)
+    await page.locator('button[type="submit"]').click()
+    await page.waitForURL((url) => !url.pathname.includes('/login'), {
+      timeout: 15_000,
+    })
+
+    await page.goto('/dash/developers/sso')
+    await page.getByText('Get Started', { exact: false }).click({ timeout: 5_000 }).catch(() => {})
+    await page.getByText("Let's go", { exact: false }).click({ timeout: 3_000 }).catch(() => {})
+    await expect(page.locator('body')).not.toContainText('Enterprise')
+
+    await page.goto('/dash/users/settings/audit-logs')
+    await expect(page.locator('body')).not.toContainText('Enterprise')
+
+    await page.goto('/dash/analytics')
+    await page.getByText('Advanced', { exact: false }).first().click({ timeout: 5_000 })
+    await expect(page.locator('body')).not.toContainText('Upgrade to')
+    await expect(page.locator('body')).not.toContainText('Enterprise')
+  })
 })

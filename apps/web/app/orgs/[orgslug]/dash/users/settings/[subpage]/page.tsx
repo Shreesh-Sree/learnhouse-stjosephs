@@ -15,6 +15,7 @@ import OrgSignInMethods from '@components/Dashboard/Pages/Users/Security/OrgSign
 import { ShieldAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { DashTabBar, DashTabItem } from '@components/Dashboard/Shared/DashTabBar/DashTabBar'
+import { useOrg } from '@components/Contexts/OrgContext'
 
 export type SettingsParams = {
   subpage: string
@@ -24,6 +25,15 @@ export type SettingsParams = {
 function UsersSettingsPage(props: { params: Promise<SettingsParams> }) {
   const { t } = useTranslation()
   const params = use(props.params);
+  const org = useOrg() as any
+  const rf = org?.config?.config?.resolved_features
+  // audit_logs resolves as genuinely enabled in OSS mode (see resolve.py's
+  // _OSS_BUILT_EE_FEATURES), but its tab below still hardcodes
+  // requiresPlan: 'enterprise' for DashTabBar's PlanBadge, which — like
+  // planMeetsRequirement itself — has no notion of that OSS exception and
+  // would show a misleading "Enterprise" lock on a tab that opens a fully
+  // working page. Same fix as the SSO tab and the SCORM import badge.
+  const auditLogsRequiredPlan = rf?.audit_logs?.enabled === true ? undefined : 'enterprise'
   const [H1Label, setH1Label] = React.useState('')
   const [H2Label, setH2Label] = React.useState('')
 
@@ -128,7 +138,7 @@ function UsersSettingsPage(props: { params: Promise<SettingsParams> }) {
       icon: <ShieldAlert size={16} />,
       href: getUriWithOrg(params.orgslug, '') + `/dash/users/settings/audit-logs`,
       active: params.subpage === 'audit-logs',
-      requiresPlan: 'enterprise',
+      requiresPlan: auditLogsRequiredPlan,
     },
   ]
 

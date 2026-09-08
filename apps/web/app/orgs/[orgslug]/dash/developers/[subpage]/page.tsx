@@ -12,6 +12,7 @@ import OrgEditSSO from '@components/Dashboard/Pages/Org/OrgEditSSO/OrgEditSSO'
 import { useTranslation } from 'react-i18next'
 import { PlanLevel, isFeatureAvailable } from '@services/plans/plans'
 import { DashTabBar, DashTabItem } from '@components/Dashboard/Shared/DashTabBar/DashTabBar'
+import { useOrg } from '@components/Contexts/OrgContext'
 
 export type DevParams = {
   subpage: string
@@ -36,6 +37,8 @@ const getDevTabs = (t: any): TabConfig[] => [
 function DevelopersPage(props: { params: Promise<DevParams> }) {
   const { t } = useTranslation()
   const params = use(props.params)
+  const org = useOrg() as any
+  const rf = org?.config?.config?.resolved_features
   const [H1Label, setH1Label] = React.useState('')
   const [H2Label, setH2Label] = React.useState('')
   // Hide tabs whose feature is unavailable in the current deployment mode.
@@ -44,7 +47,16 @@ function DevelopersPage(props: { params: Promise<DevParams> }) {
   // OSS mode too — this filter only actually drops something for 'payments'.
   // EE/SaaS keep all tabs (isFeatureAvailable returns true; per-plan gating is
   // handled downstream).
-  const DEV_TABS = getDevTabs(t).filter((tab) => isFeatureAvailable(tab.id))
+  //
+  // The SSO tab's static requiredPlan: 'enterprise' also feeds DashTabBar's
+  // PlanBadge, which (like planMeetsRequirement itself) has no notion that
+  // sso resolves as genuinely enabled in OSS mode — it would show a misleading
+  // "Enterprise" lock badge on a tab that opens a fully working settings page.
+  // Drop the requirement once the backend confirms sso is actually enabled for
+  // this org, same fix as the SCORM import badge and the analytics Advanced tab.
+  const DEV_TABS = getDevTabs(t)
+    .filter((tab) => isFeatureAvailable(tab.id))
+    .map((tab) => (tab.id === 'sso' && rf?.sso?.enabled === true ? { ...tab, requiredPlan: undefined } : tab))
 
   function handleLabels() {
     if (params.subpage == 'api') {
