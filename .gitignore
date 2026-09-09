@@ -78,3 +78,5 @@ redis_data/
 content_data/
 clickhouse_data/
 backups/
+.venv/
+scripts/.venv/
