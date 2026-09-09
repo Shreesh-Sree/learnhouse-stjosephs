@@ -945,6 +945,23 @@ async def set_course_prerequisite(
         if prerequisite.org_id != course.org_id:
             raise HTTPException(status_code=400, detail="Prerequisite course must be in the same organization")
 
+        # Multi-hop cycle detection: follow prerequisite chain from candidate prerequisite
+        # If it leads back to course.id, reject the cycle.
+        curr_id = prerequisite.prerequisite_course_id
+        visited = {course.id, prerequisite.id}
+        while curr_id is not None:
+            if curr_id == course.id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Setting this prerequisite would create a cyclic dependency",
+                )
+            if curr_id in visited:
+                break
+            visited.add(curr_id)
+            curr_id = (await db_session.execute(
+                select(Course.prerequisite_course_id).where(Course.id == curr_id)
+            )).scalars().first()
+
     course.prerequisite_course_id = prerequisite_course_id
     course.update_date = str(datetime.now())
     db_session.add(course)

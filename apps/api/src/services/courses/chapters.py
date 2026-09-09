@@ -221,6 +221,23 @@ async def set_chapter_prerequisite(
         if prerequisite.course_id != chapter.course_id:
             raise HTTPException(status_code=400, detail="Prerequisite chapter must be in the same course")
 
+        # Multi-hop cycle detection: follow prerequisite chain from candidate prerequisite
+        # If it leads back to chapter.id, reject the cycle.
+        curr_id = prerequisite.prerequisite_chapter_id
+        visited = {chapter.id, prerequisite.id}
+        while curr_id is not None:
+            if curr_id == chapter.id:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Setting this prerequisite would create a cyclic dependency",
+                )
+            if curr_id in visited:
+                break
+            visited.add(curr_id)
+            curr_id = (await db_session.execute(
+                select(Chapter.prerequisite_chapter_id).where(Chapter.id == curr_id)
+            )).scalars().first()
+
     chapter.prerequisite_chapter_id = prerequisite_chapter_id
     chapter.update_date = str(datetime.now())
     db_session.add(chapter)
