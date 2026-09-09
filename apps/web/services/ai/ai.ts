@@ -1,5 +1,6 @@
 import { getAPIUrl } from '@services/config/config'
 import { RequestBodyWithAuthHeader } from '@services/utils/ts/requests'
+import { processSSEStream } from './sse_parser'
 
 export async function startActivityAIChatSession(
   message: string,
@@ -157,69 +158,43 @@ async function processStream(
   response: Response,
   callbacks: StreamCallbacks
 ): Promise<void> {
-  const reader = response.body?.getReader()
-  if (!reader) {
-    callbacks.onError('Failed to get response reader')
-    return
-  }
-
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-
-      // Process complete SSE events (data: {...}\n\n)
-      const lines = buffer.split('\n\n')
-      buffer = lines.pop() || '' // Keep incomplete data in buffer
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const jsonStr = line.slice(6) // Remove 'data: ' prefix
-            const event: StreamEvent = JSON.parse(jsonStr)
-
-            switch (event.type) {
-              case 'start':
-                callbacks.onStart?.({ aichat_uuid: event.aichat_uuid })
-                break
-              case 'chunk':
-                callbacks.onChunk(event.content)
-                break
-              case 'done':
-                callbacks.onComplete({
-                  aichat_uuid: event.aichat_uuid,
-                  activity_uuid: event.activity_uuid,
-                })
-                break
-              case 'follow_ups':
-                callbacks.onFollowUps?.({ follow_up_suggestions: event.follow_up_suggestions })
-                break
-              case 'sources':
-                callbacks.onSources?.({ sources: event.sources })
-                break
-              case 'session_title':
-                callbacks.onSessionTitle?.(event.title)
-                break
-              case 'error':
-                callbacks.onError(event.message)
-                break
-            }
-          } catch {
-            // Failed to parse SSE event, skip
-          }
+  await processSSEStream(
+    response,
+    (jsonStr) => {
+      try {
+        const event: StreamEvent = JSON.parse(jsonStr)
+        switch (event.type) {
+          case 'start':
+            callbacks.onStart?.({ aichat_uuid: event.aichat_uuid })
+            break
+          case 'chunk':
+            callbacks.onChunk(event.content)
+            break
+          case 'done':
+            callbacks.onComplete({
+              aichat_uuid: event.aichat_uuid,
+              activity_uuid: event.activity_uuid,
+            })
+            break
+          case 'follow_ups':
+            callbacks.onFollowUps?.({ follow_up_suggestions: event.follow_up_suggestions })
+            break
+          case 'sources':
+            callbacks.onSources?.({ sources: event.sources })
+            break
+          case 'session_title':
+            callbacks.onSessionTitle?.(event.title)
+            break
+          case 'error':
+            callbacks.onError(event.message)
+            break
         }
+      } catch {
+        // Ignore malformed JSON event payload
       }
-    }
-  } catch (error) {
-    callbacks.onError(error instanceof Error ? error.message : 'Stream processing failed')
-  } finally {
-    reader.releaseLock()
-  }
+    },
+    (err) => callbacks.onError(err)
+  )
 }
 
 /**

@@ -105,21 +105,27 @@ async def rag_chat_event_generator(
         # Send done event
         yield f"data: {json.dumps({'type': 'done', 'aichat_uuid': aichat_uuid})}\n\n"
 
-        # Generate follow-up suggestions
-        follow_ups = await generate_follow_up_suggestions(
-            full_response,
-            context_text[:1000],
-            ai_model,
-            user_message,
-        )
-        if follow_ups:
-            yield f"data: {json.dumps({'type': 'follow_ups', 'follow_up_suggestions': follow_ups})}\n\n"
+        # Generate follow-up suggestions (non-blocking / resilient)
+        try:
+            follow_ups = await generate_follow_up_suggestions(
+                full_response,
+                context_text[:1000],
+                ai_model,
+                user_message,
+            )
+            if follow_ups:
+                yield f"data: {json.dumps({'type': 'follow_ups', 'follow_up_suggestions': follow_ups})}\n\n"
+        except Exception as e:
+            logger.debug("Follow-up suggestions skipped: %s", e)
 
-        # Generate AI-summarized title for new sessions
+        # Generate AI-summarized title for new sessions (non-blocking / resilient)
         if is_new_session and user_id is not None:
-            title = await generate_chat_title(user_message, full_response)
-            update_chat_session_meta(aichat_uuid, user_id, title=title)
-            yield f"data: {json.dumps({'type': 'session_title', 'title': title})}\n\n"
+            try:
+                title = await generate_chat_title(user_message, full_response)
+                update_chat_session_meta(aichat_uuid, user_id, title=title)
+                yield f"data: {json.dumps({'type': 'session_title', 'title': title})}\n\n"
+            except Exception as e:
+                logger.debug("Chat title generation skipped: %s", e)
 
     except Exception:
         stream_failed = True

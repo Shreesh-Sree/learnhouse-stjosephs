@@ -241,7 +241,6 @@ function BubbleInner({ orgslug, open, onOpenChange, sessionToLoad }: CopilotBubb
         setIsStreaming(false)
         setIsWaiting(false)
         setIsLoadingFollowUps(true)
-        streamingIndexRef.current = -1
         if (data.aichat_uuid) setAichatUuid(data.aichat_uuid)
         isNewChatRef.current = false
         if (wasNewChat) mutateSessions()

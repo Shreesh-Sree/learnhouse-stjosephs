@@ -29,9 +29,9 @@ from src.services.ai.llm.provider import build_model
 
 logger = logging.getLogger(__name__)
 
-# Per-request timeouts (seconds). Mirrors the previous hand-rolled asyncio timeouts.
-DEFAULT_TIMEOUT = 60.0
-STREAM_TIMEOUT = 90.0
+# Per-request timeouts (seconds). Generous defaults to prevent premature mid-response cutoffs.
+DEFAULT_TIMEOUT = 180.0
+STREAM_TIMEOUT = 300.0
 
 # A single user turn: a prompt string plus optional multimodal parts (images/docs/video).
 UserPrompt = Union[str, Sequence[Any]]
@@ -105,6 +105,9 @@ def _settings(
     settings: dict = {"timeout": timeout}
     if max_tokens is not None:
         settings["max_tokens"] = max_tokens
+    else:
+        # Default generous headroom ceiling (4096 tokens) so long / multilingual responses never cut off
+        settings["max_tokens"] = 4096
     if temperature is not None:
         settings["temperature"] = temperature
     return ModelSettings(**settings)

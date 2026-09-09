@@ -120,16 +120,18 @@ async def activity_chat_event_generator(
         # Send done event immediately (without waiting for follow-ups)
         yield f"data: {json.dumps({'type': 'done', 'aichat_uuid': aichat_uuid, 'activity_uuid': activity_uuid})}\n\n"
 
-        # Generate follow-up suggestions and send as separate event
-        follow_ups = await generate_follow_up_suggestions(
-            full_response,
-            ai_friendly_text[:1000],
-            ai_model,
-            user_message
-        )
-
-        if follow_ups:
-            yield f"data: {json.dumps({'type': 'follow_ups', 'follow_up_suggestions': follow_ups})}\n\n"
+        # Generate follow-up suggestions and send as separate event (resilient)
+        try:
+            follow_ups = await generate_follow_up_suggestions(
+                full_response,
+                ai_friendly_text[:1000],
+                ai_model,
+                user_message
+            )
+            if follow_ups:
+                yield f"data: {json.dumps({'type': 'follow_ups', 'follow_up_suggestions': follow_ups})}\n\n"
+        except Exception as e:
+            logger.debug("Follow-up suggestions skipped in activity chat: %s", e)
 
     except asyncio.CancelledError:
         # Client disconnect / server shutdown. Do NOT force a refund here: if

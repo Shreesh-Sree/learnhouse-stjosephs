@@ -326,7 +326,6 @@ export function CopilotChat({ orgslug }: CopilotProps) {
         setIsStreaming(false)
         setIsWaiting(false)
         setIsLoadingFollowUps(true)
-        streamingIndexRef.current = -1
         if (data.aichat_uuid) setAichatUuid(data.aichat_uuid)
         isNewChatRef.current = false
         track(AnalyticsEvent.CopilotResponseCompleted)
@@ -978,10 +977,42 @@ export function normalizeMathDelimiters(markdown: string): string {
  * chunk that follows it and renders the rest of the message as one parse error,
  * so hold the unfinished equation back until it is closed.
  */
-function dropUnclosedMath(markdown: string): string {
+function balanceMathDelimiters(markdown: string): string {
   const fences = markdown.match(/\$\$/g)
   if (!fences || fences.length % 2 === 0) return markdown
-  return markdown.slice(0, markdown.lastIndexOf('$$'))
+  // Close the unclosed fence temporarily so remark-math does not fail and no content is truncated
+  return markdown + '\n$$'
+}
+
+class MarkdownErrorBoundary extends React.Component<
+  { fallback: React.ReactNode; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(_error: any) {
+    // Graceful recovery on any remark / katex syntax error
+  }
+
+  componentDidUpdate(prevProps: any) {
+    if (this.state.hasError && prevProps.children !== this.props.children) {
+      this.setState({ hasError: false })
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback
+    }
+    return this.props.children
+  }
 }
 
 export function CopilotMarkdown({ content, sources = [], orgslug, isStreaming = false }: {
@@ -992,7 +1023,7 @@ export function CopilotMarkdown({ content, sources = [], orgslug, isStreaming = 
 }) {
   const mathContent = React.useMemo(() => {
     const normalized = normalizeMathDelimiters(content)
-    return isStreaming ? dropUnclosedMath(normalized) : normalized
+    return isStreaming ? balanceMathDelimiters(normalized) : normalized
   }, [content, isStreaming])
 
   const [mathPlugins, setMathPlugins] = React.useState<MathPlugins | null>(null)
@@ -1041,12 +1072,14 @@ export function CopilotMarkdown({ content, sources = [], orgslug, isStreaming = 
 
   return (
     <div className="relative z-10 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:text-neutral-700 dark:prose-p:text-neutral-300 prose-headings:text-neutral-900 dark:prose-headings:text-white prose-a:text-violet-600 dark:prose-a:text-violet-400 prose-strong:text-neutral-900 dark:prose-strong:text-white prose-code:text-violet-700 dark:prose-code:text-violet-300 prose-code:bg-violet-50 dark:prose-code:bg-violet-500/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_.katex-display]:py-1">
-      <ReactMarkdown
-        remarkPlugins={mathPlugins ? mathPlugins.remark : BASE_REMARK_PLUGINS}
-        rehypePlugins={mathPlugins ? mathPlugins.rehype : NO_REHYPE_PLUGINS}
-        components={components}>
-        {mathContent}
-      </ReactMarkdown>
+      <MarkdownErrorBoundary fallback={<div className="whitespace-pre-wrap text-xs text-neutral-800 dark:text-neutral-200 leading-relaxed">{content}</div>}>
+        <ReactMarkdown
+          remarkPlugins={mathPlugins ? mathPlugins.remark : BASE_REMARK_PLUGINS}
+          rehypePlugins={mathPlugins ? mathPlugins.rehype : NO_REHYPE_PLUGINS}
+          components={components}>
+          {mathContent}
+        </ReactMarkdown>
+      </MarkdownErrorBoundary>
       {isStreaming && (
         <span className="inline-block w-0.5 h-4 bg-violet-500 ms-0.5 align-middle rounded-full animate-pulse" />
       )}

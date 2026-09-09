@@ -1,4 +1,5 @@
 import { getAPIUrl } from '@services/config/config'
+import { processSSEStream } from './sse_parser'
 import type {
   MagicBlockContext,
   MagicBlockSession,
@@ -134,56 +135,22 @@ async function processStream(
   onComplete: (sessionUuid: string) => void,
   onError: (error: string) => void
 ): Promise<void> {
-  const reader = response.body?.getReader()
-  if (!reader) {
-    onError('No response body')
-    return
-  }
-
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-
-      // Process SSE events (each event starts with "data: ")
-      const lines = buffer.split('\n')
-      buffer = ''
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]
-
-        if (line.startsWith('data: ')) {
-          const jsonStr = line.slice(6) // Remove "data: " prefix
-          try {
-            const event: StreamChunk = JSON.parse(jsonStr)
-
-            if (event.type === 'chunk' && event.content) {
-              onChunk(event.content)
-            } else if (event.type === 'done' && event.session_uuid) {
-              onComplete(event.session_uuid)
-            } else if (event.type === 'error' && event.message) {
-              onError(event.message)
-            }
-          } catch {
-            // Incomplete JSON, keep in buffer
-            if (i === lines.length - 1) {
-              buffer = line
-            }
-          }
-        } else if (line.trim() !== '') {
-          // Keep non-empty, non-data lines in buffer
-          if (i === lines.length - 1) {
-            buffer = line
-          }
+  await processSSEStream(
+    response,
+    (jsonStr) => {
+      try {
+        const event: StreamChunk = JSON.parse(jsonStr)
+        if (event.type === 'chunk' && event.content) {
+          onChunk(event.content)
+        } else if (event.type === 'done' && event.session_uuid) {
+          onComplete(event.session_uuid)
+        } else if (event.type === 'error' && event.message) {
+          onError(event.message)
         }
+      } catch {
+        // Ignore malformed JSON event payload
       }
-    }
-  } finally {
-    reader.releaseLock()
-  }
+    },
+    onError
+  )
 }

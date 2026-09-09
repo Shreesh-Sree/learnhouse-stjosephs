@@ -1,4 +1,5 @@
 import { getAPIUrl } from '@services/config/config'
+import { processSSEStream } from '../ai/sse_parser'
 
 interface BoardsPlaygroundContext {
   board_name: string
@@ -92,53 +93,22 @@ async function processStream(
   onComplete: (sessionUuid: string) => void,
   onError: (error: string) => void
 ): Promise<void> {
-  const reader = response.body?.getReader()
-  if (!reader) {
-    onError('No response body')
-    return
-  }
-
-  const decoder = new TextDecoder()
-  let buffer = ''
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-
-      const lines = buffer.split('\n')
-      buffer = ''
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]
-
-        if (line.startsWith('data: ')) {
-          const jsonStr = line.slice(6)
-          try {
-            const event: StreamChunk = JSON.parse(jsonStr)
-
-            if (event.type === 'chunk' && event.content) {
-              onChunk(event.content)
-            } else if (event.type === 'done' && event.session_uuid) {
-              onComplete(event.session_uuid)
-            } else if (event.type === 'error' && event.message) {
-              onError(event.message)
-            }
-          } catch {
-            if (i === lines.length - 1) {
-              buffer = line
-            }
-          }
-        } else if (line.trim() !== '') {
-          if (i === lines.length - 1) {
-            buffer = line
-          }
+  await processSSEStream(
+    response,
+    (jsonStr) => {
+      try {
+        const event: StreamChunk = JSON.parse(jsonStr)
+        if (event.type === 'chunk' && event.content) {
+          onChunk(event.content)
+        } else if (event.type === 'done' && event.session_uuid) {
+          onComplete(event.session_uuid)
+        } else if (event.type === 'error' && event.message) {
+          onError(event.message)
         }
+      } catch {
+        // Ignore malformed JSON event payload
       }
-    }
-  } finally {
-    reader.releaseLock()
-  }
+    },
+    onError
+  )
 }
