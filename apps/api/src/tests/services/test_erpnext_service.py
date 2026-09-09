@@ -51,7 +51,7 @@ async def test_sync_course_completion_to_erpnext():
     mock_resp = MagicMock()
     mock_resp.status_code = 200
 
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=mock_resp):
+    with patch("httpx.AsyncClient.put", new_callable=AsyncMock, return_value=mock_resp):
         res = await sync_course_completion_to_erpnext(
             student_email="student@test.com",
             course_name="Full Stack Placement Training",
