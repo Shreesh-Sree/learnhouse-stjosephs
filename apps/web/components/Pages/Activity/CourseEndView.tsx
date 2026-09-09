@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 const ReactConfetti = dynamic(() => import('react-confetti'), { ssr: false });
-import { Trophy, ArrowLeft, BookOpen, Target, Download, Shield } from 'lucide-react';
+import { Trophy, ArrowLeft, BookOpen, Target, Download, Shield, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { getUriWithOrg, getAbsoluteUriWithOrg } from '@services/config/config';
 import { getCourseThumbnailMediaDirectory } from '@services/media/media';
@@ -349,7 +349,7 @@ const CourseEndView: React.FC<CourseEndViewProps> = ({
             )
           )}
 
-          <div className="pt-6">
+          <div className="pt-6 flex flex-wrap items-center justify-center gap-4">
             <Link
               href={getUriWithOrg(orgslug, `/course/${courseUuid.replace('course_', '')}`)}
               className="inline-flex items-center space-x-2 bg-gray-800 text-white px-6 py-3 rounded-full hover:bg-gray-700 transition duration-200"
@@ -357,6 +357,16 @@ const CourseEndView: React.FC<CourseEndViewProps> = ({
               <ArrowLeft className="w-5 h-5" />
               <span>{t('courses.back_to_course')}</span>
             </Link>
+
+            <a
+              href={`https://forms.stjosephsplacements.in/s/course-feedback?course=${encodeURIComponent(courseName)}&user=${encodeURIComponent(learnerName || 'Student')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-2 bg-emerald-600 text-white px-6 py-3 rounded-full hover:bg-emerald-700 transition duration-200 shadow-sm"
+            >
+              <MessageSquare className="w-5 h-5" />
+              <span>Rate & Review Course</span>
+            </a>
           </div>
         </div>
       </div>

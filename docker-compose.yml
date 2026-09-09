@@ -75,6 +75,8 @@ services:
       - "host.docker.internal:host-gateway"
       - "lms.stjosephsplacements.in:host-gateway"
       - "learn.stjosephsplacements.in:host-gateway"
+      - "erp.stjosephsplacements.in:host-gateway"
+      - "forms.stjosephsplacements.in:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/v1/health"]
       interval: 15s

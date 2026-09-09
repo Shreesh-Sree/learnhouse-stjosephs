@@ -21,6 +21,7 @@ from src.routers import lti as lti_router_module
 from src.routers import auth_sso as auth_sso_router_module
 from src.routers import ee as ee_router_module
 from src.routers.integrations import zapier as zapier_integration
+from src.routers.integrations import erpnext as erpnext_integration
 from src.routers.ai import ai, magicblocks, courseplanning, rag, images, quiz, assignment_gen, scenario, audio
 from src.routers.boards import boards_playground
 from src.routers.orgs import ai_credits
@@ -154,6 +155,11 @@ v1_router.include_router(
     zapier_integration.router,
     prefix="/integrations/zapier",
     tags=["integrations", "zapier"],
+)
+v1_router.include_router(
+    erpnext_integration.router,
+    prefix="/integrations",
+    tags=["integrations", "erpnext"],
 )
 v1_router.include_router(
     custom_domains.router,
