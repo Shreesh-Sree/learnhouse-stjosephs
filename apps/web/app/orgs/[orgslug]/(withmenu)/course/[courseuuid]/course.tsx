@@ -595,9 +595,22 @@ const CourseClient = (props: any) => {
                             </span>
                             <h3 className="text-lg font-bold leading-tight truncate min-w-0 sm:text-base md:text-lg" style={{lineHeight: '1.2'}}>{chapter.name}</h3>
                             {chapter.is_locked && (
-                              <span className="ms-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-600 text-[10px] font-semibold">
+                              <span
+                                className={`ms-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                  chapter.lock_reason === 'prerequisite'
+                                    ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                    : 'bg-rose-50 border-rose-200 text-rose-600'
+                                }`}
+                                title={
+                                  chapter.lock_reason === 'prerequisite'
+                                    ? 'Requires completion of prerequisite chapter first'
+                                    : 'Restricted content'
+                                }
+                              >
                                 <Lock size={10} />
-                                {t('course.locked', 'Locked')}
+                                {chapter.lock_reason === 'prerequisite'
+                                  ? t('course.prerequisite_required', 'Prerequisite Required')
+                                  : t('course.locked', 'Locked')}
                               </span>
                             )}
                           </div>

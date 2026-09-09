@@ -574,7 +574,9 @@ function ActivityClient(props: ActivityClientProps) {
           </h1>
           <p className="text-sm text-gray-500 mb-6 leading-relaxed">
             {isAuthenticated
-              ? t('course.locked_restricted', 'You need to be a member of the right user group to access this. Ask a course admin to add you.')
+              ? (activity?.lock_reason === 'prerequisite'
+                  ? t('course.locked_prerequisite', 'You must complete the prerequisite chapter before unlocking this activity.')
+                  : t('course.locked_restricted', 'You need to be a member of the right user group to access this. Ask a course admin to add you.'))
               : t('course.locked_auth_required', 'You need to sign in to access this activity.')}
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center">
