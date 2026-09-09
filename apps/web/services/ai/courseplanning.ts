@@ -455,55 +455,107 @@ async function processStream(
 }
 
 /**
+ * Robust JSON repair and parser for AI model streaming responses.
+ * Handles:
+ * - <think>...</think> tags from reasoning models
+ * - Markdown code fences (```json ... ``` or ``` ... ```)
+ * - Leading/trailing non-JSON text
+ * - Missing commas between properties or array items across lines
+ * - Trailing commas before } or ]
+ * - Unescaped literal newlines and control characters inside string literals
+ */
+export function repairAndParseJson<T = any>(str: string): T | null {
+  if (!str || typeof str !== 'string') return null
+
+  // 1. Remove thinking tags (<think>...</think>)
+  let cleaned = str.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+
+  // 2. Remove markdown code fences
+  if (cleaned.includes('```json')) {
+    const start = cleaned.indexOf('```json') + 7
+    const end = cleaned.indexOf('```', start)
+    if (end !== -1) {
+      cleaned = cleaned.substring(start, end).trim()
+    }
+  } else if (cleaned.includes('```')) {
+    const start = cleaned.indexOf('```') + 3
+    const end = cleaned.indexOf('```', start)
+    if (end !== -1) {
+      cleaned = cleaned.substring(start, end).trim()
+    }
+  }
+
+  // 3. Find boundaries of outer JSON object
+  const start = cleaned.indexOf('{')
+  const end = cleaned.lastIndexOf('}')
+  if (start !== -1 && end !== -1 && end > start) {
+    cleaned = cleaned.substring(start, end + 1)
+  }
+
+  // Fast path: try native JSON.parse directly
+  try {
+    return JSON.parse(cleaned) as T
+  } catch {
+    // Proceed with progressive repair
+  }
+
+  try {
+    // 4. Strip single-line comments // ...
+    let repaired = cleaned.replace(/^\s*\/\/.*$/gm, '')
+
+    // 5. Fix unescaped literal newlines, tabs, and carriage returns inside quoted strings
+    let inString = false
+    let escaped = false
+    const chars: string[] = []
+    for (let i = 0; i < repaired.length; i++) {
+      const ch = repaired[i]
+      if (ch === '\\' && inString) {
+        escaped = !escaped
+        chars.push(ch)
+        continue
+      }
+      if (ch === '"' && !escaped) {
+        inString = !inString
+      }
+      if (inString && (ch === '\n' || ch === '\r')) {
+        chars.push(ch === '\n' ? '\\n' : '\\r')
+      } else if (inString && ch === '\t') {
+        chars.push('\\t')
+      } else {
+        chars.push(ch)
+      }
+      escaped = false
+    }
+    repaired = chars.join('')
+
+    // 6. Fix missing commas between properties or array items on adjacent lines
+    repaired = repaired.replace(/(["\d]|true|false|null|\}|\])\s*\n(\s*["{\[])/g, '$1,\n$2')
+
+    // 7. Remove trailing commas before closing braces or brackets
+    repaired = repaired.replace(/,(\s*[}\]])/g, '$1')
+
+    return JSON.parse(repaired) as T
+  } catch {
+    // Fallback: strip all trailing commas and retry
+    try {
+      let fallback = cleaned.replace(/,(\s*[}\]])/g, '$1')
+      fallback = fallback.replace(/(["\d]|true|false|null|\}|\])\s*\n(\s*["{\[])/g, '$1,\n$2')
+      fallback = fallback.replace(/,(\s*[}\]])/g, '$1')
+      return JSON.parse(fallback) as T
+    } catch {
+      return null
+    }
+  }
+}
+
+/**
  * Parse a course plan from streaming content
  */
 export function parseCoursePlanFromStream(streamContent: string): CoursePlan | null {
-  try {
-    // Check if the content is an error message
-    if (streamContent.trim().startsWith('Error:')) {
-      console.error('Received error from AI:', streamContent)
-      return null
-    }
-
-    // Clean up the response - remove markdown code blocks if present
-    let cleaned = streamContent.trim()
-
-    if (cleaned.includes('```json')) {
-      const start = cleaned.indexOf('```json') + 7
-      const end = cleaned.indexOf('```', start)
-      if (end !== -1) {
-        cleaned = cleaned.substring(start, end).trim()
-      }
-    } else if (cleaned.includes('```')) {
-      const start = cleaned.indexOf('```') + 3
-      const end = cleaned.indexOf('```', start)
-      if (end !== -1) {
-        cleaned = cleaned.substring(start, end).trim()
-      }
-    }
-
-    // Try to find JSON object boundaries
-    if (!cleaned.startsWith('{')) {
-      const start = cleaned.indexOf('{')
-      if (start !== -1) {
-        cleaned = cleaned.substring(start)
-      }
-    }
-
-    if (!cleaned.endsWith('}')) {
-      const end = cleaned.lastIndexOf('}')
-      if (end !== -1) {
-        cleaned = cleaned.substring(0, end + 1)
-      }
-    }
-
-    // Parse the JSON
-    const data = JSON.parse(cleaned)
-    return data as CoursePlan
-  } catch (error) {
-    console.error('Failed to parse course plan:', error)
+  if (!streamContent || streamContent.trim().startsWith('Error:')) {
     return null
   }
+  return repairAndParseJson<CoursePlan>(streamContent)
 }
 
 /**
@@ -572,60 +624,25 @@ function validateProseMirrorDoc(content: any): { valid: boolean; error?: string 
  */
 export function parseActivityContentFromStream(streamContent: string): any | null {
   try {
-    // Check if the content is an error message
-    if (streamContent.trim().startsWith('Error:')) {
-      console.error('[parseActivityContent] Received error from AI:', streamContent)
+    if (!streamContent || streamContent.trim().startsWith('Error:')) {
       return null
     }
 
-    // Clean up the response
-    let cleaned = streamContent.trim()
-
-    // Remove markdown code blocks if present
-    if (cleaned.includes('```json')) {
-      const start = cleaned.indexOf('```json') + 7
-      const end = cleaned.indexOf('```', start)
-      if (end !== -1) {
-        cleaned = cleaned.substring(start, end).trim()
-      }
-    } else if (cleaned.includes('```')) {
-      const start = cleaned.indexOf('```') + 3
-      const end = cleaned.indexOf('```', start)
-      if (end !== -1) {
-        cleaned = cleaned.substring(start, end).trim()
-      }
+    const parsed = repairAndParseJson<any>(streamContent)
+    if (!parsed || typeof parsed !== 'object') {
+      return null
     }
-
-    // Try to find JSON object boundaries
-    if (!cleaned.startsWith('{')) {
-      const start = cleaned.indexOf('{')
-      if (start !== -1) {
-        cleaned = cleaned.substring(start)
-      }
-    }
-
-    if (!cleaned.endsWith('}')) {
-      const end = cleaned.lastIndexOf('}')
-      if (end !== -1) {
-        cleaned = cleaned.substring(0, end + 1)
-      }
-    }
-
-    // Parse the JSON
-    const parsed = JSON.parse(cleaned)
 
     // Validate ProseMirror structure
     const validation = validateProseMirrorDoc(parsed)
     if (!validation.valid) {
       console.error('[parseActivityContent] Validation failed:', validation.error)
-      console.error('[parseActivityContent] Parsed content:', JSON.stringify(parsed).substring(0, 500))
       return null
     }
 
     return parsed
   } catch (error) {
     console.error('[parseActivityContent] Failed to parse activity content:', error)
-    console.error('[parseActivityContent] Raw content preview:', streamContent.substring(0, 500))
     return null
   }
 }

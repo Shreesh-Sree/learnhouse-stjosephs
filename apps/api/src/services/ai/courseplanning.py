@@ -271,8 +271,13 @@ You MUST respond with a valid JSON object following this exact structure:
   ]
 }}
 
-CRITICAL: The "type" field MUST always be exactly "TYPE_DYNAMIC" - no other values are allowed.
-Always output ONLY the JSON object, no markdown code blocks, no explanations before or after."""
+CRITICAL RULES:
+- The "type" field MUST always be exactly "TYPE_DYNAMIC" - no other values are allowed.
+- Output strictly valid JSON (RFC 8259).
+- Put commas between every property and array element.
+- Keep each string value on a single line; never use unescaped literal newlines inside a string.
+- Never use unescaped double quotes inside strings; escape quotes with \\" if needed.
+- Output ONLY the raw JSON object, without any markdown code blocks, think tags, or conversational preamble/postscript."""
 
 
 def build_activity_content_system_prompt(
@@ -566,37 +571,89 @@ Please modify the content according to the user's request. Output ONLY the compl
         raise RuntimeError(f"Activity content generation error: {str(e)}")
 
 
+def _repair_and_parse_json(response: str) -> Optional[dict]:
+    """Robustly sanitize and parse AI JSON responses, handling common LLM formatting flaws."""
+    if not response or not response.strip():
+        return None
+
+    import re
+
+    cleaned = response.strip()
+    # 1. Strip thinking tags
+    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", cleaned, flags=re.IGNORECASE).strip()
+
+    # 2. Strip markdown fences
+    cleaned = re.sub(r"```(?:json)?([\s\S]*?)```", r"\1", cleaned, flags=re.IGNORECASE).strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```[a-zA-Z]*\s*", "", cleaned)
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    cleaned = cleaned.strip()
+
+    # 3. Object boundaries
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        cleaned = cleaned[start:end + 1]
+
+    # Fast path: native parse
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        pass
+
+    try:
+        # 4. Strip single line comments
+        repaired = re.sub(r"^\s*//.*$", "", cleaned, flags=re.MULTILINE)
+
+        # 5. Fix unescaped literal newlines/tabs inside strings
+        in_string = False
+        escaped = False
+        chars = []
+        for ch in repaired:
+            if ch == '\\' and in_string:
+                escaped = not escaped
+                chars.append(ch)
+                continue
+            if ch == '"' and not escaped:
+                in_string = not in_string
+            if in_string and ch == '\n':
+                chars.append('\\n')
+            elif in_string and ch == '\r':
+                chars.append('\\r')
+            elif in_string and ch == '\t':
+                chars.append('\\t')
+            else:
+                chars.append(ch)
+            escaped = False
+        repaired = "".join(chars)
+
+        # 6. Fix missing commas between properties or array items on adjacent lines
+        repaired = re.sub(r'([\"0-9]|true|false|null|\}|\])\s*\n(\s*[\"\{\[])', r'\1,\n\2', repaired)
+
+        # 7. Remove trailing commas before } or ]
+        repaired = re.sub(r',(\s*[\}\]])', r'\1', repaired)
+
+        return json.loads(repaired)
+    except Exception:
+        try:
+            # Fallback: remove all trailing commas and retry
+            fallback = re.sub(r',(\s*[\}\]])', r'\1', cleaned)
+            fallback = re.sub(r'([\"0-9]|true|false|null|\}|\])\s*\n(\s*[\"\{\[])', r'\1,\n\2', fallback)
+            fallback = re.sub(r',(\s*[\}\]])', r'\1', fallback)
+            return json.loads(fallback)
+        except Exception as err:
+            logger.warning("JSON repair failed: %s", err)
+            return None
+
+
 def extract_plan_from_response(response: str) -> Optional[CoursePlan]:
     """Extract and parse the course plan from the AI response"""
     try:
-        # Clean up the response - remove markdown code blocks if present
-        cleaned = response.strip()
-
-        if "```json" in cleaned:
-            start = cleaned.find("```json") + 7
-            end = cleaned.find("```", start)
-            if end != -1:
-                cleaned = cleaned[start:end].strip()
-        elif "```" in cleaned:
-            start = cleaned.find("```") + 3
-            end = cleaned.find("```", start)
-            if end != -1:
-                cleaned = cleaned[start:end].strip()
-
-        # Try to find JSON object boundaries
-        if not cleaned.startswith("{"):
-            start = cleaned.find("{")
-            if start != -1:
-                cleaned = cleaned[start:]
-
-        if not cleaned.endswith("}"):
-            end = cleaned.rfind("}")
-            if end != -1:
-                cleaned = cleaned[:end + 1]
-
-        # Parse the JSON
-        data = json.loads(cleaned)
-        return CoursePlan(**data)
+        data = _repair_and_parse_json(response)
+        if data and isinstance(data, dict):
+            return CoursePlan(**data)
+        return None
     except Exception as e:
         logger.error("Failed to parse course plan: %s", e, exc_info=True)
         return None
@@ -605,33 +662,8 @@ def extract_plan_from_response(response: str) -> Optional[CoursePlan]:
 def extract_content_from_response(response: str) -> Optional[dict]:
     """Extract and parse the activity content from the AI response"""
     try:
-        # Clean up the response
-        cleaned = response.strip()
-
-        if "```json" in cleaned:
-            start = cleaned.find("```json") + 7
-            end = cleaned.find("```", start)
-            if end != -1:
-                cleaned = cleaned[start:end].strip()
-        elif "```" in cleaned:
-            start = cleaned.find("```") + 3
-            end = cleaned.find("```", start)
-            if end != -1:
-                cleaned = cleaned[start:end].strip()
-
-        # Try to find JSON object boundaries
-        if not cleaned.startswith("{"):
-            start = cleaned.find("{")
-            if start != -1:
-                cleaned = cleaned[start:]
-
-        if not cleaned.endswith("}"):
-            end = cleaned.rfind("}")
-            if end != -1:
-                cleaned = cleaned[:end + 1]
-
-        # Parse and return the JSON
-        return json.loads(cleaned)
+        return _repair_and_parse_json(response)
     except Exception as e:
         logger.error("Failed to parse activity content: %s", e, exc_info=True)
         return None
+

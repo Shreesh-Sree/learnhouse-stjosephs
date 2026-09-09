@@ -6,6 +6,9 @@ COURSE_VIEW = "course_view"
 ACTIVITY_VIEW = "activity_view"
 SEARCH_QUERY = "search_query"
 TIME_ON_ACTIVITY = "time_on_activity"
+FEATURE_GATE_UPGRADE_SHOWN = "feature_gate_upgrade_shown"
+ONBOARDING_WELCOME_COMPLETED = "onboarding_welcome_completed"
+LANGUAGE_CHANGED = "language_changed"
 
 # API events
 COURSE_ENROLLED = "course_enrolled"
@@ -29,4 +32,8 @@ ALLOWED_FRONTEND_EVENTS = {
     ACTIVITY_VIEW,
     SEARCH_QUERY,
     TIME_ON_ACTIVITY,
+    FEATURE_GATE_UPGRADE_SHOWN,
+    ONBOARDING_WELCOME_COMPLETED,
+    LANGUAGE_CHANGED,
 }
+

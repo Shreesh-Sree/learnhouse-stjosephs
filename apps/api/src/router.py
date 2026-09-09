@@ -19,6 +19,7 @@ from src.routers import webhooks
 from src.routers import calendar as calendar_router_module
 from src.routers import lti as lti_router_module
 from src.routers import auth_sso as auth_sso_router_module
+from src.routers import ee as ee_router_module
 from src.routers.integrations import zapier as zapier_integration
 from src.routers.ai import ai, magicblocks, courseplanning, rag, images, quiz, assignment_gen, scenario, audio
 from src.routers.boards import boards_playground
@@ -434,6 +435,14 @@ v1_router.include_router(plans.router, prefix="/plans", tags=["plans"])
 
 # Register EE Routers if available
 register_ee_routers(v1_router)
+
+# Enterprise / OSS compatibility routes (/ee/audit_logs, /ee/status)
+v1_router.include_router(
+    ee_router_module.router,
+    prefix="/ee",
+    tags=["ee"],
+    dependencies=[Depends(get_non_api_token_user)],
+)
 
 v1_router.include_router(
     health.router,

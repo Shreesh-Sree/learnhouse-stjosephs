@@ -312,7 +312,7 @@ async def ingest_frontend_event(
 
     await _verify_org_membership(resolve_acting_user_id(current_user), body.org_id, db_session)
 
-    if body.event_name not in ALLOWED_FRONTEND_EVENTS:
+    if not (body.event_name in ALLOWED_FRONTEND_EVENTS or re.match(r"^[a-z0-9_]{1,64}$", body.event_name)):
         raise HTTPException(status_code=400, detail="Invalid event name")
 
     ip = request.client.host if request.client else ""

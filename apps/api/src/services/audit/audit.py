@@ -64,6 +64,7 @@ async def record_audit_event(
         # Imported lazily so this module is importable without booting the engine
         # (e.g. during unit tests that patch the factory).
         from src.core.events.database import _async_session_factory
+        from src.db.audit_logs import AuditLog
 
         async with _async_session_factory() as session:
             session.add(
@@ -75,6 +76,20 @@ async def record_audit_event(
                     user_agent=user_agent,
                     target_uuid=target_uuid,
                     audit_metadata=metadata or {},
+                )
+            )
+            session.add(
+                AuditLog(
+                    user_id=user_id,
+                    org_id=org_id,
+                    action=event_type,
+                    resource="auth" if event_type in ("login", "logout") else "activity",
+                    resource_id=target_uuid,
+                    method="POST",
+                    path=f"/api/v1/auth/{event_type}" if event_type in ("login", "logout") else f"/api/v1/audit/{event_type}",
+                    status_code=200,
+                    payload=metadata or {},
+                    ip_address=ip,
                 )
             )
             await session.commit()
