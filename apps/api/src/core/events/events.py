@@ -103,6 +103,12 @@ def startup_app(app: FastAPI) -> Callable:
         from src.services.utils.caption_jobs import start_consumer as start_captions_consumer
         start_captions_consumer()
 
+        # Start the automated live sessions reminder scheduler
+        from src.services.courses.live_sessions_notifications import (
+            start_live_session_reminders_scheduler,
+        )
+        start_live_session_reminders_scheduler()
+
         # Start Enterprise Edition Startup tasks if available
         run_ee_startup(app)
 
@@ -140,6 +146,11 @@ def shutdown_app(app: FastAPI) -> Callable:
         # Stop the demo refresh tick.
         from src.services.demo.scheduler import stop_scheduler as stop_demo_scheduler
         await stop_demo_scheduler()
+        # Stop the live session reminders scheduler.
+        from src.services.courses.live_sessions_notifications import (
+            stop_live_session_reminders_scheduler,
+        )
+        stop_live_session_reminders_scheduler()
         await close_database(app)
 
     return close_app

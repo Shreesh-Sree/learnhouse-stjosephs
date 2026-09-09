@@ -94,6 +94,16 @@ async def create_live_session(
     db_session.add(session)
     await db_session.commit()
     await db_session.refresh(session)
+
+    # Dispatch asynchronous notifications to enrolled students
+    try:
+        import asyncio
+        from src.services.courses.live_sessions_notifications import notify_enrolled_students_on_creation
+        if session.id is not None and course.id is not None:
+            asyncio.create_task(notify_enrolled_students_on_creation(session.id, course.id))
+    except Exception as e:
+        logger.debug("Failed spawning live session creation notification: %s", e)
+
     return _to_read(session)
 
 
