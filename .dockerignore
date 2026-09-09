@@ -130,6 +130,9 @@ coverage.xml
 # Database
 *.db
 *.sqlite3
+postgres_data/
+redis_data/
+content_data/
 
 # Media files (can be large)
 uploads/

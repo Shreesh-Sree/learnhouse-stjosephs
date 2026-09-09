@@ -69,7 +69,7 @@ export async function uploadScormPackage(
 // passed straight through, matching the API's {file_path:path} route which
 // accepts slashes raw rather than percent-encoded.
 export function getScormContentUrl(activityUuid: string, entryPoint: string) {
-  return `${getAPIUrl()}scorm/${activityUuid}/content/${entryPoint}`
+  return `/api/scorm/${activityUuid}/content/${entryPoint}`
 }
 
 // Instructor-only.

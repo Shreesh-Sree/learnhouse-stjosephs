@@ -5,7 +5,7 @@ import { useLHAnalytics } from '@services/analytics/useLHAnalytics'
 import { AnalyticsEvent } from '@services/analytics/events'
 import DemoEntryCard from '@components/Objects/Demo/DemoEntryCard'
 import UserAvatar from '@components/Objects/UserAvatar'
-import { getAPIUrl, getUriWithOrg, getLEARNHOUSE_PLATFORM_URL_VAL } from '@services/config/config'
+import { getAPIUrl, getUriWithOrg, getLEARNHOUSE_PLATFORM_URL_VAL, getTenancy } from '@services/config/config'
 import { apiFetch } from '@services/utils/ts/requests'
 import { signOut } from '@components/Contexts/AuthContext'
 import { getOrgLogoMediaDirectory } from '@services/media/media'
@@ -63,11 +63,15 @@ function HomeClient() {
   }, [isLoading, isAuthenticated, router])
 
   // A brand-new (org-less) user has no orgs yet — send them straight to create
-  // their first org rather than a confusing empty hub. Mirrors the platform's
-  // post-signup onboarding hop.
+  // their first org rather than a confusing empty hub. In single tenancy, user
+  // is auto-scoped to the default org so send them straight to portal.
   useEffect(() => {
-    if (isAuthenticated && Array.isArray(orgs) && orgs.length === 0) {
-      router.replace('/new')
+    if (isAuthenticated && Array.isArray(orgs)) {
+      if (getTenancy() === 'single') {
+        router.replace('/')
+      } else if (orgs.length === 0) {
+        router.replace('/new')
+      }
     }
   }, [isAuthenticated, orgs, router])
 

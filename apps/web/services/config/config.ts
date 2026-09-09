@@ -81,8 +81,10 @@ const getCookieValue = (name: string): string | null => {
 }
 
 // Dynamic config getters - these are functions to ensure runtime values are used
-const getLEARNHOUSE_HTTP_PROTOCOL = () =>
-  (getConfig('NEXT_PUBLIC_LEARNHOUSE_HTTPS') === 'true') ? 'https://' : 'http://'
+const getLEARNHOUSE_HTTP_PROTOCOL = () => {
+  const val = (getConfig('NEXT_PUBLIC_LEARNHOUSE_HTTPS') || '').toLowerCase();
+  return (val === 'true' || val === '1' || val === 'yes') ? 'https://' : 'http://';
+}
 const getLEARNHOUSE_BACKEND_URL = () => getConfig('NEXT_PUBLIC_LEARNHOUSE_BACKEND_URL', 'http://localhost/')
 const getLEARNHOUSE_DOMAIN = () => {
   // 1. Env var (backward compat for existing deploys)
@@ -165,6 +167,10 @@ export const getAPIUrl = () => {
 // Server-side only - always returns full URL (never relative path)
 // Use this in Server Components, API routes, and server-side data fetching
 export const getServerAPIUrl = () => {
+  if (typeof window === 'undefined') {
+    const internal = getConfig('LEARNHOUSE_INTERNAL_API_URL') || process.env.LEARNHOUSE_INTERNAL_API_URL;
+    if (internal) return internal.endsWith('/') ? internal : `${internal}/`;
+  }
   return deriveAPIUrl()
 }
 

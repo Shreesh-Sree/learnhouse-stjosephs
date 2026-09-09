@@ -521,7 +521,7 @@ def _smtp_port_number(port) -> int:
         return 0
 
 
-def _smtp_tls_context() -> ssl.SSLContext:
+def _smtp_tls_context(verify: bool = True) -> ssl.SSLContext:
     """Certificate-verifying TLS context for outbound SMTP.
 
     ``starttls()``/``SMTP_SSL`` with no ``context`` fall back to
@@ -533,8 +533,12 @@ def _smtp_tls_context() -> ssl.SSLContext:
     """
     context = ssl.create_default_context()
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.check_hostname = True
-    context.verify_mode = ssl.CERT_REQUIRED
+    if not verify:
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+    else:
+        context.check_hostname = True
+        context.verify_mode = ssl.CERT_REQUIRED
     return context
 
 
@@ -558,7 +562,10 @@ def _send_email_smtp(
     server = None
     try:
         if mailing.smtp_use_tls:
-            context = _smtp_tls_context()
+            tls_verify = getattr(mailing, "smtp_tls_verify", True)
+            if tls_verify is None:
+                tls_verify = True
+            context = _smtp_tls_context(verify=tls_verify)
             if _smtp_port_number(mailing.smtp_port) == _SMTP_IMPLICIT_TLS_PORT:
                 server = smtplib.SMTP_SSL(
                     mailing.smtp_host,

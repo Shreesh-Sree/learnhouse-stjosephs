@@ -1,0 +1,66 @@
+services:
+  lms-db:
+    image: pgvector/pgvector:pg18
+    container_name: lms-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: learnhouse
+      POSTGRES_USER: learnhouse
+      POSTGRES_PASSWORD: LearnHouseDB_Pass2026!
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - /data/production/lms/postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U learnhouse -d learnhouse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lms-net
+
+  lms-redis:
+    image: redis:latest
+    container_name: lms-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - /data/production/lms/redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lms-net
+
+  lms-app:
+    image: learnhouse:latest
+    container_name: lms-app
+    restart: unless-stopped
+    depends_on:
+      lms-db:
+        condition: service_healthy
+      lms-redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8200:80"
+    volumes:
+      - /data/production/lms/content_data:/app/api/content
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "lms.stjosephsplacements.in:host-gateway"
+      - "learn.stjosephsplacements.in:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/v1/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - lms-net
+
+networks:
+  lms-net:
+    driver: bridge

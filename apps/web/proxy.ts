@@ -336,10 +336,10 @@ export default async function proxy(req: NextRequest) {
   if (authPaths.includes(pathname)) {
     const hasSession = !!req.cookies.get('LH_session')?.value
 
-    // A logged-in user has no business on /login — bounce them to the hub (the
-    // page itself re-verifies, so this is a best-effort UX shortcut).
+    // A logged-in user has no business on /login — bounce them to the portal (in single mode) or hub
     if (pathname === '/login' && hasSession) {
-      return NextResponse.redirect(new URL('/home', req.url))
+      const dest = instance.tenancy === 'single' ? '/' : '/home'
+      return NextResponse.redirect(new URL(dest, req.url))
     }
 
     const resolved = await resolveTenant(req, instance)
@@ -553,8 +553,13 @@ export default async function proxy(req: NextRequest) {
   // path drops the base URL's query, and Next treats the destination's search
   // as the request's. Every other branch above appends it; this one did not, so
   // org-scoped pages lost their query string (?page, ?q, ?tab, …).
+  const target = (pathname === '/orgs' || pathname === '/orgs/')
+    ? `/orgs/${resolved.slug}`
+    : (pathname.startsWith('/orgs/')
+      ? pathname
+      : `/orgs/${resolved.slug}${pathname}`)
   const response = NextResponse.rewrite(
-    new URL(`/orgs/${resolved.slug}${pathname}${search}`, req.url),
+    new URL(`${target}${search}`, req.url),
     { request: { headers: requestHeaders } },
   )
   setOrgCookies(response, resolved, instance)

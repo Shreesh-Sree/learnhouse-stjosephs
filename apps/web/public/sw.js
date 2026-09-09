@@ -59,19 +59,11 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-function isCacheableApiRequest(url) {
-  // with_unpublished_activities=true is sent ONLY by the dashboard course
-  // editor (see CourseContext.tsx / ActivitySwitcher.tsx) — students and
-  // public readers never pass it, so it's a precise signal that this is a
-  // live-editing request, not the read-only offline-viewing case this cache
-  // exists for. Serving a stale-while-revalidate response here meant a
-  // teacher who just created or edited a chapter/activity would not see
-  // their own change without a full page reload: this cache doesn't know
-  // about that write and only catches up on the NEXT GET, one request
-  // behind. Always go straight to the network for these so the editor sees
-  // its own writes immediately; everything else (published-content reads)
-  // keeps the offline cache.
+function isCacheableApiRequest(url, request) {
+  // Never cache authenticated requests or editor/dashboard requests
+  if (request && request.headers && request.headers.get('authorization')) return false
   if (url.searchParams.get('with_unpublished_activities') === 'true') return false
+  if (url.pathname.includes('/dash') || url.pathname.includes('/editor') || url.pathname.includes('/admin')) return false
   return CACHEABLE_API_PATTERNS.some((pattern) => url.pathname.includes(pattern))
 }
 
@@ -80,25 +72,22 @@ function isStaticAsset(url) {
   return url.pathname.startsWith('/_next/static/')
 }
 
-async function staleWhileRevalidate(request, cacheName) {
+async function networkFirst(request, cacheName) {
   const cache = await caches.open(cacheName)
-  const cached = await cache.match(request)
-  const networkPromise = fetch(request)
-    .then((response) => {
-      if (response && response.ok) {
-        cache.put(request, response.clone())
-      }
-      return response
-    })
-    .catch(() => undefined)
-
-  // Serve the cached copy immediately if we have one (instant + works
-  // offline); otherwise wait on the network. Either way the cache above
-  // gets refreshed in the background when the network call succeeds.
-  return cached || (await networkPromise) || new Response(
-    JSON.stringify({ detail: 'Offline and no cached copy of this content is available yet.' }),
-    { status: 503, headers: { 'Content-Type': 'application/json' } }
-  )
+  try {
+    const response = await fetch(request)
+    if (response && response.ok) {
+      cache.put(request, response.clone())
+    }
+    return response
+  } catch (err) {
+    const cached = await cache.match(request)
+    if (cached) return cached
+    return new Response(
+      JSON.stringify({ detail: 'Offline and no cached copy of this content is available yet.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
 }
 
 async function cacheFirst(request, cacheName) {
@@ -119,8 +108,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url)
 
-  if (isCacheableApiRequest(url)) {
-    event.respondWith(staleWhileRevalidate(request, CONTENT_CACHE))
+  if (isCacheableApiRequest(url, request)) {
+    event.respondWith(networkFirst(request, CONTENT_CACHE))
     return
   }
 

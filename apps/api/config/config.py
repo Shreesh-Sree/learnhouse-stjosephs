@@ -127,6 +127,7 @@ class MailingConfig(BaseModel):
     smtp_username: Optional[str] = None
     smtp_password: Optional[str] = None
     smtp_use_tls: Optional[bool] = True
+    smtp_tls_verify: Optional[bool] = True
 
 
 class DatabaseConfig(BaseModel):
@@ -507,6 +508,7 @@ def get_learnhouse_config() -> LearnHouseConfig:
     env_smtp_username = os.environ.get("LEARNHOUSE_SMTP_USERNAME")
     env_smtp_password = os.environ.get("LEARNHOUSE_SMTP_PASSWORD")
     env_smtp_use_tls = os.environ.get("LEARNHOUSE_SMTP_USE_TLS")
+    env_smtp_tls_verify = os.environ.get("LEARNHOUSE_SMTP_TLS_VERIFY")
 
     email_provider = env_email_provider or yaml_config.get("mailing_config", {}).get(
         "email_provider", "resend"
@@ -529,6 +531,10 @@ def get_learnhouse_config() -> LearnHouseConfig:
     smtp_use_tls = (
         env_smtp_use_tls.lower() in ("true", "1", "yes") if env_smtp_use_tls
         else yaml_config.get("mailing_config", {}).get("smtp_use_tls", True)
+    )
+    smtp_tls_verify = (
+        env_smtp_tls_verify.lower() not in ("false", "0", "no") if env_smtp_tls_verify
+        else yaml_config.get("mailing_config", {}).get("smtp_tls_verify", True)
     )
 
     # Tinybird config — auto-enabled when API URL is set
@@ -754,6 +760,7 @@ def get_learnhouse_config() -> LearnHouseConfig:
             smtp_username=smtp_username,
             smtp_password=smtp_password,
             smtp_use_tls=smtp_use_tls,
+            smtp_tls_verify=smtp_tls_verify,
         ),
         payments_config=InternalPaymentsConfig(
             stripe=InternalStripeConfig(
