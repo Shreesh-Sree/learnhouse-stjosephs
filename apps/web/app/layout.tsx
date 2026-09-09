@@ -28,6 +28,10 @@ const tajawal = Tajawal({
   weight: ['300', '400', '500', '700', '800'],
   display: 'swap',
   variable: '--font-arabic',
+  // Only applied in Arabic locale (see globals.css). Preloading on every
+  // page load triggers "link preload but not used" warnings for all
+  // non-Arabic pages. The font is still fetched on demand when used.
+  preload: false,
 })
 
 export default function RootLayout({
