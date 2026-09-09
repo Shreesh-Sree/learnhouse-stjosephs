@@ -244,6 +244,28 @@ async def api_rag_chat(
     ):
         raise HTTPException(status_code=404, detail="Chat session not found")
 
+    # Pre-flight Inbound Guardrail: intercept prompt injection, exploits, or dangerous
+    # requests before reserving credits or running vector similarity searches.
+    from src.services.ai.guardrails import validate_input
+    from uuid import uuid4
+    guard_in = validate_input(chat_request.message)
+    if not guard_in.passed:
+        refusal_uuid = chat_request.aichat_uuid or f"aichat_{uuid4()}"
+        async def _guardrail_refusal_generator():
+            yield f"data: {json.dumps({'type': 'start', 'aichat_uuid': refusal_uuid})}\n\n"
+            yield f"data: {json.dumps({'type': 'chunk', 'content': guard_in.refusal_message})}\n\n"
+            yield f"data: {json.dumps({'type': 'done', 'aichat_uuid': refusal_uuid})}\n\n"
+
+        return StreamingResponse(
+            _guardrail_refusal_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
     # Atomic credit reservation — RAG chat makes 2 API calls (embedding + generation)
     await reserve_ai_credit(org_id, db_session, amount=2)
 
