@@ -192,6 +192,31 @@
   --color-chart-3: hsl(var(--chart-3));
   --color-chart-4: hsl(var(--chart-4));
   --color-chart-5: hsl(var(--chart-5));
+
+  --z-index-behind: -10;
+  --z-index-background: -1;
+  --z-index-base: 0;
+  --z-index-content: 1;
+  --z-index-elevated: 5;
+  --z-index-sticky: 10;
+  --z-index-sticky-header: 15;
+  --z-index-interactive: 20;
+  --z-index-drag-overlay: 30;
+  --z-index-nav: 50;
+  --z-index-nav-menu: 51;
+  --z-index-dropdown: 100;
+  --z-index-popover: 250;
+  --z-index-overlay: 120;
+  --z-index-editor-toolbar: 130;
+  --z-index-editor-bubble: 135;
+  --z-index-tooltip: 250;
+  --z-index-modal-backdrop: 200;
+  --z-index-modal: 210;
+  --z-index-modal-content: 220;
+  --z-index-toast: 300;
+  --z-index-notification: 310;
+  --z-index-critical: 400;
+  --z-index-max: 9999;
 }
 
 /*

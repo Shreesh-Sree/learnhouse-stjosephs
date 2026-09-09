@@ -14,6 +14,7 @@ interface HoverMenuProps {
 const HoverMenu = React.forwardRef<HTMLDivElement, HoverMenuProps>(
   ({ children, content, contentClassName, align = "start" }, ref) => {
     const triggerRef = React.useRef<HTMLDivElement>(null)
+    const menuRef = React.useRef<HTMLDivElement>(null)
     const [isHovered, setIsHovered] = React.useState(false)
     // Anchored on `left` in LTR and on `right` in RTL. Anchoring from the edge
     // the menu grows away from means we don't need to know its width before it
@@ -24,15 +25,53 @@ const HoverMenu = React.forwardRef<HTMLDivElement, HoverMenuProps>(
     const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
     const leaveTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
+    const setRefs = React.useCallback(
+      (node: HTMLDivElement | null) => {
+        menuRef.current = node
+        if (typeof ref === "function") {
+          ref(node)
+        } else if (ref) {
+          (ref as React.MutableRefObject<HTMLDivElement | null>).current = node
+        }
+      },
+      [ref]
+    )
+
     const updatePosition = React.useCallback(() => {
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect()
+        const viewportHeight = window.innerHeight
+        const padding = 12
         let top = rect.top
 
         if (align === "end") {
           top = rect.bottom
         } else if (align === "center") {
           top = rect.top + rect.height / 2
+        }
+
+        // Viewport collision adjustment to prevent dropdowns from overflowing downwards
+        const menuHeight = menuRef.current?.offsetHeight || 0
+        if (menuHeight > 0) {
+          if (align === "end") {
+            // align=end transforms with translateY(-100%)
+            if (top - menuHeight < padding) {
+              top = menuHeight + padding
+            }
+          } else if (align === "center") {
+            const halfH = menuHeight / 2
+            if (top + halfH > viewportHeight - padding) {
+              top = viewportHeight - padding - halfH
+            }
+            if (top - halfH < padding) {
+              top = padding + halfH
+            }
+          } else {
+            // align === "start": menu extends downwards from top
+            if (top + menuHeight > viewportHeight - padding) {
+              top = Math.max(padding, viewportHeight - menuHeight - padding)
+            }
+          }
         }
 
         // The flyout opens toward the inline end: right of the trigger in LTR,
@@ -48,6 +87,13 @@ const HoverMenu = React.forwardRef<HTMLDivElement, HoverMenuProps>(
         )
       }
     }, [align])
+
+    // Re-adjust position once menu is rendered and measured
+    React.useLayoutEffect(() => {
+      if (isHovered) {
+        updatePosition()
+      }
+    }, [isHovered, updatePosition])
 
     const handleMouseEnter = React.useCallback(() => {
       if (leaveTimeoutRef.current) {
@@ -93,12 +139,13 @@ const HoverMenu = React.forwardRef<HTMLDivElement, HoverMenuProps>(
         {shouldRenderPortal && (
           <Portal.Root>
             <div
-              ref={ref}
+              ref={setRefs}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
               style={{
                 position: 'fixed',
                 top: position.top,
+                zIndex: 250,
                 ...(position.left !== undefined ? { left: position.left } : { right: position.right }),
                 transform: align === "end" ? "translateY(-100%)" : align === "center" ? "translateY(-50%)" : undefined,
               }}
@@ -131,7 +178,7 @@ const HoverMenuContent = React.forwardRef<HTMLDivElement, HoverMenuContentProps>
       <div
         ref={ref}
         className={cn(
-          "min-w-[200px] rounded-lg border bg-[#0f0f10] border-white/10 shadow-xl shadow-black/30 py-1",
+          "min-w-[200px] max-h-[calc(100vh-32px)] overflow-y-auto overscroll-contain [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-white/20 rounded-lg border bg-[#0f0f10] border-white/10 shadow-xl shadow-black/30 py-1",
           className
         )}
       >

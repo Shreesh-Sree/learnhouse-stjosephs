@@ -13,6 +13,7 @@ import {
   Files,
   Certificate,
   ChartBar,
+  X,
 } from '@phosphor-icons/react'
 import WelcomeGlobe from './WelcomeGlobe'
 import { useTranslation } from 'react-i18next'
@@ -127,7 +128,10 @@ export default function WelcomeModal() {
         className="fixed inset-0 z-[100] flex items-center justify-center"
       >
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/15 backdrop-blur-[2px]" />
+        <div
+          className="absolute inset-0 bg-black/15 backdrop-blur-[2px] cursor-pointer"
+          onClick={() => markWelcomeSeen()}
+        />
 
         {/* Modal */}
         <motion.div
@@ -137,6 +141,14 @@ export default function WelcomeModal() {
           className="relative w-full max-w-3xl mx-4"
         >
           <div className="bg-white rounded-2xl nice-shadow relative overflow-hidden">
+            {/* Close button */}
+            <button
+              onClick={() => markWelcomeSeen()}
+              className="absolute top-4 end-4 z-30 p-2 rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              aria-label={t('common.close', { defaultValue: 'Close' })}
+            >
+              <X size={20} weight="bold" />
+            </button>
             {/* Top content */}
             <AnimatePresence mode="wait">
               {!showFeatures ? (

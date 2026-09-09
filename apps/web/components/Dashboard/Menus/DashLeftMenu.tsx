@@ -237,39 +237,39 @@ function DashLeftMenu() {
     <nav
       aria-label={t('dashboard.nav.sidebar_navigation')}
       className={cn(
-        "flex flex-col text-white h-screen sticky top-0 z-overlay border-e border-white/[0.08] bg-[#0f0f10] transition-all duration-300",
+        "flex flex-col text-white h-screen sticky top-0 z-nav border-e border-white/[0.08] bg-[#0f0f10] transition-all duration-300",
         isCollapsed ? "w-[72px]" : "w-64"
       )}
     >
       {/* Header with Logo and Toggle */}
       <div className={cn(
-        "relative flex items-center h-16 border-b border-white/[0.08] px-4 shrink-0",
+        "relative flex items-center h-16 border-b border-white/[0.08] px-4 shrink-0 gap-2",
         isCollapsed ? "justify-center" : "justify-between"
       )}>
         <Link
-          className={cn("flex items-center transition-opacity hover:opacity-70", isCollapsed ? "" : "space-x-3")}
+          className={cn("flex items-center transition-opacity hover:opacity-70 min-w-0", isCollapsed ? "justify-center" : "flex-1 gap-3")}
           href={'/'}
         >
           {planMeetsRequirement(plan, 'standard') && org?.logo_image ? (
             <img
               src={getOrgLogoMediaDirectory(org.org_uuid, org.logo_image)}
               alt={org?.name}
-              className="h-9 w-9 object-contain rounded-lg"
+              className="h-9 w-9 object-contain rounded-lg shrink-0"
             />
           ) : (
             <img
               src="/lrn-dash.svg"
               alt="St. Joseph's Placements and Training Cell logo"
-              className="h-8 w-8"
+              className="h-8 w-8 shrink-0"
             />
           )}
           {!isCollapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="font-semibold text-sm text-white truncate">
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="font-semibold text-sm text-white truncate block">
                 {org?.name}
               </span>
               <span className={cn(
-                "mt-0.5 inline-flex w-fit items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider",
+                "mt-0.5 inline-flex w-fit items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider shrink-0",
                 planPillColor
               )}>
                 {planLabel}
@@ -282,7 +282,7 @@ function DashLeftMenu() {
           <button
             aria-label={t('dashboard.nav.collapse_sidebar')}
             onClick={toggleCollapse}
-            className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.08] transition-all"
+            className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.08] transition-all shrink-0"
           >
             <SidebarSimple size={18} weight="fill" />
           </button>
@@ -319,8 +319,8 @@ function DashLeftMenu() {
         )}
       </div>
 
-      {/* Main Navigation - Vertically Centered */}
-      <div className="flex-1 flex flex-col justify-center py-4 px-3">
+      {/* Main Navigation - Scrollable with hidden scrollbar */}
+      <div className="flex-1 flex flex-col justify-start overflow-y-auto overflow-x-hidden py-4 px-3 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <AdminAuthorization authorizationMode="component">
           <div className="space-y-1">
             <MenuLink
@@ -1196,7 +1196,7 @@ function DashLeftMenu() {
                 </div>
                 <HoverMenuSeparator />
                 <HoverMenuItem asChild>
-                  <Link href="/account/general" className="flex items-center gap-2 px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/[0.08] cursor-pointer transition-colors">
+                  <Link href={getUriWithOrg(org?.slug, '/account/general')} className="flex items-center gap-2 px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/[0.08] cursor-pointer transition-colors">
                     <Gear size={16} weight="fill" />
                     <span>{t('common.settings')}</span>
                   </Link>
