@@ -33,6 +33,27 @@ services:
     networks:
       - lms-net
 
+  lms-clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: lms-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: LearnHouseAnalytics2026!
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - /data/production/lms/clickhouse_data:/var/lib/clickhouse
+    ports:
+      - "127.0.0.1:8125:8123"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lms-net
+
   lms-app:
     image: learnhouse:latest
     container_name: lms-app
@@ -41,6 +62,8 @@ services:
       lms-db:
         condition: service_healthy
       lms-redis:
+        condition: service_healthy
+      lms-clickhouse:
         condition: service_healthy
     env_file:
       - .env

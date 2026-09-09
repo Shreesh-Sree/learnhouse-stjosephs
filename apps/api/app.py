@@ -24,6 +24,7 @@ from src.core.middleware.cors import configure_cors
 from src.router import v1_router
 from src.routers.content_files import router as content_files_router
 from src.routers.local_content import router as local_content_router
+from src.routers.tinybird_emulator import router as tinybird_emulator_router, init_clickhouse_schema
 
 
 learnhouse_config: LearnHouseConfig = get_learnhouse_config()
@@ -130,6 +131,10 @@ if learnhouse_config.general_config.sentry_config.dsn:
 async def lifespan(application: FastAPI):
     await startup_app(application)()
     try:
+        await init_clickhouse_schema()
+    except Exception as e:
+        logging.getLogger(__name__).warning("ClickHouse auto-init skipped: %s", e)
+    try:
         yield
     finally:
         await shutdown_app(application)()
@@ -158,6 +163,7 @@ if learnhouse_config.hosting_config.content_delivery.type == "s3api":
 else:
     app.include_router(local_content_router)
 
+app.include_router(tinybird_emulator_router)
 app.include_router(v1_router)
 
 

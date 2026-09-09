@@ -71,3 +71,9 @@ apps/api/ee
 # Playwright MCP session artifacts
 .playwright-mcp/
 .demo-secrets
+
+# Persistent data volumes
+postgres_data/
+redis_data/
+content_data/
+clickhouse_data/

@@ -133,6 +133,7 @@ coverage.xml
 postgres_data/
 redis_data/
 content_data/
+clickhouse_data/
 
 # Media files (can be large)
 uploads/
