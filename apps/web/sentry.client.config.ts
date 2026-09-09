@@ -31,6 +31,14 @@ if (SENTRY_DSN) {
       // play() with no user gesture, and a source swap aborts one in flight.
       "The play() request was interrupted",
       "play() failed because the user didn't interact with the document first",
+      // Sentry Replay SDK processing PerformanceEntry objects that have no
+      // timing data (startTime undefined). This is a known SDK quirk on some
+      // browsers when the Replay tries to record LCP/FCP entries that arrive
+      // asynchronously after the observer registers. Not actionable from here.
+      /Cannot read properties of undefined \(reading 'startTime'\)/,
+      // Next.js internal hydration timing — safe to ignore.
+      "Hydration failed because the server rendered HTML didn't match",
+      "There was an error while hydrating",
     ],
     denyUrls: [
       /extensions\//i,
