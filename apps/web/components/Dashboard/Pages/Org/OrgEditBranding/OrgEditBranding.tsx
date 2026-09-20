@@ -529,7 +529,11 @@ export default function OrgEditBranding() {
                           "border-2 border-gray-100 hover:border-blue-200 transition-all duration-300",
                           isLogoUploading && "opacity-50"
                         )}
-                        style={{ backgroundImage: `url(${localLogo || getOrgLogoMediaDirectory(org?.org_uuid, org?.logo_image)})` }}
+                        style={{
+                          backgroundImage: (localLogo || getOrgLogoMediaDirectory(org?.org_uuid, org?.logo_image))
+                            ? `url(${localLogo || getOrgLogoMediaDirectory(org?.org_uuid, org?.logo_image)})`
+                            : undefined
+                        }}
                       />
                     </div>
 

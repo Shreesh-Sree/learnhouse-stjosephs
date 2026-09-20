@@ -62,11 +62,13 @@ export default function DashboardHome() {
                 {t('dashboard.home.welcome_back')}{username ? `, ${username}` : ''}
               </h1>
               <div className="flex items-center gap-2 mt-1.5">
-                <span
-                  className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full capitalize ${planStyle.bg} ${planStyle.text}`}
-                >
-                  {plan === 'oss' ? 'OSS' : `${plan} ${t('dashboard.home.plan')}`}
-                </span>
+                {plan && plan !== 'oss' && plan !== 'enterprise' && (
+                  <span
+                    className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full capitalize ${planStyle.bg} ${planStyle.text}`}
+                  >
+                    {`${plan} ${t('dashboard.home.plan')}`}
+                  </span>
+                )}
                 {org?.name && (
                   <span className="text-xs text-gray-400">{org.name}</span>
                 )}

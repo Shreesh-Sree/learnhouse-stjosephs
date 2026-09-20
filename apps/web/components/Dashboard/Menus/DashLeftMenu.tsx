@@ -268,12 +268,14 @@ function DashLeftMenu() {
               <span className="font-semibold text-sm text-white truncate block">
                 {org?.name}
               </span>
-              <span className={cn(
-                "mt-0.5 inline-flex w-fit items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider shrink-0",
-                planPillColor
-              )}>
-                {planLabel}
-              </span>
+              {planLabel && !['oss', 'enterprise', 'enterprise edition'].includes(planLabel.toLowerCase()) && (
+                <span className={cn(
+                  "mt-0.5 inline-flex w-fit items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider shrink-0",
+                  planPillColor
+                )}>
+                  {planLabel}
+                </span>
+              )}
             </div>
           )}
         </Link>
@@ -726,7 +728,7 @@ function DashLeftMenu() {
                   <HoverMenuItem asChild>
                     <Link href="/dash/developers/sso" className="flex items-center gap-2 px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/[0.08] cursor-pointer transition-colors">
                       <Lock size={16} weight="fill" />
-                      <span className="flex items-center">{t('dashboard.organization.settings.tabs.sso', { defaultValue: 'SSO' })}<PlanBadge currentPlan={plan} requiredPlan="enterprise" variant="dark" /></span>
+                      <span className="flex items-center">{t('dashboard.organization.settings.tabs.sso', { defaultValue: 'SSO' })}</span>
                     </Link>
                   </HoverMenuItem>
                 </HoverMenuContent>
@@ -785,7 +787,7 @@ function DashLeftMenu() {
                   <HoverMenuItem asChild>
                     <Link href="/dash/analytics" className="flex items-center gap-2 px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/[0.08] cursor-pointer transition-colors">
                       <ChartLine size={16} weight="fill" />
-                      <span className="flex items-center">{t('analytics.tabs.advanced')}<PlanBadge currentPlan={plan} requiredPlan="enterprise" variant="dark" /></span>
+                      <span className="flex items-center">{t('analytics.tabs.advanced')}</span>
                     </Link>
                   </HoverMenuItem>
                 </HoverMenuContent>

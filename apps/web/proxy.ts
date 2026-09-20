@@ -545,7 +545,39 @@ export default async function proxy(req: NextRequest) {
   }
 
   // -------------------------------------------------------------------------
-  // 11. Tenant-scoped rewrite — the catch-all that puts us under /orgs/{slug}
+  // 11. Auth guard — redirect unauthenticated visitors to /login.
+  //
+  //     Checked here (not in section 3) so it applies to ALL tenant-scoped
+  //     routes that reach this point. Earlier sections have already handled:
+  //       - /login, /signup, /reset, /forgot, /verify-email  (section 3)
+  //       - /auth/sso, /auth/callback, /auth/magic           (section 4)
+  //       - /course/…/edit, /board/…, /editor/…              (section 5)
+  //       - /redirect_from_auth                               (section 8)
+  //     …so none of those ever land here.
+  //
+  //     We rely on the same non-httpOnly LH_session marker cookie that the
+  //     /login bounce-back (section 3, line ~340) already uses — it is the
+  //     agreed-upon signal for "a session might exist". The page itself
+  //     re-validates the real httpOnly refresh token, so this is best-effort
+  //     and safe to check from the Edge runtime.
+  //
+  //     The ?next= param lets the login page return the user exactly where
+  //     they were headed after a successful sign-in, matching the behaviour
+  //     users expect from every modern auth flow.
+  // -------------------------------------------------------------------------
+  const hasSession = !!req.cookies.get('LH_session')?.value
+  if (!hasSession) {
+    // Preserve the intended destination so the login page can redirect back.
+    const loginUrl = new URL('/login', req.url)
+    const intendedPath = `${pathname}${search}`
+    if (intendedPath && intendedPath !== '/') {
+      loginUrl.searchParams.set('next', intendedPath)
+    }
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // -------------------------------------------------------------------------
+  // 12. Tenant-scoped rewrite — the catch-all that puts us under /orgs/{slug}
   // -------------------------------------------------------------------------
   const resolved = await resolveTenant(req, instance)
   const requestHeaders = tenantRequestHeaders(req, resolved, instance)

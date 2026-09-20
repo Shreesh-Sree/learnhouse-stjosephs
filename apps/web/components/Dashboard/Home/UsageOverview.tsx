@@ -133,11 +133,13 @@ export default function UsageOverview() {
       <div className="bg-white rounded-xl nice-shadow p-5">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-sm font-semibold text-gray-700">{t('dashboard.home.plan_and_usage')}</h3>
-          <span
-            className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full capitalize ${planStyle.bg} ${planStyle.text}`}
-          >
-            {plan === 'oss' ? 'OSS' : plan}
-          </span>
+          {plan && plan !== 'oss' && plan !== 'enterprise' && (
+            <span
+              className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full capitalize ${planStyle.bg} ${planStyle.text}`}
+            >
+              {plan}
+            </span>
+          )}
         </div>
 
         {isLoading ? (

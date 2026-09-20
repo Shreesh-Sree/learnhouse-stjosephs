@@ -34,6 +34,29 @@ export default function AccountDangerZone() {
 
   const username = user?.username ?? ''
   const canDelete = confirmText.trim() === username && !!username
+  const isSuperAdminAccount =
+    user?.email?.toLowerCase() === 'admin@stjosephsplacements.in' || user?.is_superadmin
+
+  if (isSuperAdminAccount) {
+    return (
+      <div className="bg-white rounded-xl nice-shadow ring-1 ring-inset ring-indigo-100 overflow-hidden mt-6">
+        <div className="flex flex-col bg-indigo-50/60 -space-y-1 px-5 py-3 mx-3 mt-3 rounded-md">
+          <h1 className="font-bold text-xl text-indigo-700 flex items-center gap-2">
+            <AlertTriangle size={18} />
+            Protected Root SuperAdmin Account
+          </h1>
+          <h2 className="text-indigo-500/80 text-md ps-7">
+            Primary Institutional Administrator
+          </h2>
+        </div>
+        <div className="mx-5 mt-3 mb-5">
+          <p className="text-sm text-gray-600">
+            The root SuperAdmin account (<strong>admin@stjosephsplacements.in</strong>) is permanently protected and cannot be deleted or removed.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const handleDelete = async () => {
     if (!canDelete || deleting) return

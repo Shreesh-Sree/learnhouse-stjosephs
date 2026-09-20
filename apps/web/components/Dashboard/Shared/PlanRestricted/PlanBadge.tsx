@@ -81,6 +81,12 @@ const PlanBadge: React.FC<PlanBadgeProps> = ({
   noMargin = false,
   variant = 'light'
 }) => {
+  // Fully remove Enterprise and OSS tags
+  const normRequired = requiredPlan?.toLowerCase()
+  if (normRequired === 'enterprise' || normRequired === 'oss') {
+    return null
+  }
+
   // Don't show badge if user meets the requirement (unless alwaysShow)
   if (!alwaysShow && planMeetsRequirement(currentPlan, requiredPlan)) {
     return null

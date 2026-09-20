@@ -86,6 +86,7 @@ class AIConfig(BaseModel):
     # Unset by default — the tool is simply not registered on the agent, no error.
     firecrawl_url: str | None = None
     firecrawl_api_key: str | None = None
+    student_byok: bool = False
 
 
 class S3ApiConfig(BaseModel):
@@ -492,6 +493,12 @@ def get_learnhouse_config() -> LearnHouseConfig:
     else:
         is_ai_enabled = yaml_ai_config.get("is_ai_enabled", False)
 
+    env_student_byok_str = os.environ.get("LEARNHOUSE_STUDENT_AI_BYOK") or os.environ.get("LEARNHOUSE_AI_BYOK")
+    if env_student_byok_str:
+        student_byok = env_student_byok_str.lower() in ("true", "1", "yes")
+    else:
+        student_byok = yaml_ai_config.get("student_byok", False)
+
     # Redis config
     env_redis_connection_string = os.environ.get("LEARNHOUSE_REDIS_CONNECTION_STRING")
     redis_connection_string = env_redis_connection_string or yaml_config.get(
@@ -688,6 +695,7 @@ def get_learnhouse_config() -> LearnHouseConfig:
         tts_model=ai_tts_model,
         firecrawl_url=firecrawl_url,
         firecrawl_api_key=firecrawl_api_key,
+        student_byok=bool(student_byok),
     )
 
     # Surface missing internal-service keys at boot rather than at first

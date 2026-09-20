@@ -117,11 +117,13 @@ export default function OrgEditUsage() {
           <h3 className="text-lg font-semibold text-gray-800">
             {t('dashboard.organization.usage.plan_resource_usage')}
           </h3>
-          <span
-            className={`text-xs font-semibold px-3 py-1 rounded-full capitalize ${planStyle.bg} ${planStyle.text}`}
-          >
-            {plan === 'oss' ? 'OSS' : plan}
-          </span>
+          {plan && plan !== 'oss' && plan !== 'enterprise' && (
+            <span
+              className={`text-xs font-semibold px-3 py-1 rounded-full capitalize ${planStyle.bg} ${planStyle.text}`}
+            >
+              {plan}
+            </span>
+          )}
         </div>
         <div className="p-6">
           {isLoading ? (

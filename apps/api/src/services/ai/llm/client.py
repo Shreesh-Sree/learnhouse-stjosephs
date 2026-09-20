@@ -126,9 +126,10 @@ def _agent(
     system_prompt: Optional[str],
     output_type: Any,
     tools: Optional[Sequence[Any]] = None,
+    model: Optional[Model] = None,
 ) -> Agent:
     return Agent(
-        build_model(model_name),
+        model if model is not None else build_model(model_name),
         output_type=output_type,
         system_prompt=system_prompt or (),
         tools=list(tools) if tools else [],
@@ -146,6 +147,7 @@ async def generate(
     temperature: Optional[float] = None,
     timeout: float = DEFAULT_TIMEOUT,
     tools: Optional[Sequence[Any]] = None,
+    model: Optional[Model] = None,
 ) -> Any:
     """Run a single (non-streaming) generation with bi-directional guardrails.
 
@@ -165,7 +167,7 @@ async def generate(
     # 2. System Prompt Defense
     hardened_system_prompt = harden_system_prompt(system_prompt)
 
-    agent = _agent(model_name, hardened_system_prompt, output_type, tools)
+    agent = _agent(model_name, hardened_system_prompt, output_type, tools, model=model)
     result = await agent.run(
         user_prompt,
         message_history=to_message_history(history) or None,
@@ -192,6 +194,7 @@ async def generate_stream(
     temperature: Optional[float] = None,
     timeout: float = STREAM_TIMEOUT,
     tools: Optional[Sequence[Any]] = None,
+    model: Optional[Model] = None,
 ) -> AsyncGenerator[str, None]:
     """Stream text deltas for a single generation with bi-directional guardrails.
 
@@ -206,7 +209,7 @@ async def generate_stream(
     # 2. System Prompt Defense
     hardened_system_prompt = harden_system_prompt(system_prompt)
 
-    agent = _agent(model_name, hardened_system_prompt, str, tools)
+    agent = _agent(model_name, hardened_system_prompt, str, tools, model=model)
 
     async def _raw_stream() -> AsyncGenerator[str, None]:
         async with agent.run_stream(

@@ -4,13 +4,13 @@ import {
   startActivityAIChatSessionStream,
   StreamCallbacks,
 } from '@services/ai/ai'
-import { AlertTriangle, BadgeInfo, NotebookTabs, Maximize2, Minimize2, PanelRightOpen, PanelRightClose, PanelTop } from 'lucide-react'
+import { AlertTriangle, BadgeInfo, NotebookTabs, Maximize2, Minimize2, PanelRightOpen, PanelRightClose, PanelTop, KeyRound, Sparkles } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
 import { FlaskConical, MessageCircle, X } from 'lucide-react'
 import Image from 'next/image'
 import learnhouseAI_icon from 'public/learnhouse_ai_simple.png'
 import learnhouseAI_logo_black from 'public/learnhouse_ai_black_logo.png'
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   AIChatBotStateTypes,
   useAIChatBot,
@@ -21,6 +21,7 @@ import UserAvatar from '@components/Objects/UserAvatar'
 import { useTranslation } from 'react-i18next'
 import AIMarkdownRenderer from './AIMarkdownRenderer'
 import AIFollowUpSuggestions from './AIFollowUpSuggestions'
+import { AIKeySettingsModal, useStudentBYOK } from './AIKeySettingsModal'
 
 type AIActivityAskProps = {
   activity: any
@@ -94,6 +95,8 @@ function ActivityChatMessageBox(props: ActivityChatMessageBoxProps) {
   const aiChatBotState = useAIChatBot() as AIChatBotStateTypes
   const dispatchAIChatBot = useAIChatBotDispatch() as any
   const { mode, setMode } = useAIPanelMode()
+  const { byok, hasByokKey, saveBYOK, removeBYOK } = useStudentBYOK()
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false)
 
   const isInputDisabled = aiChatBotState.isWaitingForResponse || aiChatBotState.isStreaming
   const inputClass = isInputDisabled
@@ -127,6 +130,20 @@ function ActivityChatMessageBox(props: ActivityChatMessageBoxProps) {
 
   const sendMessage = async (message: string) => {
     if (!message.trim()) return
+
+    // Require student BYOK key
+    if (!hasByokKey) {
+      setIsKeyModalOpen(true)
+      await dispatchAIChatBot({
+        type: 'setError',
+        payload: {
+          isError: true,
+          status: 400,
+          error_message: 'Please configure your personal AI API Key (BYOK) to ask questions. Free Google Gemini & Groq keys are supported!',
+        },
+      })
+      return
+    }
 
     // Clear previous follow-up suggestions and reset accumulated content
     await dispatchAIChatBot({ type: 'clearFollowUpSuggestions' })
@@ -206,6 +223,8 @@ function ActivityChatMessageBox(props: ActivityChatMessageBoxProps) {
       },
     }
 
+    const byokPayload = byok ? { apiKey: byok.apiKey, provider: byok.provider, model: byok.model } : undefined
+
     // Call appropriate streaming function
     if (aiChatBotState.aichat_uuid) {
       await sendActivityAIChatMessageStream(
@@ -213,14 +232,16 @@ function ActivityChatMessageBox(props: ActivityChatMessageBoxProps) {
         aiChatBotState.aichat_uuid,
         props.activity.activity_uuid,
         access_token,
-        callbacks
+        callbacks,
+        byokPayload
       )
     } else {
       await startActivityAIChatSessionStream(
         message,
         props.activity.activity_uuid,
         access_token,
-        callbacks
+        callbacks,
+        byokPayload
       )
     }
   }
@@ -297,6 +318,26 @@ function ActivityChatMessageBox(props: ActivityChatMessageBoxProps) {
             >
               <div className="flex flex-row-reverse pb-3 justify-between items-center">
                 <div className="flex space-x-2 items-center">
+                  <button
+                    onClick={() => setIsKeyModalOpen(true)}
+                    className={`hover:cursor-pointer p-1 rounded-full items-center transition-colors relative flex ${
+                      hasByokKey
+                        ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                        : 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                    }`}
+                    title={
+                      hasByokKey
+                        ? `AI Key Active (${byok?.provider || 'BYOK'}) - Click to change`
+                        : 'Configure your personal AI API Key (BYOK)'
+                    }
+                  >
+                    <KeyRound size={18} />
+                    <span
+                      className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${
+                        hasByokKey ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                      }`}
+                    />
+                  </button>
                   <button
                     onClick={() => {
                       setMode('side')
@@ -500,6 +541,9 @@ function ActivityChatMessageBox(props: ActivityChatMessageBoxProps) {
                   sendMessage={sendMessage}
                   activity_uuid={props.activity.activity_uuid}
                   isFullscreen={aiChatBotState.isFullscreen}
+                  onOpenKeyModal={() => setIsKeyModalOpen(true)}
+                  hasByokKey={hasByokKey}
+                  byokProvider={byok?.provider}
                 />
               )}
               {aiChatBotState.error.isError && (
@@ -514,6 +558,14 @@ function ActivityChatMessageBox(props: ActivityChatMessageBoxProps) {
                         {aiChatBotState.error.error_message}
                       </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsKeyModalOpen(true)}
+                      className="mt-1 w-max px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                    >
+                      <KeyRound size={13} />
+                      <span>Configure AI API Key (BYOK)</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -550,6 +602,13 @@ function ActivityChatMessageBox(props: ActivityChatMessageBoxProps) {
               </div>
             </div>
           </motion.div>
+          <AIKeySettingsModal
+            isOpen={isKeyModalOpen}
+            onClose={() => setIsKeyModalOpen(false)}
+            onSave={saveBYOK}
+            onRemove={removeBYOK}
+            currentData={byok}
+          />
         </>
       )}
     </AnimatePresence>
@@ -602,6 +661,9 @@ const AIMessagePlaceHolder = (props: {
   activity_uuid: string
   sendMessage: any
   isFullscreen?: boolean
+  onOpenKeyModal?: () => void
+  hasByokKey?: boolean
+  byokProvider?: string
 }) => {
   const session = useLHSession() as any
   const aiChatBotState = useAIChatBot() as AIChatBotStateTypes
@@ -610,7 +672,7 @@ const AIMessagePlaceHolder = (props: {
   if (!aiChatBotState.error.isError) {
     return (
       <div className={`w-full ${props.isFullscreen ? 'flex-1 flex items-center justify-center' : 'h-[237px]'}`}>
-        <div className="flex flex-col text-center justify-center pt-6">
+        <div className="flex flex-col text-center justify-center pt-4">
           <motion.div
             initial={{ y: 20, opacity: 0, filter: 'blur(5px)' }}
             animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
@@ -625,19 +687,41 @@ const AIMessagePlaceHolder = (props: {
             }}
           >
             <Image
-              width={100}
+              width={90}
               className="mx-auto"
               src={learnhouseAI_logo_black}
               alt=""
             />
-            <p className="pt-3 text-2xl font-semibold text-white/70 flex justify-center space-x-2 items-center">
+            <p className="pt-2 text-xl font-semibold text-white/70 flex justify-center space-x-2 items-center">
               <span className="items-center">{t('common.hello')}</span>
               <span className="capitalize flex space-x-2 items-center">
-                <UserAvatar rounded="rounded-lg" border="border-2" width={35} shadow="shadow-none" />
+                <UserAvatar rounded="rounded-lg" border="border-2" width={30} shadow="shadow-none" />
                 <span>{session.data.user.username},</span>
               </span>
               <span>{t('ai.how_can_we_help')}</span>
             </p>
+
+            {/* BYOK status chip */}
+            {props.onOpenKeyModal && (
+              <div className="pt-2.5 flex justify-center">
+                <button
+                  type="button"
+                  onClick={props.onOpenKeyModal}
+                  className={`text-xs px-3.5 py-1 rounded-full border flex items-center space-x-1.5 transition-all cursor-pointer ${
+                    props.hasByokKey
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                      : 'bg-amber-500/15 border-amber-500/40 text-amber-200 hover:bg-amber-500/25 animate-pulse'
+                  }`}
+                >
+                  <KeyRound size={13} />
+                  <span>
+                    {props.hasByokKey
+                      ? `BYOK Active: ${props.byokProvider || 'Custom Key'}`
+                      : '⚡ Bring Your Own Key Required — Click to configure'}
+                  </span>
+                </button>
+              </div>
+            )}
           </motion.div>
           <motion.div
             initial={{ y: 20, opacity: 0, filter: 'blur(5px)' }}
@@ -712,6 +796,8 @@ function AISidePanelInline(props: AISidePanelProps) {
   const aiChatBotState = useAIChatBot() as AIChatBotStateTypes
   const dispatchAIChatBot = useAIChatBotDispatch() as any
   const { mode, setMode } = useAIPanelMode()
+  const { byok, hasByokKey, saveBYOK, removeBYOK } = useStudentBYOK()
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false)
   const isInitialRender = useRef(true)
   const accumulatedContentRef = useRef('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -792,6 +878,20 @@ function AISidePanelInline(props: AISidePanelProps) {
   const sendMessage = async (message: string) => {
     if (!message.trim()) return
 
+    // Require student BYOK key
+    if (!hasByokKey) {
+      setIsKeyModalOpen(true)
+      await dispatchAIChatBot({
+        type: 'setError',
+        payload: {
+          isError: true,
+          status: 400,
+          error_message: 'Please configure your personal AI API Key (BYOK) to ask questions. Free Google Gemini & Groq keys are supported!',
+        },
+      })
+      return
+    }
+
     await dispatchAIChatBot({ type: 'clearFollowUpSuggestions' })
     accumulatedContentRef.current = ''
 
@@ -859,20 +959,24 @@ function AISidePanelInline(props: AISidePanelProps) {
       },
     }
 
+    const byokPayload = byok ? { apiKey: byok.apiKey, provider: byok.provider, model: byok.model } : undefined
+
     if (aiChatBotState.aichat_uuid) {
       await sendActivityAIChatMessageStream(
         message,
         aiChatBotState.aichat_uuid,
         props.activity.activity_uuid,
         access_token,
-        callbacks
+        callbacks,
+        byokPayload
       )
     } else {
       await startActivityAIChatSessionStream(
         message,
         props.activity.activity_uuid,
         access_token,
-        callbacks
+        callbacks,
+        byokPayload
       )
     }
   }
@@ -891,9 +995,10 @@ function AISidePanelInline(props: AISidePanelProps) {
   const panelHeight = isSecondaryBarVisible ? 'calc(100vh - 220px)' : 'calc(100vh - 160px)'
 
   return (
-    <motion.div
-      initial={isInitialRender.current ? false : { opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+    <>
+      <motion.div
+        initial={isInitialRender.current ? false : { opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
       transition={isInitialRender.current ? { duration: 0 } : {
         type: 'spring',
         bounce: 0.2,
@@ -910,6 +1015,26 @@ function AISidePanelInline(props: AISidePanelProps) {
           {/* Header */}
           <div className="flex flex-row-reverse pb-3 justify-between items-center">
             <div className="flex space-x-2 items-center">
+              <button
+                onClick={() => setIsKeyModalOpen(true)}
+                className={`hover:cursor-pointer p-1 rounded-full items-center transition-colors relative flex ${
+                  hasByokKey
+                    ? 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                    : 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+                }`}
+                title={
+                  hasByokKey
+                    ? `AI Key Active (${byok?.provider || 'BYOK'}) - Click to change`
+                    : 'Configure your personal AI API Key (BYOK)'
+                }
+              >
+                <KeyRound size={17} />
+                <span
+                  className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${
+                    hasByokKey ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'
+                  }`}
+                />
+              </button>
               <button
                 onClick={() => {
                   setMode('hover')
@@ -1091,6 +1216,9 @@ function AISidePanelInline(props: AISidePanelProps) {
             <AISidePanelPlaceholder
               sendMessage={sendMessage}
               activity_uuid={props.activity.activity_uuid}
+              onOpenKeyModal={() => setIsKeyModalOpen(true)}
+              hasByokKey={hasByokKey}
+              byokProvider={byok?.provider}
             />
           )}
 
@@ -1107,6 +1235,14 @@ function AISidePanelInline(props: AISidePanelProps) {
                     {aiChatBotState.error.error_message}
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsKeyModalOpen(true)}
+                  className="mt-1 w-max px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                >
+                  <KeyRound size={13} />
+                  <span>Configure AI API Key (BYOK)</span>
+                </button>
               </div>
             </div>
           )}
@@ -1142,12 +1278,23 @@ function AISidePanelInline(props: AISidePanelProps) {
             </div>
           </div>
         </motion.div>
+        <AIKeySettingsModal
+          isOpen={isKeyModalOpen}
+          onClose={() => setIsKeyModalOpen(false)}
+          onSave={saveBYOK}
+          onRemove={removeBYOK}
+          currentData={byok}
+        />
+    </>
   )
 }
 
 const AISidePanelPlaceholder = (props: {
   activity_uuid: string
   sendMessage: any
+  onOpenKeyModal?: () => void
+  hasByokKey?: boolean
+  byokProvider?: string
 }) => {
   const session = useLHSession() as any
   const aiChatBotState = useAIChatBot() as AIChatBotStateTypes
@@ -1183,6 +1330,28 @@ const AISidePanelPlaceholder = (props: {
               </span>
               <span>{t('ai.how_can_we_help')}</span>
             </p>
+
+            {/* BYOK status chip */}
+            {props.onOpenKeyModal && (
+              <div className="pt-2 flex justify-center">
+                <button
+                  type="button"
+                  onClick={props.onOpenKeyModal}
+                  className={`text-[11px] px-3 py-1 rounded-full border flex items-center space-x-1.5 transition-all cursor-pointer ${
+                    props.hasByokKey
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
+                      : 'bg-amber-500/15 border-amber-500/40 text-amber-200 hover:bg-amber-500/25 animate-pulse'
+                  }`}
+                >
+                  <KeyRound size={12} />
+                  <span>
+                    {props.hasByokKey
+                      ? `BYOK: ${props.byokProvider || 'Active'}`
+                      : '⚡ BYOK Required — Setup Key'}
+                  </span>
+                </button>
+              </div>
+            )}
           </motion.div>
           <motion.div
             initial={{ y: 20, opacity: 0, filter: 'blur(5px)' }}

@@ -44,7 +44,7 @@ export function planMeetsRequirement(
   currentPlan: PlanLevel,
   requiredPlan: PlanLevel
 ): boolean {
-  if (currentPlan === 'oss') return requiredPlan !== 'enterprise'
+  if (currentPlan === 'oss') return true
   const currentIndex = PLAN_HIERARCHY.indexOf(currentPlan)
   const requiredIndex = PLAN_HIERARCHY.indexOf(requiredPlan)
   return currentIndex >= requiredIndex

@@ -22,11 +22,18 @@ def _live_fields(tenancy: str) -> dict:
     internally, so asking for both separately doubles the work on a public
     endpoint that runs this per request.
     """
+    import os
+    from config.config import get_learnhouse_config
     mode = get_deployment_mode()
+    lh_config = get_learnhouse_config()
+    byok_env = os.environ.get("LEARNHOUSE_STUDENT_AI_BYOK", "").lower() in ("true", "1", "yes")
+    student_ai_byok = byok_env or getattr(lh_config.ai_config, "student_byok", False)
+
     return {
         "mode": mode,
         # Deprecated: prefer `tenancy`. Will be removed in a future release.
         "multi_org_enabled": tenancy == "multi" and mode in ("ee", "saas"),
+        "student_ai_byok": student_ai_byok,
     }
 
 

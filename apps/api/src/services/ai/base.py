@@ -26,6 +26,7 @@ async def ask_ai(
     text_reference: str,
     message_for_the_prompt: str,
     model_name: str,
+    model: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Process an AI query through the provider-agnostic LLM layer with course content as context.
@@ -36,6 +37,7 @@ async def ask_ai(
             user_prompt=question,
             system_prompt=_build_context_prompt(message_for_the_prompt, text_reference),
             history=message_history,
+            model=model,
         )
         return {"output": output, "intermediate_steps": []}
     except Exception as e:
@@ -339,6 +341,7 @@ async def ask_ai_stream(
     text_reference: str,
     message_for_the_prompt: str,
     model_name: str,
+    model: Optional[Any] = None,
 ) -> AsyncGenerator[str, None]:
     """
     Process an AI query through the provider-agnostic LLM layer with a streaming response.
@@ -350,6 +353,7 @@ async def ask_ai_stream(
             user_prompt=question,
             system_prompt=_build_context_prompt(message_for_the_prompt, text_reference),
             history=message_history,
+            model=model,
         ):
             yield chunk
     except Exception as e:
@@ -362,6 +366,7 @@ async def generate_follow_up_suggestions(
     context: str,
     model_name: str,
     user_message: str = "",
+    model: Optional[Any] = None,
 ) -> list[str]:
     """
     Generate 3 contextual follow-up questions based on the AI response.
@@ -382,10 +387,11 @@ Response: {response_snippet}
 Questions:"""
 
         text = await generate(
-            model_name=model_for_tier("fast"),
+            model_name=model_for_tier("fast") if model is None else model_name,
             user_prompt=prompt,
             max_tokens=150,
             temperature=0.7,
+            model=model,
         )
 
         # Parse the response into a list of questions

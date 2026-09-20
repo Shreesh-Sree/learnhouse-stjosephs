@@ -454,7 +454,11 @@ export default function OrgEditImages() {
                       "border-2 border-gray-100 hover:border-blue-200 transition-all duration-300",
                       isLogoUploading && "opacity-50"
                     )}
-                    style={{ backgroundImage: `url(${localLogo || getOrgLogoMediaDirectory(org?.org_uuid, org?.logo_image)})` }}
+                    style={{
+                      backgroundImage: (localLogo || getOrgLogoMediaDirectory(org?.org_uuid, org?.logo_image))
+                        ? `url(${localLogo || getOrgLogoMediaDirectory(org?.org_uuid, org?.logo_image)})`
+                        : undefined
+                    }}
                   />
                 </div>
 
@@ -513,7 +517,11 @@ export default function OrgEditImages() {
                       "border-2 border-gray-100 hover:border-purple-200 transition-all duration-300",
                       isThumbnailUploading && "opacity-50"
                     )}
-                    style={{ backgroundImage: `url(${localThumbnail || getOrgThumbnailMediaDirectory(org?.org_uuid, org?.thumbnail_image)})` }}
+                    style={{
+                      backgroundImage: (localThumbnail || getOrgThumbnailMediaDirectory(org?.org_uuid, org?.thumbnail_image))
+                        ? `url(${localThumbnail || getOrgThumbnailMediaDirectory(org?.org_uuid, org?.thumbnail_image)})`
+                        : undefined
+                    }}
                   />
                 </div>
 

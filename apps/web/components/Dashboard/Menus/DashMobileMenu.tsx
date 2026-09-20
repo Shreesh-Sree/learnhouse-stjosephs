@@ -200,15 +200,17 @@ function DashMobileMenu() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white truncate leading-none mb-0.5">{org?.name}</p>
-                  <p className={cn(
-                    'text-[10px] font-medium',
-                    mode === 'ee' ? 'text-amber-400' :
-                    mode === 'oss' ? 'text-green-400' :
-                    plan === 'enterprise' ? 'text-amber-400' :
-                    plan === 'pro' ? 'text-purple-400' :
-                    plan === 'standard' ? 'text-blue-400' :
-                    'text-white/30'
-                  )}>{planLabel}</p>
+                  {planLabel && !['oss', 'enterprise', 'enterprise edition'].includes(planLabel.toLowerCase()) && (
+                    <p className={cn(
+                      'text-[10px] font-medium',
+                      mode === 'ee' ? 'text-amber-400' :
+                      mode === 'oss' ? 'text-green-400' :
+                      plan === 'enterprise' ? 'text-amber-400' :
+                      plan === 'pro' ? 'text-purple-400' :
+                      plan === 'standard' ? 'text-blue-400' :
+                      'text-white/30'
+                    )}>{planLabel}</p>
+                  )}
                 </div>
               </div>
 

@@ -23,24 +23,32 @@ DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434/v1"
 _GOOGLE_ALIASES = {"google", "google-gla", "gemini"}
 # Providers that speak the OpenAI Chat Completions API (incl. local/compatible servers).
 # `openrouter` has its own branch (it auto-configures its base URL), so it's not listed here.
-_OPENAI_ALIASES = {"openai", "openai-compatible", "azure", "together"}
+_OPENAI_ALIASES = {"openai", "openai-compatible", "azure", "together", "groq"}
 
 
 class AINotConfiguredError(Exception):
     """Raised when the configured AI provider is missing its API key."""
 
 
-def build_model(model_name: str) -> Model:
-    """Build a Pydantic AI ``Model`` for ``model_name`` using the global AI config.
+def build_model(
+    model_name: str,
+    provider: Optional[str] = None,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> Model:
+    """Build a Pydantic AI ``Model`` for ``model_name`` using the provided or global AI config.
 
     Provider SDKs are imported lazily so an unused/uninstalled provider never breaks import.
     """
     lh_config = get_learnhouse_config()
     cfg = lh_config.ai_config
     # Treat None / empty / whitespace-only as "unset" and fall back to the default provider.
-    provider_id = (getattr(cfg, "provider", None) or "").strip().lower() or DEFAULT_PROVIDER
-    api_key = getattr(cfg, "api_key", None)
-    base_url = getattr(cfg, "base_url", None) or None  # treat "" as unset
+    provider_id = (provider or getattr(cfg, "provider", None) or "").strip().lower() or DEFAULT_PROVIDER
+    api_key = api_key or getattr(cfg, "api_key", None)
+    base_url = base_url or getattr(cfg, "base_url", None) or None  # treat "" as unset
+
+    if provider_id == "groq" and not base_url:
+        base_url = "https://api.groq.com/openai/v1"
 
     # Ollama (and other local OpenAI-compatible servers) need no real key.
     if provider_id == "ollama":

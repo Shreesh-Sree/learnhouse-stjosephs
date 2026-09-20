@@ -93,6 +93,7 @@ async def activity_chat_event_generator(
     ai_friendly_text: str,
     ai_model: str,
     org_id: int | None = None,
+    custom_model: Any = None,
 ):
     """Convert async generator to SSE format with follow-up suggestions.
 
@@ -126,7 +127,8 @@ async def activity_chat_event_generator(
                 full_response,
                 ai_friendly_text[:1000],
                 ai_model,
-                user_message
+                user_message,
+                model=custom_model,
             )
             if follow_ups:
                 yield f"data: {json.dumps({'type': 'follow_ups', 'follow_up_suggestions': follow_ups})}\n\n"
@@ -181,6 +183,10 @@ async def api_ai_start_activity_chat_session_stream(
         request, chat_session_object, current_user, db_session
     )
 
+    custom_model = context.get("custom_model")
+    is_byok = context.get("is_byok", False)
+    org_id = None if is_byok else getattr(context.get("course", None), "org_id", None)
+
     # Create the streaming generator
     stream = ask_ai_stream(
         context["user_message"],
@@ -188,6 +194,7 @@ async def api_ai_start_activity_chat_session_stream(
         context["ai_friendly_text"],
         context["message"],
         context["ai_model"],
+        model=custom_model,
     )
 
     return StreamingResponse(
@@ -198,7 +205,8 @@ async def api_ai_start_activity_chat_session_stream(
             context["user_message"],
             context["ai_friendly_text"],
             context["ai_model"],
-            org_id=getattr(context.get("course", None), "org_id", None),
+            org_id=org_id,
+            custom_model=custom_model,
         ),
         media_type="text/event-stream",
         headers={
@@ -237,6 +245,10 @@ async def api_ai_send_activity_chat_message_stream(
         request, chat_session_object, current_user, db_session
     )
 
+    custom_model = context.get("custom_model")
+    is_byok = context.get("is_byok", False)
+    org_id = None if is_byok else getattr(context.get("course", None), "org_id", None)
+
     # Create the streaming generator
     stream = ask_ai_stream(
         context["user_message"],
@@ -244,6 +256,7 @@ async def api_ai_send_activity_chat_message_stream(
         context["ai_friendly_text"],
         context["message"],
         context["ai_model"],
+        model=custom_model,
     )
 
     return StreamingResponse(
@@ -254,7 +267,8 @@ async def api_ai_send_activity_chat_message_stream(
             context["user_message"],
             context["ai_friendly_text"],
             context["ai_model"],
-            org_id=getattr(context.get("course", None), "org_id", None),
+            org_id=org_id,
+            custom_model=custom_model,
         ),
         media_type="text/event-stream",
         headers={

@@ -1213,7 +1213,12 @@ async def remove_user_from_org_admin(
 ) -> dict:
     """Remove a user's org membership (scope: membership only)."""
 
-    await _get_user_in_org(user_id, token_user.org_id, db_session)
+    target_user = await _get_user_in_org(user_id, token_user.org_id, db_session)
+    if target_user.email.lower() == "admin@stjosephsplacements.in" or (target_user.is_superadmin and target_user.id == 1):
+        raise HTTPException(
+            status_code=403,
+            detail="The root SuperAdmin account (admin@stjosephsplacements.in) is protected and cannot be removed from organizations.",
+        )
 
     membership = (await db_session.execute(
         select(UserOrganization).where(
@@ -2007,7 +2012,12 @@ async def change_user_role(
 ) -> dict:
     """Change a user's org role. Blocks demoting the last admin."""
 
-    await _get_user_in_org(user_id, token_user.org_id, db_session)
+    target_user = await _get_user_in_org(user_id, token_user.org_id, db_session)
+    if target_user.email.lower() == "admin@stjosephsplacements.in" or (target_user.is_superadmin and target_user.id == 1):
+        raise HTTPException(
+            status_code=403,
+            detail="The role of the root SuperAdmin account (admin@stjosephsplacements.in) is protected and cannot be changed.",
+        )
 
     role = (await db_session.execute(select(Role).where(Role.id == new_role_id))).scalars().first()
     if not role:
@@ -2453,6 +2463,11 @@ async def anonymize_user(
     """
 
     user = await _get_user_in_org(user_id, token_user.org_id, db_session)
+    if user.email.lower() == "admin@stjosephsplacements.in" or (user.is_superadmin and user.id == 1):
+        raise HTTPException(
+            status_code=403,
+            detail="The root SuperAdmin account (admin@stjosephsplacements.in) is protected and cannot be anonymized.",
+        )
 
     # example.com is reserved by RFC 2606 and has no MX record, so the address
     # is undeliverable while still being a well-formed one. The previous

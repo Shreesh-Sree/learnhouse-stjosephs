@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
 from fastapi import Depends, HTTPException, Request
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -22,6 +22,8 @@ from src.services.ai.base import (
     save_message_to_history,
 )
 from src.services.ai.llm import model_for_tier
+from src.services.ai.llm.provider import build_model
+from config.config import get_learnhouse_config
 
 from src.services.ai.schemas.ai import (
     ActivityAIChatSessionResponse,
@@ -34,6 +36,88 @@ from src.services.courses.activities.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_and_resolve_byok(
+    request: Request,
+    chat_session_object: StartActivityAIChatSession | SendActivityAIChatMessage,
+) -> Tuple[Optional[Any], bool, Optional[str]]:
+    """Resolve BYOK (Bring Your Own Key) model if provided or required.
+
+    Returns: (custom_model, is_byok, byok_model_name)
+    """
+    lh_config = get_learnhouse_config()
+    byok_required = getattr(lh_config.ai_config, "student_byok", False)
+
+    api_key = (
+        getattr(chat_session_object, "byok_api_key", None)
+        or request.headers.get("x-byok-api-key")
+        or ""
+    ).strip()
+    provider = (
+        getattr(chat_session_object, "byok_provider", None)
+        or request.headers.get("x-byok-provider")
+        or ""
+    ).strip().lower()
+    model_name = (
+        getattr(chat_session_object, "byok_model", None)
+        or request.headers.get("x-byok-model")
+        or ""
+    ).strip()
+
+    if not api_key:
+        if byok_required:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "BYOK_REQUIRED",
+                    "message": "Student AI requires Bring Your Own Key (BYOK). Please configure your API key in the AI settings.",
+                },
+            )
+        return None, False, None
+
+    # Auto-detect provider if missing
+    if not provider:
+        if api_key.startswith("AIza"):
+            provider = "google"
+        elif api_key.startswith("gsk_"):
+            provider = "groq"
+        elif api_key.startswith("sk-ant-"):
+            provider = "anthropic"
+        elif api_key.startswith("sk-or-"):
+            provider = "openrouter"
+        elif api_key.startswith("sk-"):
+            provider = "openai"
+        else:
+            provider = "google"
+
+    # Default model if missing
+    if not model_name:
+        if provider in ("google", "google-gla", "gemini"):
+            model_name = "gemini-1.5-flash"
+        elif provider == "groq":
+            model_name = "llama-3.3-70b-versatile"
+        elif provider == "openai":
+            model_name = "gpt-4o-mini"
+        elif provider == "anthropic":
+            model_name = "claude-3-5-haiku-20241022"
+        elif provider == "openrouter":
+            model_name = "google/gemini-flash-1.5"
+        else:
+            model_name = "gemini-1.5-flash"
+
+    try:
+        custom_model = build_model(model_name=model_name, provider=provider, api_key=api_key)
+        return custom_model, True, model_name
+    except Exception as e:
+        logger.error("Failed to build BYOK model: %s", e)
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "BYOK_INVALID",
+                "message": f"Failed to initialize BYOK model ({provider}): {str(e)}",
+            },
+        )
 
 
 async def _authorize_activity_ai_access(
@@ -148,8 +232,12 @@ async def ai_start_activity_chat_session(
     from src.services.security.rate_limiting import enforce_ai_rate_limit
     enforce_ai_rate_limit(resolve_acting_user_id(current_user), org.id)
 
-    # Reserve credit atomically before the AI call; refund below on failure.
-    await reserve_ai_credit(org.id, db_session)
+    # Check for BYOK or enforce BYOK requirement
+    custom_model, is_byok, byok_model_name = _extract_and_resolve_byok(request, chat_session_object)
+
+    # Reserve credit atomically before the AI call if not using BYOK; refund below on failure.
+    if not is_byok:
+        await reserve_ai_credit(org.id, db_session)
 
     # Get Activity Content Blocks
     content = activity.content
@@ -177,7 +265,7 @@ async def ai_start_activity_chat_session(
     org_config = OrganizationConfig.model_validate(org_config)
 
     # Default chat model (provider-agnostic; resolved from AI config)
-    ai_model = model_for_tier("standard")
+    ai_model = byok_model_name or model_for_tier("standard")
 
     chat_session = get_chat_session_history()
 
@@ -197,10 +285,12 @@ async def ai_start_activity_chat_session(
             ai_friendly_text,
             message,
             ai_model,
+            model=custom_model,
         )
     except Exception as e:
-        # Refund the credit we reserved up-front since the AI call failed.
-        refund_ai_credit(org.id)
+        # Refund the credit we reserved up-front since the AI call failed (only if not BYOK).
+        if not is_byok:
+            refund_ai_credit(org.id)
         logger.error("AI service error in ai_start_activity_chat_session: %s", e)
         raise HTTPException(status_code=503, detail={"code": "AI_UNAVAILABLE", "message": "AI service is temporarily unavailable"})
 
@@ -295,8 +385,12 @@ async def ai_send_activity_chat_message(
     from src.services.security.rate_limiting import enforce_ai_rate_limit
     enforce_ai_rate_limit(resolve_acting_user_id(current_user), course.org_id)
 
-    # Reserve credit atomically before the AI call; refund below on failure.
-    await reserve_ai_credit(course.org_id, db_session)
+    # Check for BYOK or enforce BYOK requirement
+    custom_model, is_byok, byok_model_name = _extract_and_resolve_byok(request, chat_session_object)
+
+    # Reserve credit atomically before the AI call if not using BYOK; refund below on failure.
+    if not is_byok:
+        await reserve_ai_credit(course.org_id, db_session)
 
     # Get Activity Content Blocks
     content = activity.content
@@ -321,7 +415,7 @@ async def ai_send_activity_chat_message(
     org_config = OrganizationConfig.model_validate(org_config)
 
     # Default chat model (provider-agnostic; resolved from AI config)
-    ai_model = model_for_tier("standard")
+    ai_model = byok_model_name or model_for_tier("standard")
 
     chat_session = get_chat_session_history(chat_session_object.aichat_uuid)
 
@@ -341,10 +435,12 @@ async def ai_send_activity_chat_message(
             ai_friendly_text,
             message,
             ai_model,
+            model=custom_model,
         )
     except Exception as e:
-        # Refund the credit we reserved up-front since the AI call failed.
-        refund_ai_credit(course.org_id)
+        # Refund the credit we reserved up-front since the AI call failed (only if not BYOK).
+        if not is_byok:
+            refund_ai_credit(course.org_id)
         logger.error("AI service error in ai_send_activity_chat_message: %s", e)
         raise HTTPException(status_code=503, detail={"code": "AI_UNAVAILABLE", "message": "AI service is temporarily unavailable"})
 
@@ -486,8 +582,12 @@ async def ai_start_activity_chat_session_stream(
     from src.services.security.rate_limiting import enforce_ai_rate_limit
     enforce_ai_rate_limit(resolve_acting_user_id(current_user), org.id)
 
-    # Atomic credit reservation to prevent concurrent over-use.
-    await reserve_ai_credit(org.id, db_session)
+    # Check for BYOK or enforce BYOK requirement
+    custom_model, is_byok, byok_model_name = _extract_and_resolve_byok(request, chat_session_object)
+
+    # Atomic credit reservation to prevent concurrent over-use (skipped for BYOK).
+    if not is_byok:
+        await reserve_ai_credit(org.id, db_session)
 
     try:
         chat_session = get_chat_session_history()
@@ -501,14 +601,17 @@ async def ai_start_activity_chat_session_stream(
         message += "."
         message += "Use your knowledge to help the student if the context is not enough."
     except Exception:
-        refund_ai_credit(org.id)
+        if not is_byok:
+            refund_ai_credit(org.id)
         raise
 
     return {
         "chat_session": chat_session,
         "activity": activity,
         "course": course,
-        "ai_model": ai_model,
+        "ai_model": byok_model_name or ai_model,
+        "custom_model": custom_model,
+        "is_byok": is_byok,
         "ai_friendly_text": ai_friendly_text,
         "message": message,
         "user_message": chat_session_object.message,
@@ -535,8 +638,12 @@ async def ai_send_activity_chat_message_stream(
     from src.services.security.rate_limiting import enforce_ai_rate_limit
     enforce_ai_rate_limit(resolve_acting_user_id(current_user), org.id)
 
-    # Atomic credit reservation to prevent concurrent over-use.
-    await reserve_ai_credit(org.id, db_session)
+    # Check for BYOK or enforce BYOK requirement
+    custom_model, is_byok, byok_model_name = _extract_and_resolve_byok(request, chat_session_object)
+
+    # Atomic credit reservation to prevent concurrent over-use (skipped for BYOK).
+    if not is_byok:
+        await reserve_ai_credit(org.id, db_session)
 
     try:
         chat_session = get_chat_session_history(chat_session_object.aichat_uuid)
@@ -550,14 +657,17 @@ async def ai_send_activity_chat_message_stream(
         message += "."
         message += "Use your knowledge to help the student if the context is not enough."
     except Exception:
-        refund_ai_credit(org.id)
+        if not is_byok:
+            refund_ai_credit(org.id)
         raise
 
     return {
         "chat_session": chat_session,
         "activity": activity,
         "course": course,
-        "ai_model": ai_model,
+        "ai_model": byok_model_name or ai_model,
+        "custom_model": custom_model,
+        "is_byok": is_byok,
         "ai_friendly_text": ai_friendly_text,
         "message": message,
         "user_message": chat_session_object.message,

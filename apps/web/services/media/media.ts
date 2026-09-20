@@ -263,32 +263,38 @@ export function getActivityMediaDirectory(
   }
 }
 
-export function getOrgLogoMediaDirectory(orgUUID: string, fileId: string) {
+export function getOrgLogoMediaDirectory(orgUUID?: string | null, fileId?: string | null) {
+  if (!orgUUID || !fileId || !fileId.trim()) return ''
   let uri = `${getMediaUrl()}content/orgs/${orgUUID}/logos/${fileId}`
   return uri
 }
 
-export function getOrgThumbnailMediaDirectory(orgUUID: string, fileId: string) {
+export function getOrgThumbnailMediaDirectory(orgUUID?: string | null, fileId?: string | null) {
+  if (!orgUUID || !fileId || !fileId.trim()) return ''
   let uri = `${getMediaUrl()}content/orgs/${orgUUID}/thumbnails/${fileId}`
   return uri
 }
 
-export function getOrgPreviewMediaDirectory(orgUUID: string, fileId: string) {
+export function getOrgPreviewMediaDirectory(orgUUID?: string | null, fileId?: string | null) {
+  if (!orgUUID || !fileId || !fileId.trim()) return ''
   let uri = `${getMediaUrl()}content/orgs/${orgUUID}/previews/${fileId}`
   return uri
 }
 
-export function getOrgOgImageMediaDirectory(orgUUID: string, fileId: string) {
+export function getOrgOgImageMediaDirectory(orgUUID?: string | null, fileId?: string | null) {
+  if (!orgUUID || !fileId || !fileId.trim()) return ''
   let uri = `${getMediaUrl()}content/orgs/${orgUUID}/og_images/${fileId}`
   return uri
 }
 
-export function getOrgAuthBackgroundMediaDirectory(orgUUID: string, fileId: string) {
+export function getOrgAuthBackgroundMediaDirectory(orgUUID?: string | null, fileId?: string | null) {
+  if (!orgUUID || !fileId || !fileId.trim()) return ''
   let uri = `${getMediaUrl()}content/orgs/${orgUUID}/auth_backgrounds/${fileId}`
   return uri
 }
 
-export function getOrgFaviconMediaDirectory(orgUUID: string, fileId: string) {
+export function getOrgFaviconMediaDirectory(orgUUID?: string | null, fileId?: string | null) {
+  if (!orgUUID || !fileId || !fileId.trim()) return ''
   let uri = `${getMediaUrl()}content/orgs/${orgUUID}/favicons/${fileId}`
   return uri
 }

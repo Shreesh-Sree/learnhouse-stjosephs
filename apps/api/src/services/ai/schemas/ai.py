@@ -1,10 +1,13 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 
 class StartActivityAIChatSession(BaseModel):
     activity_uuid: str
     message: str
+    byok_api_key: Optional[str] = None
+    byok_provider: Optional[str] = None
+    byok_model: Optional[str] = None
 
 class ActivityAIChatSessionResponse(BaseModel):
     aichat_uuid: str
@@ -16,6 +19,9 @@ class SendActivityAIChatMessage(BaseModel):
     aichat_uuid: str
     activity_uuid: str
     message: str
+    byok_api_key: Optional[str] = None
+    byok_provider: Optional[str] = None
+    byok_model: Optional[str] = None
 
 
 # Streaming response types

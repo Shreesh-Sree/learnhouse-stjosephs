@@ -500,14 +500,17 @@ export default function OrganizationList() {
                   <AdminUserTooltip users={org.admin_users} />
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs font-medium uppercase tracking-wider px-2 py-0.5 rounded ${
-                    org.plan === 'enterprise' ? 'bg-amber-400/10 text-amber-400'
-                      : org.plan === 'pro' ? 'bg-purple-400/10 text-purple-400'
-                      : org.plan === 'standard' ? 'bg-blue-400/10 text-blue-400'
-                      : 'bg-white/[0.06] text-white/40'
-                  }`}>
-                    {org.plan}
-                  </span>
+                  {!['enterprise', 'oss'].includes(org.plan?.toLowerCase()) ? (
+                    <span className={`text-xs font-medium uppercase tracking-wider px-2 py-0.5 rounded ${
+                      org.plan === 'pro' ? 'bg-purple-400/10 text-purple-400'
+                        : org.plan === 'standard' ? 'bg-blue-400/10 text-blue-400'
+                        : 'bg-white/[0.06] text-white/40'
+                    }`}>
+                      {org.plan}
+                    </span>
+                  ) : (
+                    <span className="text-white/20">—</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <span className="text-sm text-white/40">{new Date(org.creation_date).toLocaleDateString()}</span>

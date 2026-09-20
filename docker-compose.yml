@@ -71,6 +71,8 @@ services:
       - "127.0.0.1:8200:80"
     volumes:
       - /data/production/lms/content_data:/app/api/content
+      - /data/production/lms/apps/api/src/services/utils/ssrf_guard.py:/app/api/src/services/utils/ssrf_guard.py:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "lms.stjosephsplacements.in:host-gateway"
@@ -85,7 +87,10 @@ services:
       start_period: 40s
     networks:
       - lms-net
+      - mailserver_mail-net
 
 networks:
   lms-net:
     driver: bridge
+  mailserver_mail-net:
+    external: true

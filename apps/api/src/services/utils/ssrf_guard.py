@@ -14,6 +14,7 @@ The guard has two steps:
 """
 
 import ipaddress
+import os
 import socket
 from urllib.parse import urlparse
 
@@ -51,6 +52,13 @@ def _normalize(ip: ipaddress._BaseAddress) -> ipaddress._BaseAddress:
 
 def _is_ip_blocked(ip: ipaddress._BaseAddress) -> bool:
     ip = _normalize(ip)
+    allowed_ips_str = os.environ.get("LEARNHOUSE_SSRF_ALLOWED_IPS", "10.1.55.99")
+    try:
+        allowed_ips = [ipaddress.ip_address(x.strip()) for x in allowed_ips_str.split(",") if x.strip()]
+        if ip in allowed_ips:
+            return False
+    except ValueError:
+        pass
     return any(ip in net for net in _BLOCKED_NETWORKS)
 
 

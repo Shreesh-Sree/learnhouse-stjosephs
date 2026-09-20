@@ -389,6 +389,7 @@ CRITICAL JSON STRUCTURE REQUIREMENTS:
 - The response MUST be a valid JSON object with "type": "doc" at the root
 - The "content" array MUST contain block objects
 - Each block MUST have a "type" field with one of the exact names above
+- CRITICAL: Every single item in ANY "content" array MUST be a JSON object with a "type" property. Never put raw strings or objects without a "type" property inside any "content" array.
 - Text content MUST be wrapped in {{"type": "text", "text": "..."}} objects
 - For bold/italic text, add "marks" array with {{"type": "bold"}} or {{"type": "italic"}}
 - Paragraphs MUST have content array with text objects

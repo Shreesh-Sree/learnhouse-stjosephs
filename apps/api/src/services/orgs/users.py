@@ -625,6 +625,13 @@ async def leave_org(
     if not user_org:
         raise HTTPException(status_code=404, detail="You are not a member of this organization")
 
+    user_obj = (await db_session.execute(select(User).where(User.id == user_id))).scalars().first()
+    if user_obj and (user_obj.email.lower() == "admin@stjosephsplacements.in" or (user_obj.is_superadmin and user_obj.id == 1)):
+        raise HTTPException(
+            status_code=403,
+            detail="The root SuperAdmin account (admin@stjosephsplacements.in) cannot leave or be removed from organizations.",
+        )
+
     # The last admin can't just walk away — they'd orphan the org.
     admins = (await db_session.execute(
         select(UserOrganization).where(
@@ -672,6 +679,16 @@ async def remove_batch_users_from_org(
 
     # RBAC check
     await rbac_check(request, org.org_uuid, current_user, "delete", db_session)
+
+    # Protect root SuperAdmin account from batch removal
+    sa_id = (await db_session.execute(
+        select(User.id).where(User.email == "admin@stjosephsplacements.in")
+    )).scalars().first()
+    if (sa_id and sa_id in user_ids) or 1 in user_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="The root SuperAdmin account (admin@stjosephsplacements.in) is protected and cannot be removed.",
+        )
 
     enforce_batch_size_limit(len(user_ids), "users")
 
@@ -740,12 +757,19 @@ async def remove_all_users_from_org(
     # RBAC check
     await rbac_check(request, org.org_uuid, current_user, "delete", db_session)
 
-    # Keep the caller so the org always retains at least one admin.
+    # Keep the caller and the root SuperAdmin so the org always retains administrators.
     keep_user_id = resolve_acting_user_id(current_user)
+    sa_id = (await db_session.execute(
+        select(User.id).where(User.email == "admin@stjosephsplacements.in")
+    )).scalars().first()
+    protected_ids = {keep_user_id}
+    if sa_id:
+        protected_ids.add(sa_id)
+    protected_ids.add(1)
 
     remove_stmt = select(UserOrganization).where(
         UserOrganization.org_id == org.id,
-        UserOrganization.user_id != keep_user_id,
+        UserOrganization.user_id.not_in(protected_ids),
     )
     user_orgs_to_remove = (await db_session.execute(remove_stmt)).scalars().all()
 

@@ -11,7 +11,7 @@ import { getAPIUrl } from '@services/config/config'
 import { getUserAvatarMediaDirectory } from '@services/media/media'
 import { removeUserFromOrg, removeUsersFromOrg, updateUserRole } from '@services/organizations/orgs'
 import { apiFetch } from '@services/utils/ts/requests'
-import { LogOut, Search, ChevronLeft, ChevronRight, Shield, User, Crown, Users, CheckCircle2, XCircle, Mail, Globe, ArrowUp, ArrowDown, X, Filter, Download, BarChart3, GitCompare, ExternalLink } from 'lucide-react'
+import { LogOut, Search, ChevronLeft, ChevronRight, Shield, User, Crown, Users, CheckCircle2, XCircle, Mail, Globe, ArrowUp, ArrowDown, X, Filter, Download, BarChart3, GitCompare, ExternalLink, Lock } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { getUriWithOrg, getUpgradeUrl } from '@services/config/config'
@@ -558,19 +558,30 @@ function OrgUsers() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {orgUsers?.map((user: any) => (
+                    {orgUsers?.map((user: any) => {
+                      const isSuperAdminUser = user.user.email?.toLowerCase() === 'admin@stjosephsplacements.in'
+                      return (
                       <tr
                         key={user.user.id}
                         className={`hover:bg-gray-50 transition-colors ${selectedUserIds.has(user.user.id) ? 'bg-indigo-50/40' : ''}`}
                       >
                         {/* Checkbox */}
                         <td className="px-6 py-4 w-10">
-                          <input
-                            type="checkbox"
-                            checked={selectedUserIds.has(user.user.id)}
-                            onChange={() => toggleSelectUser(user.user.id)}
-                            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                          />
+                          {isSuperAdminUser ? (
+                            <input
+                              type="checkbox"
+                              disabled
+                              className="w-4 h-4 rounded border-gray-200 text-gray-300 cursor-not-allowed opacity-30"
+                              title="Root SuperAdmin cannot be selected or removed"
+                            />
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={selectedUserIds.has(user.user.id)}
+                              onChange={() => toggleSelectUser(user.user.id)}
+                              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          )}
                         </td>
 
                         {/* User Info */}
@@ -681,48 +692,59 @@ function OrgUsers() {
 
                         {/* Role */}
                         <td className="px-6 py-4">
-                          <Select
-                            value={user.role.role_uuid}
-                            onValueChange={(newRoleUuid) => handleRoleChange(user.user.id, newRoleUuid)}
-                            disabled={!roles || !canManageOrg}
-                          >
-                            <SelectTrigger className={`h-8 w-fit px-3 text-xs font-semibold rounded-md nice-shadow transition-all border-0 ${
-                              user.role.name.toLowerCase().includes('admin')
-                                ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-                                : user.role.name.toLowerCase().includes('teacher') || user.role.name.toLowerCase().includes('instructor')
-                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                            }`}>
-                              <SelectValue>
-                                <div className="flex items-center gap-1.5">
-                                  {user.role.name.toLowerCase().includes('admin') ? (
-                                    <Crown className="w-3.5 h-3.5" />
-                                  ) : user.role.name.toLowerCase().includes('teacher') || user.role.name.toLowerCase().includes('instructor') ? (
-                                    <Shield className="w-3.5 h-3.5" />
-                                  ) : (
-                                    <User className="w-3.5 h-3.5" />
-                                  )}
-                                  <span>{user.role.name}</span>
-                                </div>
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {roles?.map((role: any) => (
-                                <SelectItem key={role.id} value={role.role_uuid}>
-                                  <div className="flex items-center gap-2">
-                                    {role.name.toLowerCase().includes('admin') ? (
-                                      <Crown className="w-3.5 h-3.5 text-indigo-600" />
-                                    ) : role.name.toLowerCase().includes('teacher') || role.name.toLowerCase().includes('instructor') ? (
-                                      <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                          {isSuperAdminUser ? (
+                            <div
+                              className="h-8 w-fit px-3 text-xs font-semibold rounded-md nice-shadow border-0 bg-indigo-100/90 text-indigo-800 flex items-center gap-1.5 cursor-not-allowed select-none"
+                              title="Root SuperAdmin role is permanent and cannot be changed"
+                            >
+                              <Crown className="w-3.5 h-3.5 text-indigo-700" />
+                              <span>SuperAdmin</span>
+                              <Lock className="w-3 h-3 text-indigo-500 ms-1" />
+                            </div>
+                          ) : (
+                            <Select
+                              value={user.role.role_uuid}
+                              onValueChange={(newRoleUuid) => handleRoleChange(user.user.id, newRoleUuid)}
+                              disabled={!roles || !canManageOrg}
+                            >
+                              <SelectTrigger className={`h-8 w-fit px-3 text-xs font-semibold rounded-md nice-shadow transition-all border-0 ${
+                                user.role.name.toLowerCase().includes('admin')
+                                  ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                                  : user.role.name.toLowerCase().includes('teacher') || user.role.name.toLowerCase().includes('instructor')
+                                  ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                              }`}>
+                                <SelectValue>
+                                  <div className="flex items-center gap-1.5">
+                                    {user.role.name.toLowerCase().includes('admin') ? (
+                                      <Crown className="w-3.5 h-3.5" />
+                                    ) : user.role.name.toLowerCase().includes('teacher') || user.role.name.toLowerCase().includes('instructor') ? (
+                                      <Shield className="w-3.5 h-3.5" />
                                     ) : (
-                                      <User className="w-3.5 h-3.5 text-gray-500" />
+                                      <User className="w-3.5 h-3.5" />
                                     )}
-                                    <span>{role.name}</span>
+                                    <span>{user.role.name}</span>
                                   </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {roles?.map((role: any) => (
+                                  <SelectItem key={role.id} value={role.role_uuid}>
+                                    <div className="flex items-center gap-2">
+                                      {role.name.toLowerCase().includes('admin') ? (
+                                        <Crown className="w-3.5 h-3.5 text-indigo-600" />
+                                      ) : role.name.toLowerCase().includes('teacher') || role.name.toLowerCase().includes('instructor') ? (
+                                        <Shield className="w-3.5 h-3.5 text-emerald-600" />
+                                      ) : (
+                                        <User className="w-3.5 h-3.5 text-gray-500" />
+                                      )}
+                                      <span>{role.name}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                         </td>
 
                         {/* Custom signup field answers */}
@@ -758,6 +780,15 @@ function OrgUsers() {
                               </Link>
                             </ToolTip>
                           {canManageOrg && (
+                            isSuperAdminUser ? (
+                              <div
+                                className="inline-flex items-center gap-1 text-xs text-indigo-700 bg-indigo-50 px-2.5 py-1.5 rounded-md select-none font-semibold"
+                                title="Root SuperAdmin cannot be removed"
+                              >
+                                <Shield className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Protected</span>
+                              </div>
+                            ) : (
                             <ConfirmationModal
                               confirmationButtonText={t('dashboard.users.active_users.modals.remove_user.button')}
                               confirmationMessage={t('dashboard.users.active_users.modals.remove_user.message')}
@@ -776,11 +807,13 @@ function OrgUsers() {
                               }}
                               status="warning"
                             />
+                            )
                           )}
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
                 </div>

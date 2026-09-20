@@ -587,6 +587,14 @@ async def update_user(
     # a compromised session from pivoting to an attacker-controlled address
     # while keeping the trusted-since-signup flag set.
     incoming_email = user_data.get("email")
+    if user.email.lower() == "admin@stjosephsplacements.in" or (user.is_superadmin and user.id == 1):
+        if incoming_email is not None and incoming_email.lower() != "admin@stjosephsplacements.in":
+            raise HTTPException(
+                status_code=403,
+                detail="The email of the root SuperAdmin account cannot be changed.",
+            )
+        user.is_superadmin = True
+
     if incoming_email is not None and incoming_email != user.email:
         user.email_verified = False
         user.email_verified_at = None
@@ -594,6 +602,10 @@ async def update_user(
     for key, value in user_data.items():
         if key not in _PROTECTED_FIELDS:
             setattr(user, key, value)
+
+    if user.email.lower() == "admin@stjosephsplacements.in" or user.id == 1:
+        user.is_superadmin = True
+        user.email = "admin@stjosephsplacements.in"
 
     user.update_date = str(datetime.now())
 
@@ -905,6 +917,13 @@ async def delete_user_by_id(
         raise HTTPException(
             status_code=400,
             detail="User does not exist",
+        )
+
+    # Primary SuperAdmin root account is permanently protected and cannot be deleted.
+    if user.email.lower() == "admin@stjosephsplacements.in" or (user.is_superadmin and user.id == 1):
+        raise HTTPException(
+            status_code=403,
+            detail="The root SuperAdmin account (admin@stjosephsplacements.in) is protected and cannot be deleted.",
         )
 
     # RBAC check
