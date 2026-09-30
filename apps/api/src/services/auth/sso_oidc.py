@@ -582,7 +582,11 @@ async def handle_sso_callback(
 
     config = get_learnhouse_config()
     scheme = "https" if config.hosting_config.ssl else "http"
-    redirect_url = f"{scheme}://{config.hosting_config.frontend_domain}/orgs/{org.slug}/home"
+    # Single-tenancy mode: redirect to root, multi-org mode: redirect to /orgs/{slug}/home
+    if config.hosting_config.tenancy == "single":
+        redirect_url = f"{scheme}://{config.hosting_config.frontend_domain}/"
+    else:
+        redirect_url = f"{scheme}://{config.hosting_config.frontend_domain}/orgs/{org.slug}/home"
 
     return SSOCallbackResult(
         user=user, org=org, access_token=issue.access_token, refresh_token=issue.refresh_token,

@@ -15,6 +15,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    ports:
+      - "127.0.0.1:30432:5432"
     networks:
       - lms-net
 
@@ -71,6 +73,7 @@ services:
       - "127.0.0.1:8200:80"
     volumes:
       - /data/production/lms/content_data:/app/api/content
+      - /data/production/lms/apps/api/ee:/app/api/ee:ro
       - /data/production/lms/apps/api/src/services/utils/ssrf_guard.py:/app/api/src/services/utils/ssrf_guard.py:ro
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     extra_hosts:
@@ -79,6 +82,7 @@ services:
       - "learn.stjosephsplacements.in:host-gateway"
       - "erp.stjosephsplacements.in:host-gateway"
       - "forms.stjosephsplacements.in:host-gateway"
+      - "sso.stjosephsplacements.in:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/v1/health"]
       interval: 15s

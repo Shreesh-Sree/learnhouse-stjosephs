@@ -72,7 +72,7 @@ FROM python:3.14.7-alpine3.24 AS runner
 # Apply the stable distribution's security updates at build time. The Python
 # image can be published before a newer package fix reaches Alpine's mirrors.
 RUN apk upgrade --no-cache \
-    && apk add --no-cache nginx curl netcat-openbsd ca-certificates bash nodejs npm libstdc++ \
+    && apk add --no-cache nginx curl netcat-openbsd ca-certificates bash nodejs npm libstdc++ ffmpeg \
     && npm install -g pm2 \
     && rm -rf /root/.npm \
     && mkdir -p /run/nginx
