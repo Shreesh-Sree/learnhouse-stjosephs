@@ -75,10 +75,17 @@ services:
       - /data/production/lms/content_data:/app/api/content
       - /data/production/lms/apps/api/ee:/app/api/ee:ro
       - /data/production/lms/apps/api/src/services/utils/ssrf_guard.py:/app/api/src/services/utils/ssrf_guard.py:ro
+      - /data/production/lms/apps/api/src/services/orgs/custom_domains.py:/app/api/src/services/orgs/custom_domains.py:ro
+      - /data/production/lms/apps/api/src/routers/ee.py:/app/api/src/routers/ee.py:ro
+      - /data/production/lms/apps/api/src/services/ai/tools/course_tools.py:/app/api/src/services/ai/tools/course_tools.py:ro
+      - /data/production/lms/apps/api/src/services/ai/courseplanning.py:/app/api/src/services/ai/courseplanning.py:ro
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "lms.stjosephsplacements.in:host-gateway"
+      - "learn.lms.stjosephsplacements.in:host-gateway"
+      - "admin.lms.stjosephsplacements.in:host-gateway"
+      - "stjosephs.lms.stjosephsplacements.in:host-gateway"
       - "learn.stjosephsplacements.in:host-gateway"
       - "erp.stjosephsplacements.in:host-gateway"
       - "forms.stjosephsplacements.in:host-gateway"

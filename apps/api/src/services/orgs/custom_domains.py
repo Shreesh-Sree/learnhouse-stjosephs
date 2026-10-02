@@ -169,6 +169,21 @@ async def verify_domain_dns(domain: CustomDomain, db_session: AsyncSession, org_
         await db_session.commit()
         return True, "Verified automatically (subdomain of your agency domain)"
 
+    # Check Cloudflare Custom Hostname status directly
+    try:
+        from ee.domain_manager import ensure_custom_hostname
+        cf_res = await ensure_custom_hostname(domain.domain)
+        if cf_res.get("status") == "active" and cf_res.get("ssl_status") == "active":
+            domain.status = "verified"
+            domain.verified_at = str(datetime.now())
+            domain.last_check_at = str(datetime.now())
+            domain.check_error = None
+            db_session.add(domain)
+            await db_session.commit()
+            return True, "Domain verified successfully via Cloudflare edge SSL"
+    except Exception as e:
+        logger.debug(f"Cloudflare verification check: {e}")
+
     try:
         import dns.resolver
 
@@ -338,6 +353,19 @@ async def add_custom_domain(
     db_session.add(custom_domain)
     await db_session.commit()
     await db_session.refresh(custom_domain)
+
+    # Automatically provision custom domain in Cloudflare
+    try:
+        from ee.domain_manager import auto_provision_custom_domain
+        cf_res = await auto_provision_custom_domain(domain, org_id, db_session)
+        if cf_res.get("status") == "active" and cf_res.get("ssl_status") == "active":
+            custom_domain.status = "verified"
+            custom_domain.verified_at = now
+            db_session.add(custom_domain)
+            await db_session.commit()
+            await db_session.refresh(custom_domain)
+    except Exception as e:
+        logger.error(f"Cloudflare auto-provision for {domain} error: {e}")
 
     return CustomDomainRead(**custom_domain.model_dump())
 
@@ -527,6 +555,13 @@ async def delete_custom_domain(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Custom domain not found",
         )
+
+    # Delete from Cloudflare
+    try:
+        from ee.domain_manager import delete_custom_hostname
+        await delete_custom_hostname(domain.domain)
+    except Exception as e:
+        logger.error(f"Cloudflare delete for {domain.domain} error: {e}")
 
     # Delete the domain
     await db_session.delete(domain)

@@ -243,6 +243,11 @@ export default async function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL(`${pathname.toLowerCase()}${search}`, req.url), 308)
   }
 
+  const hostNoPort = (fullhost || '').split(':')[0]
+  if (hostNoPort === 'admin.lms.stjosephsplacements.in') {
+    return NextResponse.redirect(new URL(`${pathname}${search}`, 'https://admin.stjosephsplacements.in'))
+  }
+
   // -------------------------------------------------------------------------
   // 1. Admin subdomain (multi only) → rewrite to /admin route group.
   //    Idempotent: if the path already starts with /admin (e.g. internal nav
@@ -259,11 +264,14 @@ export default async function proxy(req: NextRequest) {
   }
 
   // -------------------------------------------------------------------------
-  // 1b. Admin path — direct /admin access works in any tenancy mode.
-  //     In single mode this is the only way to reach the admin panel; in
-  //     multi mode it's an alternative to the admin.{domain} subdomain.
+  // 1b. Admin path — on multi-tenancy, superadmin routes must only be accessed
+  //     via admin.stjosephsplacements.in. Direct /admin slugs on any other domain
+  //     (e.g. lms.stjosephsplacements.in/admin/login) redirect to the admin portal.
   // -------------------------------------------------------------------------
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    if (instance.tenancy === 'multi') {
+      return NextResponse.redirect(new URL(`${pathname}${search}`, 'https://admin.stjosephsplacements.in'))
+    }
     const response = NextResponse.rewrite(new URL(`${pathname}${search}`, req.url))
     setInstanceCookies(response, instance)
     return response
@@ -336,13 +344,17 @@ export default async function proxy(req: NextRequest) {
   if (authPaths.includes(pathname)) {
     const hasSession = !!req.cookies.get('LH_session')?.value
 
-    // A logged-in user has no business on /login — bounce them to the portal (in single mode) or hub
+    const resolved = await resolveTenant(req, instance)
+    const onOrgHost =
+      instance.tenancy === 'single'
+      || resolved.source === 'subdomain'
+      || resolved.source === 'custom-domain'
+
+    // A logged-in user has no business on /login — bounce them to the dashboard (on org host) or hub (apex)
     if (pathname === '/login' && hasSession) {
-      const dest = instance.tenancy === 'single' ? '/' : '/home'
+      const dest = onOrgHost ? '/dash' : '/home'
       return NextResponse.redirect(new URL(dest, req.url))
     }
-
-    const resolved = await resolveTenant(req, instance)
 
     // `/signup` is NOT only a signup page: for a signed-in user on an org host
     // it is the JOIN screen (the "Join this organization" banner and every

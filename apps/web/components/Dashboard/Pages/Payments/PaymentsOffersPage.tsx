@@ -113,9 +113,13 @@ function PaymentsOffersPage() {
           />
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {offers.data.map((offer: any) => (
-            <div key={offer.id} className="bg-white p-4 rounded-lg nice-shadow flex flex-col h-full">
+        {(() => {
+          const offersList = Array.isArray(offers?.data) ? offers.data : (Array.isArray(offers) ? offers : []);
+          return (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {offersList.map((offer: any) => (
+                  <div key={offer.id} className="bg-white p-4 rounded-lg nice-shadow flex flex-col h-full">
               {editingOfferId === String(offer.id) ? (
                 <EditOfferForm
                   offer={offer}
@@ -217,12 +221,15 @@ function PaymentsOffersPage() {
           ))}
         </div>
 
-        {offers.data.length === 0 && (
-          <div className="flex mx-auto space-x-2 font-semibold mt-3 text-gray-600 items-center">
-            <Info size={20} />
-            <p>No offers available. Create a new offer to get started.</p>
-          </div>
-        )}
+              {offersList.length === 0 && (
+                <div className="flex mx-auto space-x-2 font-semibold mt-3 text-gray-600 items-center">
+                  <Info size={20} />
+                  <p>No offers available. Create a new offer to get started.</p>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         <div className="flex justify-center items-center py-10">
           <button

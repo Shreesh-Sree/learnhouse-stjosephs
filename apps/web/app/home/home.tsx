@@ -62,18 +62,43 @@ function HomeClient() {
     }
   }, [isLoading, isAuthenticated, router])
 
+  const isSuperadmin = session?.data?.user?.is_superadmin === true || session?.data?.user?.email?.toLowerCase() === 'admin@stjosephsplacements.in'
+
   // A brand-new (org-less) user has no orgs yet — send them straight to create
   // their first org rather than a confusing empty hub. In single tenancy, user
   // is auto-scoped to the default org so send them straight to portal.
+  // For non-superadmin users (org admins / members), take them straight to their
+  // organization dashboard rather than the apex hub.
   useEffect(() => {
     if (isAuthenticated && Array.isArray(orgs)) {
       if (getTenancy() === 'single') {
         router.replace('/')
       } else if (orgs.length === 0) {
         router.replace('/new')
+      } else if (!isSuperadmin) {
+        const targetOrg = orgs[0]
+        if (targetOrg?.slug) {
+          const dashUrl = getUriWithOrg(targetOrg.slug, '/dash')
+          if (dashUrl.startsWith('http')) {
+            window.location.href = dashUrl
+          } else {
+            router.replace(dashUrl)
+          }
+        }
       }
     }
-  }, [isAuthenticated, orgs, router])
+  }, [isAuthenticated, orgs, isSuperadmin, router])
+
+  if (isAuthenticated && !isSuperadmin) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-gray-500 font-medium">Loading dashboard...</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-[100] bg-white overflow-y-auto">

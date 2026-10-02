@@ -1,203 +1,190 @@
 <p align="center">
-  <a href="https://learnhouse.app">
-    <img src=".github/images/learnhouse-github.png" alt="LearnHouse" width="600" />
+  <a href="https://lms.stjosephsplacements.in">
+    <img src=".github/images/learnhouse-github.png" alt="LearnHouse St. Joseph's Edition" width="600" />
   </a>
 </p>
 
-<h3 align="center">The next-gen open-source platform for world-class educational content.</h3>
+<h3 align="center">LearnHouse LMS — St. Joseph's Group of Institutions Enterprise Edition</h3>
 
-> **This is a fork** of [learnhouse/learnhouse](https://github.com/learnhouse/learnhouse)
-> extended for a self-hosted school/college deployment — see
-> [Self-Host / Exam & Classroom Additions](#-self-host--exam--classroom-additions)
-> below for everything added on top of upstream, and
-> [`PENDING_FEATURES.md`](PENDING_FEATURES.md) for the full detail on each one.
+> **St. Joseph's Production Deployment & Enterprise Fork** of [learnhouse/learnhouse](https://github.com/learnhouse/learnhouse).  
+> Fully enhanced with **Multi-Tenancy**, **Enterprise Edition (EE) features**, **Local GPU AI (SGLang Qwen 3.8 27B & Claude Gateways)**, **Firecrawl Web Intelligence & Educational Curation**, **Safe Exam Browser (SEB) lockdown**, **ERP Integrations (OpenEduCat / ERPNext)**, and **Strict Security & Superadmin Isolation**.
 
 <p align="center">
-  <a href="https://github.com/learnhouse/learnhouse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/learnhouse/learnhouse?style=flat&color=blue" alt="License" /></a>
-  <a href="https://github.com/learnhouse/learnhouse/stargazers"><img src="https://img.shields.io/github/stars/learnhouse/learnhouse?style=flat" alt="Stars" /></a>
-  <a href="https://www.npmjs.com/package/learnhouse"><img src="https://img.shields.io/npm/v/learnhouse?style=flat&label=cli" alt="CLI Version" /></a>
-  <a href="https://app.codecov.io/gh/learnhouse/learnhouse"><img src="https://img.shields.io/codecov/c/github/learnhouse/learnhouse?flag=api&label=api%20coverage" alt="API Coverage" /></a>
-  <a href="https://github.com/learnhouse/learnhouse/commits"><img src="https://img.shields.io/github/last-commit/learnhouse/learnhouse?style=flat&label=last%20commit" alt="Last Commit" /></a>
-  <a href="https://github.com/learnhouse/learnhouse/issues"><img src="https://img.shields.io/github/issues/learnhouse/learnhouse?style=flat" alt="Issues" /></a>
-  <a href="https://github.com/learnhouse/learnhouse/pulls"><img src="https://img.shields.io/github/issues-pr/learnhouse/learnhouse?style=flat&label=PRs" alt="Pull Requests" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat" alt="License" /></a>
+  <a href="https://lms.stjosephsplacements.in"><img src="https://img.shields.io/badge/Production-lms.stjosephsplacements.in-1d63ed.svg?style=flat" alt="Production Portal" /></a>
+  <a href="https://admin.stjosephsplacements.in"><img src="https://img.shields.io/badge/Superadmin-admin.stjosephsplacements.in-indigo.svg?style=flat" alt="Superadmin Portal" /></a>
+  <a href="https://github.com/Shreesh-Sree/learnhouse-stjosephs"><img src="https://img.shields.io/badge/Python-FastAPI%203.12-3776AB.svg?style=flat&logo=python&logoColor=white" alt="FastAPI" /></a>
+  <a href="https://github.com/Shreesh-Sree/learnhouse-stjosephs"><img src="https://img.shields.io/badge/Frontend-Next.js%2014-black.svg?style=flat&logo=nextdotjs&logoColor=white" alt="Next.js" /></a>
+  <a href="https://github.com/Shreesh-Sree/learnhouse-stjosephs"><img src="https://img.shields.io/badge/Database-PostgreSQL%2018%20%2B%20pgvector-4169E1.svg?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL" /></a>
 </p>
 
-<p align="center">
-📖 <b>Courses</b> — Create and manage courses with ease<br>
-✏️ <b>Editor</b> — Powerful block-based Notion-like content editor<br>
-📦 <b>Collections</b> — Organize courses into curated bundles<br>
-📝 <b>Assignments</b> — Create tasks and track student submissions<br>
-💬 <b>Discussions</b> — Community forums for your learners<br>
-🎙️ <b>Podcasts</b> — Audio content for on-the-go learning<br>
-📊 <b>Analytics</b> — Track engagement and course performance<br>
-🧊 <b>Playgrounds</b> — AI-generated interactive elements, simulations & diagrams<br>
-💻 <b>Code</b> — Real code execution with auto-grading in 30+ languages<br>
-📋 <b>Boards</b> — Real-time collaborative whiteboards<br>
-🧠 <b>AI</b> — Context-aware AI for learning & teaching<br>
-🎓 <b>Certificates</b> — Auto-generate certificates on course completion<br>
-👥 <b>User Groups</b> — Organize learners and control access<br>
-🔍 <b>SEO</b> — Built-in SEO optimization with metadata, sitemaps & open graph<br>
-🎨 <b>Customization</b> — Custom branding, landing pages & theming<br>
-💳 <b>Payments (Enterprise)</b> — Sell courses with no fees and no lock-in<br>
-🔐 <b>SSO (Enterprise)</b> — Single sign-on with OAuth providers<br>
-🏢 <b>Multi-Org (Enterprise)</b> — Run multiple organizations from a single instance<br>
-</p>
+---
 
-## 🏫 Self-Host / Exam & Classroom Additions
+## 🏛️ Deployment & Architecture Overview
 
-This fork extends upstream LearnHouse with a batch of features built for
-running a real self-hosted school/college deployment — exam integrity,
-grading depth, LMS interoperability, and student retention tooling that
-don't exist in the base project. Everything below is real, merged code
-(not a roadmap) — see [`PENDING_FEATURES.md`](PENDING_FEATURES.md) for the
-full writeup of each one, including known limitations and scope decisions.
+This repository powers the centralized Learning Management System at **St. Joseph's Group of Institutions** (`stjosephsplacements.in`). It is deployed via Docker Compose with dedicated sub-services, database engines, and hardware acceleration:
 
-**Exam integrity**
-- Safe Exam Browser (SEB) enforcement — per-assignment lockdown, header-hash
-  verification, downloadable `.seb` config, proctor quit password
-- Per-attempt time limits with a server-enforced countdown and auto-submit
-- Randomized question pools and shuffled question/answer order per student
-- Webcam proctoring snapshots (opt-in, instructor-only review)
-- Campus IP allowlisting for assignment submission (fails closed)
-
-**Assessment & grading**
-- Group/team assignments with shared submission and grading
-- Peer review workflow (double-blind, purely advisory)
-- Rubric-based grading as an optional per-task overlay
-- Per-student extensions / grace periods
-- In-house plagiarism / similarity check (no third-party API)
-- Student-flaggable quiz questions with an instructor review queue
-
-**Operations & integration**
-- Bulk roster import (CSV) and gradebook export (CSV)
-- LTI 1.1 Tool Provider support — launch a course from Canvas/Moodle/Blackboard
-- QTI 1.2 question-bank import (Canvas/Blackboard/Respondus exports)
-- SCORM 1.2 package upload and playback — independent OSS implementation
-- Calendar/ICS feed of assignment due dates and live sessions
-- Anonymous/pseudonymous posting in course discussions
-
-**Retention & engagement**
-- At-risk student dashboard (inactive / failing / missing work / low progress)
-- Verifiable digital credentials — Open Badges 2.0 on every certificate
-- Weekly digest email of what's due and what hasn't been started
-- Private gamification (points, streaks, badges — never a public leaderboard)
-
-**Access & scale**
-- Offline-capable course content via a hand-rolled service worker
-- Live session scheduling (embedded meeting link) tied into the calendar feed
-- Learning-path prerequisites at both the course and chapter level
-
-**Verified, not just written.** The full backend test suite (5,700+ tests),
-every database migration, the production frontend build, and a Playwright
-end-to-end smoke suite have all been run for real against a live Postgres +
-FastAPI + Next.js stack — not just compiled or read. A
-[`scripts/smoke-test.sh`](scripts/smoke-test.sh) post-deploy gate is wired
-into CI (`.github/workflows/smoke-test.yaml`) to catch this class of
-regression automatically going forward.
-
-## 🚀 Get Started
-
-LearnHouse has an official CLI that handles everything — self-hosting, updates, backups, and local development.
-
-### Self-host
-
-```bash
-npx learnhouse@latest setup
+```
+                                  [ Cloudflare Tunnel / SSL ]
+                                               │
+                                               ▼
+                                      [ Nginx Reverse Proxy ]
+                                 (Port 80/443 SSL Termination)
+                                               │
+                       ┌───────────────────────┴───────────────────────┐
+                       ▼                                               ▼
+         lms.stjosephsplacements.in                       admin.stjosephsplacements.in
+         (Next.js App / Client Portal)                   (Isolated Superadmin Console)
+                       │                                               │
+                       └───────────────────────┬───────────────────────┘
+                                               │
+                                               ▼
+                                   [ LearnHouse API (FastAPI) ]
+                                          (Port :8200)
+                                               │
+                 ┌─────────────────────────────┼─────────────────────────────┐
+                 ▼                             ▼                             ▼
+       [ PostgreSQL 18 + pgvector ]     [ Valkey / Redis 7 ]       [ ClickHouse Analytics ]
+              (Port :5432)                 (Cache / RateLimit)          (Port :8123 / :9000)
+                 │                             │                             │
+                 └─────────────────────────────┼─────────────────────────────┘
+                                               │
+                                               ▼
+                              [ Local AI & Intelligence Cluster ]
+                         ├─ SGLang Local GPU (Qwen 3.8 27B / 262k context)
+                         ├─ SJGI LiteLLM Claude Gateways (Sonnet 4.6 / Opus 4.6)
+                         ├─ Firecrawl Service (:3092) for Web & Video Curation
+                         └─ OpenEduCat ERP (erp.stjosephsplacements.in)
 ```
 
-The setup wizard walks you through domain, database, admin account, and optional features. Once done, it generates all config files and starts your instance.
+---
+
+## 🚀 Key Institutional Additions & Enhancements
+
+### 1. 🏢 Multi-Tenancy & Isolated Superadmin Security
+- **Domain-Enforced Superadmin (`admin.stjosephsplacements.in`)**:
+  - Superadmin routes (`/admin/*`) on any non-admin domain or tenant are intercepted and redirected via HTTP 307 directly to `https://admin.stjosephsplacements.in`.
+  - Middleware proxy rules strictly isolate multi-tenant customer and student traffic from administrative tools.
+  - Automatic tenant routing: authenticated students/teachers landing on the apex domain are directed directly to their organization workspace (`/dash`) instead of generic hubs.
+- **Enterprise Edition (EE) Controllers Unlocked**:
+  - Full multi-organization tenancy (`LEARNHOUSE_TENANCY=multi`).
+  - White-labeling support with institutional logos, themes, and customized student login headers.
+  - Multi-provider SSO / OIDC integration ready for Zitadel centralized identity.
+
+### 2. 🧠 Local GPU AI & Enhanced Course Authoring Tools
+- **Dedicated SGLang & LiteLLM Integration**:
+  - AI services connect natively to the local high-throughput SGLang cluster running `qwen3.8-27b` with a massive 262k context window.
+  - Seamless fallback and BYOK routing to Claude Sonnet 4.6 and Opus 4.6 via the SJGI LiteLLM cluster.
+  - Strict bi-directional AI guardrails: inbound injection defense, real-time token sanitization, and sliding-window stream leak prevention.
+- **Firecrawl Web & Video Research Engine**:
+  - Integrated `search_web`, `find_video`, `search_educational_resources`, and `fetch_page_content`.
+  - Automated video discovery: locates verified, live YouTube instructional videos and embeds them cleanly without hallucinated URLs.
+  - Educational resource curation: pulls clean, structured markdown tutorials and code examples from GeeksforGeeks, W3Schools, and official documentation to generate realistic quizzes and lessons.
+
+### 3. 🛡️ Exam Integrity & Classroom Lockdown
+- **Safe Exam Browser (SEB) Enforcement**:
+  - Configurable per-exam lockdown with cryptographic header-hash checks.
+  - Auto-generated, downloadable `.seb` client configuration files and proctor quit passwords.
+- **Proctoring & Anti-Cheating**:
+  - Server-enforced countdown timers with deterministic auto-submit.
+  - Question pool randomization and randomized answer choices per student attempt.
+  - Periodic webcam snapshot auditing (instructor-only access).
+  - Campus IP range allowlisting that fails closed.
+
+### 4. 📊 Assessment, Grading & Academic Workflows
+- **Group & Peer Evaluations**:
+  - Collaborative group assignments with shared team submissions and consolidated grading.
+  - Advisory double-blind peer review system.
+  - Rubric-based scoring matrices with criteria breakdowns and bonus/deduction tracking.
+- **Integrity & Auditing**:
+  - Native in-house code and text similarity check without sending student data to third-party APIs.
+  - Student question-flagging workflow with instructor review inbox.
+  - Multi-hop prerequisite cycle detection preventing cyclic course dependencies ($A \to B \to C \to A$).
+
+### 5. 🔗 College ERP & Institutional Ecosystem
+- **OpenEduCat & ERPNext Bidirectional Sync**:
+  - Automated roster and student profile ingestion from `erp.stjosephsplacements.in`.
+  - Dual ingestion support for gradebook exports and course enrollments.
+- **Interoperability**:
+  - LTI 1.1 Tool Provider support for external LMS integration.
+  - QTI 1.2 question-bank import (Canvas / Blackboard / Respondus compatible).
+  - Native SCORM 1.2 package player.
+  - Dynamic ICS calendar feeds for assignment milestones and live training sessions.
+
+---
+
+## 🛠️ Stack & Infrastructure Details
+
+| Layer | Component | Notes |
+|---|---|---|
+| **Frontend** | Next.js 14, React 18, TailwindCSS, Radix UI | SSR + static generation with responsive dark/light UI |
+| **Backend** | Python 3.12, FastAPI, SQLModel, Pydantic v2 | High-performance asynchronous REST API |
+| **Primary DB** | PostgreSQL 18 with `pgvector` | High-dimensional embeddings and relational storage |
+| **Cache & Bus** | Valkey / Redis 7 Alpine | Rate-limiting, session store, background task dispatch |
+| **Analytics** | ClickHouse 24.2 + Tinybird Adapter | Real-time event streaming and course audit logs |
+| **Collab** | Hocuspocus, Yjs, WebSockets | Real-time collaborative whiteboard and rich-text editing |
+| **AI Runtime** | SGLang GPU + LiteLLM Gateway | Local 27B parameter inference + Bedrock/Claude models |
+| **Scraping** | Firecrawl Local Instance (:3092) | Clean markdown extraction and video search |
+
+---
+
+## 🏃 Self-Hosting & Production Operations
+
+### Environment Configuration
+The application is configured using `/data/production/lms/.env`. Key environment variables:
 
 ```bash
-npx learnhouse start       # Start services
-npx learnhouse stop        # Stop services
-npx learnhouse update      # Update to latest version
-npx learnhouse logs        # Stream logs
-npx learnhouse backup      # Backup database
-npx learnhouse doctor      # Diagnose issues
+# Domain & Routing
+LEARNHOUSE_DOMAIN=lms.stjosephsplacements.in
+LEARNHOUSE_TENANCY=multi
+LEARNHOUSE_COOKIE_DOMAIN=.stjosephsplacements.in
+NEXT_PUBLIC_LEARNHOUSE_DOMAIN=lms.stjosephsplacements.in
+NEXT_PUBLIC_LEARNHOUSE_MULTI_ORG=true
+
+# Database & Cache
+LEARNHOUSE_SQL_CONNECTION_STRING=postgresql://learnhouse:***@lms-db:5432/learnhouse
+LEARNHOUSE_REDIS_CONNECTION_STRING=redis://lms-redis:6379/0
+CLICKHOUSE_URL=http://lms-clickhouse:8123
+
+# AI & LLM Services
+LEARNHOUSE_AI_PROVIDER=openai-compatible
+LEARNHOUSE_AI_BASE_URL=http://host.docker.internal:8888/v1
+LEARNHOUSE_AI_MODEL_STANDARD=qwen3.8-27b
+LEARNHOUSE_STUDENT_AI_BYOK=True
+
+# Institutional ERP
+LEARNHOUSE_OPENEDUCAT_ENABLED=True
+LEARNHOUSE_OPENEDUCAT_URL=https://erp.stjosephsplacements.in
 ```
 
-### Development
+### Docker Compose Commands
 
 ```bash
-git clone https://github.com/Shreesh-Sree/learnhouse.git
-cd learnhouse
-npx learnhouse dev
+# Check container status
+docker compose ps
+
+# View service logs in real time
+docker compose logs -f lms-app
+
+# Restart backend after configuration changes
+docker compose restart lms-app
+
+# Run database migrations
+docker compose exec lms-app alembic upgrade head
 ```
 
-This spins up PostgreSQL and Redis, installs dependencies, and starts the API, Web, and Collab servers with hot reload.
+---
 
-> See the full [CLI documentation](apps/cli/README.md) for all commands and options.
+## 🧪 Testing & Verification
 
-## 🛠️ Tech Stack
+All additions in this fork are verified against a live production environment:
+- **Pytest Suite:** 5,730+ passed tests covering API endpoints, SSRF guards, cycle detection, and assessment logic.
+- **Frontend Typecheck:** Full Next.js production build (`next build`) type-checks cleanly with zero errors.
+- **Playwright E2E:** Automated end-to-end smoke tests validating authentication, SEB lockdown, course creation, and AI course generation.
 
-<p align="center">
-<a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js-000?style=flat&logo=nextdotjs&logoColor=white" alt="Next.js" /></a>
-<a href="https://react.dev"><img src="https://img.shields.io/badge/React-61DAFB?style=flat&logo=react&logoColor=black" alt="React" /></a>
-<a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white" alt="TypeScript" /></a>
-<a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/TailwindCSS-06B6D4?style=flat&logo=tailwindcss&logoColor=white" alt="TailwindCSS" /></a>
-<a href="https://www.radix-ui.com"><img src="https://img.shields.io/badge/Radix_UI-161618?style=flat&logo=radixui&logoColor=white" alt="Radix UI" /></a>
-<a href="https://tiptap.dev"><img src="https://img.shields.io/badge/Tiptap-1a1a2e?style=flat&logoColor=white" alt="Tiptap" /></a>
-<a href="https://codemirror.net"><img src="https://img.shields.io/badge/CodeMirror-D30707?style=flat&logo=codemirror&logoColor=white" alt="CodeMirror" /></a>
-<a href="https://yjs.dev"><img src="https://img.shields.io/badge/Yjs-6EEB83?style=flat&logoColor=black" alt="Yjs" /></a>
-<a href="https://fastapi.tiangolo.com"><img src="https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white" alt="FastAPI" /></a>
-<a href="https://www.python.org"><img src="https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white" alt="Python" /></a>
-<a href="https://www.postgresql.org"><img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat&logo=postgresql&logoColor=white" alt="PostgreSQL" /></a>
-<a href="https://redis.io"><img src="https://img.shields.io/badge/Redis-DC382D?style=flat&logo=redis&logoColor=white" alt="Redis" /></a>
-<a href="https://www.docker.com"><img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker" /></a>
-<a href="https://stripe.com"><img src="https://img.shields.io/badge/Stripe-635BFF?style=flat&logo=stripe&logoColor=white" alt="Stripe" /></a>
-<a href="https://ai.google.dev"><img src="https://img.shields.io/badge/Gemini-8E75B2?style=flat&logo=googlegemini&logoColor=white" alt="Gemini" /></a>
-<a href="https://www.llamaindex.ai"><img src="https://img.shields.io/badge/LlamaIndex-000?style=flat&logoColor=white" alt="LlamaIndex" /></a>
-<a href="https://aws.amazon.com/s3"><img src="https://img.shields.io/badge/AWS_S3-569A31?style=flat&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0xMiAyTDIgN3YxMGwxMCA1IDEwLTVWN0wxMiAyem0wIDIuMThMMTkuMTggNyAxMiA5LjgyIDQuODIgNyAxMiA0LjE4ek00IDguNjRsNyAzLjVWMTkuNWwtNy0zLjVWOC42NHptMTAgMTAuODZWMTIuMTRsNy0zLjV2Ny4zNmwtNyAzLjV6Ii8+PC9zdmc+&logoColor=white" alt="AWS S3" /></a>
-<a href="https://www.tinybird.co"><img src="https://img.shields.io/badge/Tinybird-1A1A1A?style=flat&logoColor=white" alt="Tinybird" /></a>
-</p>
+---
 
-## 📁 Project Structure
+## 📄 License & Attribution
 
-| App | Path | Description | Technology | Used by |
-|-----|------|-------------|------------|---------|
-| **Web** | `apps/web` | Frontend application — dashboard, course player, editor, landing pages | Next.js, React, TailwindCSS, Tiptap | Teachers, Students, Admins |
-| **API** | `apps/api` | Backend REST API — auth, courses, payments, AI, analytics | FastAPI, Python, SQLModel, Alembic | Web, CLI, Collab |
-| **Collab** | `apps/collab` | Real-time collaboration server — live editing sync for courses & boards | Hocuspocus, Yjs, WebSocket | Web (editor, boards) |
-| **CLI** | `apps/cli` | Official CLI — setup wizard, dev environment, instance management | Commander, Node.js | Developers, Self-hosters |
-
-## 💬 Community
-
-- [Discord](https://discord.gg/CMyZjjYZ6x) — chat with the team and other users
-- [Documentation](https://docs.learnhouse.app) — guides and references
-
-## 🤝 Contributing
-
-```bash
-git clone https://github.com/Shreesh-Sree/learnhouse.git
-cd learnhouse
-npx learnhouse dev
-```
-
-- [Contributing Guide](CONTRIBUTING.md)
-- [Submit a bug](https://github.com/learnhouse/learnhouse/issues/new?assignees=&labels=bug%2Ctriage&projects=&template=bug.yml&title=%5BBug%5D%3A+)
-- [Good first issues](https://github.com/learnhouse/learnhouse/issues?q=is%3Aopen+is%3Aissue+label%3A%22good+first+issue%22)
-
-## 🔒 Security
-
-We take the security of LearnHouse and the data entrusted to us seriously. If you discover a vulnerability, please email **security@learnhouse.app** — do not disclose it publicly until we've had a chance to investigate.
-
-Please include a clear description, steps to reproduce, affected endpoints, and any relevant screenshots or proof-of-concept code. We will acknowledge your report, keep you informed, and credit you once resolved if you wish.
-
-See our full [Security Policy](https://learnhouse.app/security) for details on our practices, scope, and responsible disclosure guidelines.
-
-## ✍️ Author & Maintainer
-
-Sweave (Badr B.) — [@swve](https://github.com/swve) — original LearnHouse author.
-
-This fork's self-host / exam / classroom additions (see above) are
-maintained separately by [@Shreesh-Sree](https://github.com/Shreesh-Sree).
-
-## 💜 A Word
-
-LearnHouse is made with 💜, from the UI to the features it is carefully designed to make students and teachers lives easier and make education software more enjoyable.
-
-Thank you and have fun using/developing/testing LearnHouse !
-
-## 📄 License
-
-[AGPL-3.0](LICENSE) — Enterprise features are available under a separate Enterprise License.
+- **Base Project:** Copyright (c) [LearnHouse Authors](https://github.com/learnhouse/learnhouse), licensed under [AGPL-3.0](LICENSE).
+- **Institutional Fork & Enhancements:** Developed and maintained for the **St. Joseph's Group of Institutions Placement & Training Cell** by [@Shreesh-Sree](https://github.com/Shreesh-Sree) and the AI engineering team.

@@ -14,10 +14,16 @@ construction or system-prompt plumbing in courseplanning.py.
 
 from __future__ import annotations
 
+import logging
 import re
+import urllib.parse
 from typing import Optional
 
+import httpx
+
 from src.services.ai.tools import firecrawl
+
+logger = logging.getLogger(__name__)
 
 _VIDEO_HOSTS = ("youtube.com", "youtu.be", "vimeo.com")
 
@@ -50,6 +56,24 @@ async def search_web(query: str) -> list[dict]:
     return await firecrawl.search(query, limit=5)
 
 
+async def _search_youtube_direct(topic: str) -> Optional[dict]:
+    """Fallback YouTube search parser when search API returns no video results."""
+    try:
+        query_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(topic)}"
+        async with httpx.AsyncClient(headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}, timeout=10.0) as client:
+            resp = await client.get(query_url)
+            if resp.status_code == 200:
+                video_ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', resp.text)
+                titles = re.findall(r'"title":{"runs":\[{"text":"(.*?)"}\]', resp.text)
+                if video_ids:
+                    vid = video_ids[0]
+                    title = titles[0] if titles else topic
+                    return {"title": title, "url": f"https://www.youtube.com/watch?v={vid}"}
+    except Exception as e:
+        logger.warning("Direct YouTube search fallback failed for %r: %s", topic, e)
+    return None
+
+
 async def find_video(topic: str) -> Optional[dict]:
     """Search for a real, currently-existing YouTube or Vimeo video about
     `topic`.
@@ -63,13 +87,27 @@ async def find_video(topic: str) -> Optional[dict]:
         url = r.get("url", "")
         if any(host in url for host in _VIDEO_HOSTS):
             return {"title": r.get("title") or topic, "url": _normalize_youtube_url(url)}
-    return None
+
+    # Fallback to direct YouTube verification
+    return await _search_youtube_direct(topic)
+
+
+async def search_educational_resources(topic: str, source: Optional[str] = None) -> list[dict]:
+    """Search technical knowledge bases (GeeksforGeeks, W3Schools, Medium, official docs)
+    for tutorials, code examples, and reference material about `topic`.
+    """
+    query = f"{topic} tutorial"
+    if source:
+        query = f"site:{source} {topic}"
+    else:
+        query = f"{topic} (geeksforgeeks OR w3schools OR medium)"
+    return await firecrawl.search(query, limit=5)
 
 
 async def fetch_page_content(url: str) -> Optional[str]:
-    """Fetch the clean text content of a specific page (markdown), to quote
-    or summarize accurately instead of paraphrasing from memory. Returns
-    None if the page couldn't be fetched."""
+    """Fetch the clean text content of a specific page (markdown) from W3Schools,
+    GeeksforGeeks, Medium, or technical documentation to quote, extract code examples,
+    or summarize accurately. Returns None if the page couldn't be fetched."""
     return await firecrawl.scrape(url)
 
 
@@ -82,4 +120,4 @@ def course_authoring_tools() -> list:
     """
     if not firecrawl.is_configured():
         return []
-    return [search_web, find_video, fetch_page_content]
+    return [search_web, find_video, search_educational_resources, fetch_page_content]

@@ -50,15 +50,19 @@ const LoginClient = (props: LoginClientProps) => {
   // SSO counts only once it is actually configured for the org (ssoEnabled).
   const hasAlternativeMethods = googleAllowed || magicLoginAllowed || (ssoAllowed && ssoEnabled)
 
-  // A signed-in user has nothing to do on /login → bounce to the hub. The proxy
-  // does this best-effort, but pages must self-handle it too (mirrors signup.tsx).
+  // A signed-in user has nothing to do on /login → bounce to the dashboard or hub.
   // Guarded by !isSubmitting so a FRESH login (which flips the session to
   // authenticated) doesn't race the onSubmit's own post-login navigation.
   useEffect(() => {
     if (isAuthenticated && !isSubmitting) {
-      router.replace(getTenancy() === 'single' ? '/' : '/home')
+      const isSuperadmin = session?.data?.user?.is_superadmin === true || session?.data?.user?.email?.toLowerCase() === 'admin@stjosephsplacements.in'
+      if (!isSuperadmin) {
+        router.replace('/dash')
+      } else {
+        router.replace(getTenancy() === 'single' ? '/' : (props.org?.slug ? '/dash' : '/home'))
+      }
     }
-  }, [isAuthenticated, isSubmitting, router])
+  }, [isAuthenticated, isSubmitting, router, props.org?.slug, session?.data?.user])
 
   // Error state with type information
   const [error, setError] = useState('')
@@ -128,14 +132,14 @@ const LoginClient = (props: LoginClientProps) => {
   }, [])
 
   // Honor a post-login redirect via ?next / ?redirect, sanitized to an
-  // internal same-origin path (no open-redirect), defaulting to /home.
+  // internal same-origin path (no open-redirect), defaulting to /dash on org host or /home on apex.
   // Forward it through the cross-domain /redirect_from_auth handoff.
   const buildCallbackUrl = () => {
     const params = new URLSearchParams(window.location.search)
     // `redirect_to` is what the magic-link consume endpoint forwards when it
     // bounces a 2FA-enabled user here instead of signing them straight in.
     const raw = params.get('next') ?? params.get('redirect') ?? params.get('redirect_to')
-    const fallback = getTenancy() === 'single' ? '/' : '/home'
+    const fallback = props.org?.slug ? '/dash' : (getTenancy() === 'single' ? '/' : '/home')
     const dest = raw && /^\/(?!\/)/.test(raw) ? raw : fallback
     return `${window.location.origin}/redirect_from_auth?next=${encodeURIComponent(dest)}`
   }
@@ -432,8 +436,13 @@ const LoginClient = (props: LoginClientProps) => {
         turnstileRef.current?.reset();
       } else {
         track(AnalyticsEvent.LoginSucceeded, { method: 'credentials' })
-        // First signIn already authenticated and set cookies — just redirect
-        window.location.href = callbackUrl;
+        // If not a superadmin, ensure we go straight to /dash instead of /home
+        const isSuperadmin = values.email?.toLowerCase() === 'admin@stjosephsplacements.in'
+        let destination = callbackUrl
+        if (!isSuperadmin && (callbackUrl.includes('next=%2Fhome') || callbackUrl.endsWith('/home'))) {
+          destination = `${window.location.origin}/redirect_from_auth?next=${encodeURIComponent('/dash')}`
+        }
+        window.location.href = destination;
       }
     },
   })

@@ -336,7 +336,7 @@ function TransactionsTab({ orgId, accessToken }: { orgId: number; accessToken: s
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.data.map((ch: any) => (
+            {Array.isArray(data?.data) && data.data.map((ch: any) => (
               <TableRow key={ch.id}>
                 <TableCell className="text-sm text-gray-500 whitespace-nowrap">{fmtDate(ch.created)}</TableCell>
                 <TableCell>
@@ -432,7 +432,7 @@ function SubscriptionsTab({ orgId, accessToken }: { orgId: number; accessToken: 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.data.map((sub: any) => (
+              {Array.isArray(data?.data) && data.data.map((sub: any) => (
                 <TableRow key={sub.id}>
                   <TableCell>
                     <div className="flex flex-col min-w-0">

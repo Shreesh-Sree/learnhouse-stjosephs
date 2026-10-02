@@ -195,13 +195,11 @@ def _tool_usage_guidance(tools_available: bool) -> str:
         return ""
     return """
 
-WEB SEARCH TOOLS:
-You have search_web, find_video, and fetch_page_content tools. Use find_video when a
-chapter or activity would clearly benefit from a real video (e.g. a topic that's easier
-to show than describe) — pass it a specific topic, and if it returns a result, mention
-that video in the relevant activity's description so the content-generation step embeds
-it. If find_video returns nothing relevant, do not mention a video for that activity —
-never invent a YouTube URL or video title yourself."""
+WEB SEARCH & CURATION TOOLS:
+You have search_web, find_video, search_educational_resources, and fetch_page_content tools:
+1. find_video: Use when a topic, concept, or practical lab benefits from real video instruction (e.g. YouTube). If it returns a verified video URL, note that video and include "blockEmbed" in the activity. Never fabricate or hallucinate a YouTube URL.
+2. search_educational_resources: Use to find accurate, authoritative reference material and tutorials from GeeksforGeeks (geeksforgeeks.org), W3Schools (w3schools.com), Medium, or official technical documentation.
+3. fetch_page_content: Use to scrape and read the actual clean markdown from an educational article or tutorial (e.g. W3Schools or GFG code examples) to curate realistic quizzes, code snippets, and explanations rather than guessing from memory."""
 
 
 def build_course_planning_system_prompt(language: str = "en", tools_available: bool = False) -> str:
